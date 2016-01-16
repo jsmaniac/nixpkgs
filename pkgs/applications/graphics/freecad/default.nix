@@ -1,6 +1,9 @@
 { stdenv, fetchurl, cmake, coin3d, xercesc, ode, eigen, qt4, opencascade, gts
 , boost, zlib, python, swig, gfortran, soqt, libf2c, makeWrapper
-, matplotlib, pycollada, pyside, pysideTools, pysideShiboken, pivy, python27Packages }:
+, matplotlib, pycollada, pyside, pysideTools, pysideShiboken
+, pivy, python27Packages
+, spacenavSupport ? true, libspnav
+ }:
 
 let
   pythonPackages = python27Packages;
@@ -15,8 +18,10 @@ in stdenv.mkDerivation rec {
 
   buildInputs = with pythonPackages; [ cmake coin3d xercesc ode eigen qt4 opencascade gts boost
     zlib python swig gfortran soqt libf2c makeWrapper matplotlib
-    pycollada pyside pysideShiboken pysideTools pivy pyyaml
-  ];
+    pycollada pyside pysideShiboken pysideTools
+    pivy pyyaml
+  ]
+  ++ stdenv.lib.optional spacenavSupport libspnav;
 
   enableParallelBuilding = true;
 
