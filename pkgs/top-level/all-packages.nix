@@ -5899,6 +5899,8 @@ let
       pythonPackages = python3Packages;
   };
 
+  nix-xcode = callPackage ../development/tools/nix-xcode { };
+
   node_webkit = node_webkit_0_9;
 
   nwjs_0_12 = callPackage ../development/tools/node-webkit/nw12.nix {
