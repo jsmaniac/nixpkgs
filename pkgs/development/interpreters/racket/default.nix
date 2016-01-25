@@ -57,6 +57,7 @@ stdenv.mkDerivation rec {
   enableParallelBuilding = false;
 
   postInstall = ''
+    "$out/bin/raco" setup
     for p in $(ls $out/bin/) ; do
       wrapProgram $out/bin/$p --set LD_LIBRARY_PATH "${LD_LIBRARY_PATH}";
     done
