@@ -5168,6 +5168,7 @@ let
   pyrex096 = callPackage ../development/interpreters/pyrex/0.9.6.nix { };
 
   racket = callPackage ../development/interpreters/racket { };
+  racket-nightly = callPackage ../development/interpreters/racket/racket-nightly.nix { };
 
   rakudo = callPackage ../development/interpreters/rakudo { };
 
