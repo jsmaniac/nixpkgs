@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, pkgconfig, e19 }:
+{ stdenv, fetchurl, pkgconfig, e19, makeWrapper }:
 stdenv.mkDerivation rec {
   name = "terminology-${version}";
   version = "0.9.1";
@@ -6,7 +6,10 @@ stdenv.mkDerivation rec {
     url = "http://download.enlightenment.org/rel/apps/terminology/${name}.tar.xz";
     sha256 = "1kwv9vkhngdm5v38q93xpcykghnyawhjjcb5bgy0p89gpbk7mvpc";
   };
-  buildInputs = [ pkgconfig e19.efl e19.elementary ];
+  buildInputs = [ pkgconfig e19.efl e19.elementary makeWrapper ];
+  postInstall = ''
+    wrapProgram $out//bin/terminology --run "${e19.efl}/bin/ethumbd -t=-1&" --suffix PATH : ${e19.efl}/bin
+  '';
   meta = {
     description = "The best terminal emulator written with the EFL";
     homepage = http://enlightenment.org/;

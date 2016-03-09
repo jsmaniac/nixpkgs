@@ -5562,6 +5562,7 @@ let
   pyrex096 = callPackage ../development/interpreters/pyrex/0.9.6.nix { };
 
   racket = callPackage ../development/interpreters/racket { };
+  racket-nightly = callPackage ../development/interpreters/racket/nightly.nix { };
 
   rakudo = callPackage ../development/interpreters/rakudo { };
 
@@ -15082,6 +15083,7 @@ let
   clearlooks-phenix = callPackage ../misc/themes/gtk3/clearlooks-phenix { };
 
   enlightenment = callPackage ../desktops/enlightenment { };
+  e16keyedit = callPackage ../desktops/enlightenment/e16keyedit.nix { };
 
   e19 = recurseIntoAttrs (callPackage ../desktops/e19 {
     callPackage = newScope pkgs.e19;
