@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, pkgconfig, e19, makeWrapper }:
+{ stdenv, fetchurl, pkgconfig, e19, xineLib, zlib, libspectre, gstreamer, gst_plugins_base, gst_ffmpeg, gst_plugins_good, poppler, librsvg, libraw }:
 stdenv.mkDerivation rec {
   name = "terminology-${version}";
   version = "0.8.0";
@@ -6,10 +6,7 @@ stdenv.mkDerivation rec {
     url = "http://download.enlightenment.org/rel/apps/terminology/${name}.tar.gz";
     sha256 = "7a10d44b023cf6134c2483304e4ad33bea6df0f11266aec482f54fa67a3ce628";
   };
-  buildInputs = [ pkgconfig e19.efl e19.elementary makeWrapper ];
-  postInstall = ''
-    wrapProgram $out//bin/terminology --run "${e19.efl}/bin/ethumbd -t=-1&" --suffix PATH : ${e19.efl}/bin
-  '';
+  buildInputs = [ pkgconfig e19.efl e19.elementary e19.evas e19.emotion xineLib zlib libspectre gstreamer gst_plugins_base gst_ffmpeg gst_plugins_good poppler librsvg libraw ];
   meta = {
     description = "The best terminal emulator written with the EFL";
     homepage = http://enlightenment.org/;
