@@ -5950,6 +5950,7 @@ in
   pyrex096 = callPackage ../development/interpreters/pyrex/0.9.6.nix { };
 
   racket = callPackage ../development/interpreters/racket { };
+  racket-nightly = callPackage ../development/interpreters/racket/nightly.nix { };
 
   rakudo = callPackage ../development/interpreters/rakudo {
     inherit (darwin.apple_sdk.frameworks) CoreServices ApplicationServices;
@@ -16213,6 +16214,7 @@ in
   enlightenment = recurseIntoAttrs (callPackage ../desktops/enlightenment {
     callPackage = newScope pkgs.enlightenment;
   });
+  e16keyedit = callPackage ../desktops/enlightenment/e16keyedit.nix { };
 
   gnome2 = callPackage ../desktops/gnome-2 {
     callPackage = pkgs.newScope pkgs.gnome2;
