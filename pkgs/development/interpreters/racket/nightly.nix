@@ -35,7 +35,7 @@ stdenv.mkDerivation rec {
 
   src = fetchurl {
     url = "http://plt.eecs.northwestern.edu/snapshots/current/installers/racket-test-${version}-src-pre-built.tgz";
-    sha256 = "1kj58rlki4ixpygpn1ndxvj0v88308h3nm7kvh89ll1vlbccn1kd";
+    sha256 = "0vm1xh3x8w2vky1yz7nlzrn1pxcnym4lxbyp981ysgj2fbd3wnj4";
   };
 
   FONTCONFIG_FILE = fontsConf;
