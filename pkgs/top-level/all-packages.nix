@@ -5951,6 +5951,7 @@ in
 
   racket = callPackage ../development/interpreters/racket { };
   racket-nightly = callPackage ../development/interpreters/racket/nightly.nix { };
+  racket-minimal = callPackage ../development/interpreters/racket/minimal.nix { };
 
   rakudo = callPackage ../development/interpreters/rakudo {
     inherit (darwin.apple_sdk.frameworks) CoreServices ApplicationServices;
