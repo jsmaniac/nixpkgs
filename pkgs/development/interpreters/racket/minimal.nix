@@ -31,11 +31,11 @@ in
 
 stdenv.mkDerivation rec {
   name = "racket-${version}";
-  version = "6.6.0.5";
+  version = "6.7.0.1";
 
   src = fetchurl {
     url = "https://plt.eecs.northwestern.edu/snapshots/current/installers/min-racket-${version}-src-pre-built.tgz";
-    sha256 = "0dl4ggsi1rwlwn69ma4azsix258q24hm6d9l9bhn99x5vfnfzbzz";
+    sha256 = "1vdd9ypdb9c87lpizfrfjnjfmcg63fazvz6flpdha8b7i5q2q9ix";
   };
 
   FONTCONFIG_FILE = fontsConf;
