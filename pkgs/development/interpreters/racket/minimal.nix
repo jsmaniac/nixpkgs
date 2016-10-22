@@ -35,7 +35,7 @@ stdenv.mkDerivation rec {
 
   src = fetchurl {
     url = "https://plt.eecs.northwestern.edu/snapshots/current/installers/min-racket-${version}-src-pre-built.tgz";
-    sha256 = "1vdd9ypdb9c87lpizfrfjnjfmcg63fazvz6flpdha8b7i5q2q9ix";
+    sha256 = "04q9166gms6q4mjqamfwqbsfrb2l5gz7ymzj0g1czmjrab0l49lg";
   };
 
   FONTCONFIG_FILE = fontsConf;
