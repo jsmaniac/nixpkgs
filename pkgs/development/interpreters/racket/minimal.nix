@@ -2,7 +2,7 @@
 , cairo, coreutils, fontconfig, freefont_ttf
 , glib, gmp, gtk2, libffi, libjpeg, libpng
 , libtool, mpfr, openssl, pango, poppler
-, readline, sqlite
+, readline, sqlite, libedit
 }:
 
 let
@@ -25,6 +25,7 @@ let
     poppler
     readline
     sqlite
+    libedit
   ];
 
 in
@@ -35,7 +36,7 @@ stdenv.mkDerivation rec {
 
   src = fetchurl {
     url = "https://plt.eecs.northwestern.edu/snapshots/current/installers/min-racket-${version}-src-pre-built.tgz";
-    sha256 = "04q9166gms6q4mjqamfwqbsfrb2l5gz7ymzj0g1czmjrab0l49lg";
+    sha256 = "24q9166gms6q4mjqamfwqbsfrb2l5gz7ymzj0g1czmjrab0l49lg";
   };
 
   FONTCONFIG_FILE = fontsConf;
