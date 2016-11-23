@@ -2,7 +2,7 @@
 
 let version = "0.16.8.15"; in
   stdenv.mkDerivation {
-    name = "enlightenment-${version}";
+    name = "e16-${version}";
 
     src = fetchurl {
       url = "mirror://sourceforge/enlightenment/e16-${version}.tar.gz";
