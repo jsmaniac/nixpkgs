@@ -32,11 +32,11 @@ in
 
 stdenv.mkDerivation rec {
   name = "racket-${version}";
-  version = "6.7.0.3";
+  version = "6.7.0.4";
 
   src = fetchurl {
     url = "https://plt.eecs.northwestern.edu/snapshots/current/installers/min-racket-${version}-src-pre-built.tgz";
-    sha256 = "1a4kbfqizy70aqri2p1vyxvvrgsy3j9w28pzfnixycx2l4nqzqff";
+    sha256 = "1wf1grv8zh1w2vp2s5f6s8lmmbzyg5rr1cg8dcfhndn1bw2s02zi";
   };
 
   FONTCONFIG_FILE = fontsConf;
@@ -46,6 +46,8 @@ stdenv.mkDerivation rec {
   buildInputs = [ fontconfig libffi libtool makeWrapper sqlite ];
 
   preConfigure = ''
+    find | grep module.c
+    sed -i -e 's/if (\*all_simple_bindings \&\& env->genv->module->rn_stx) {/if (*all_simple_bindings \&\& env->genv->module->rn_stx \&\& rec[drec].comp) {/' ./src/racket/src/module.c
     substituteInPlace src/configure --replace /usr/bin/uname ${coreutils}/bin/uname
     mkdir src/build
     cd src/build
