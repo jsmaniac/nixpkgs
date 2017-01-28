@@ -2,7 +2,7 @@
 , cairo, coreutils, fontconfig, freefont_ttf
 , glib, gmp, gtk2, libffi, libjpeg, libpng
 , libtool, mpfr, openssl, pango, poppler
-, readline, sqlite, libedit
+, readline, sqlite, libedit, mesa_glu
 }:
 
 let
@@ -26,17 +26,18 @@ let
     readline
     sqlite
     libedit
+    mesa_glu
   ];
 
 in
 
 stdenv.mkDerivation rec {
   name = "racket-${version}";
-  version = "6.7.0.4";
+  version = "6.8.0.1";
 
   src = fetchurl {
     url = "https://plt.eecs.northwestern.edu/snapshots/current/installers/min-racket-${version}-src-pre-built.tgz";
-    sha256 = "1wf1grv8zh1w2vp2s5f6s8lmmbzyg5rr1cg8dcfhndn1bw2s02zi";
+    sha256 = "0sy7fd6bdgy744m0p3x9ln6ac65i8z0kwza8p76vgc5qf2cagixf";
   };
 
   FONTCONFIG_FILE = fontsConf;
