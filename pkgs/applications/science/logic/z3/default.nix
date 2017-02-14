@@ -7,8 +7,10 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner  = "Z3Prover";
     repo   = "z3";
-    rev    = "z3-${version}";
-    sha256 = "1ix100r1h00iph1bk5qx5963gpqaxmmx42r2vb5zglynchjif07c";
+    rev    = "d89c39cbe2bb862daff2c183a79361360f7e2dc1";  # Hardcoded from rosette/private/install
+    sha256 = "1ljrx1r4mhm7i1189k5xkcs4k5nbhnx7sqvxps82d3i3hw7yykrm";
+    #rev    = "z3-${version}";                            # before
+    #sha256 = "1ix100r1h00iph1bk5qx5963gpqaxmmx42r2vb5zglynchjif07c";
   };
 
   buildInputs = [ python ];
