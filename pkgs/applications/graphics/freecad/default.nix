@@ -1,8 +1,10 @@
 { stdenv, fetchurl, cmake, coin3d, xercesc, ode, eigen, qt4, opencascade, gts
 , boost, zlib, python, swig, gfortran, soqt, libf2c, makeWrapper
-, matplotlib, pycollada, pyside, pysideTools, pysideShiboken, pivy }:
+, matplotlib, pycollada, pyside, pysideTools, pysideShiboken, pivy, python27Packages }:
 
-stdenv.mkDerivation rec {
+let
+  pythonPackages = python27Packages;
+in stdenv.mkDerivation rec {
   name = "freecad-${version}";
   version = "0.16";
 
@@ -11,9 +13,9 @@ stdenv.mkDerivation rec {
     sha256 = "02cfw5wlb04j0ymhk4skrm7rvbz13hpv995asf9v8q6wn2s1mivc";
   };
 
-  buildInputs = [ cmake coin3d xercesc ode eigen qt4 opencascade gts boost
+  buildInputs = with pythonPackages; [ cmake coin3d xercesc ode eigen qt4 opencascade gts boost
     zlib python swig gfortran soqt libf2c makeWrapper matplotlib
-    pycollada pyside pysideShiboken pysideTools pivy
+    pycollada pyside pysideShiboken pysideTools pivy pyyaml
   ];
 
   enableParallelBuilding = true;
