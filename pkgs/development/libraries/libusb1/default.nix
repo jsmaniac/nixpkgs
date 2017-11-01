@@ -10,7 +10,7 @@ stdenv.mkDerivation rec {
 
   outputs = [ "out" "dev" ]; # get rid of propagating systemd closure
 
-  buildInputs = [ pkgconfig ];
+  nativeBuildInputs = [ pkgconfig ];
   propagatedBuildInputs =
     stdenv.lib.optional stdenv.isLinux systemd ++
     stdenv.lib.optionals stdenv.isDarwin [ libobjc IOKit ];
@@ -25,6 +25,6 @@ stdenv.mkDerivation rec {
     homepage = http://www.libusb.info;
     description = "User-space USB library";
     platforms = stdenv.lib.platforms.unix;
-    maintainers = [ stdenv.lib.maintainers.urkud ];
+    maintainers = [ ];
   };
 }

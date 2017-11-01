@@ -3,12 +3,14 @@
 , openssl ? null
 , cyrus_sasl ? null
 , gpgme ? null
+, kerberos ? null
 , headerCache  ? true
 , sslSupport   ? true
 , saslSupport  ? true
 , gpgmeSupport ? true
 , imapSupport  ? true
 , withSidebar  ? true
+, gssSupport   ? true
 }:
 
 assert headerCache  -> gdbm       != null;
@@ -20,11 +22,11 @@ with stdenv.lib;
 
 stdenv.mkDerivation rec {
   name = "mutt-${version}";
-  version = "1.7.1";
+  version = "1.9.1";
 
   src = fetchurl {
     url = "http://ftp.mutt.org/pub/mutt/${name}.tar.gz";
-    sha256 = "1pyns0xw52s4yma1a93pdcl4dirs55q2m1hd7w1r11nlhf7giip9";
+    sha256 = "1c8vv4anl555a03pbnwf8wnf0d8pcnd4p35y3q8f5ikkcflq76vl";
   };
 
   patchPhase = optionalString (openssl != null) ''
@@ -35,6 +37,7 @@ stdenv.mkDerivation rec {
     [ ncurses which perl ]
     ++ optional headerCache  gdbm
     ++ optional sslSupport   openssl
+    ++ optional gssSupport   kerberos
     ++ optional saslSupport  cyrus_sasl
     ++ optional gpgmeSupport gpgme;
 
@@ -45,7 +48,6 @@ stdenv.mkDerivation rec {
     (enableFeature withSidebar  "sidebar")
     "--enable-smtp"
     "--enable-pop"
-    "--enable-imap"
     "--with-mailpath="
 
     # Look in $PATH at runtime, instead of hardcoding /usr/bin/sendmail
@@ -59,6 +61,7 @@ stdenv.mkDerivation rec {
     # I set the value 'mailbox' because it is a default in the configure script
     "--with-homespool=mailbox"
   ] ++ optional sslSupport  "--with-ssl"
+    ++ optional gssSupport  "--with-gss"
     ++ optional saslSupport "--with-sasl";
 
   meta = {

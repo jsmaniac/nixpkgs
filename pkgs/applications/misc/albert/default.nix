@@ -1,28 +1,43 @@
-{ stdenv, fetchFromGitHub, qtbase, qtsvg, qtx11extras, makeQtWrapper, muparser, cmake }:
+{ mkDerivation, lib, fetchFromGitHub, makeWrapper, qtbase, qtsvg, qtx11extras, muparser, cmake }:
 
-stdenv.mkDerivation rec {
+mkDerivation rec {
   name    = "albert-${version}";
-  version = "0.8.11";
+  version = "0.12.0";
 
   src = fetchFromGitHub {
-    owner  = "manuelschneid3r";
+    owner  = "albertlauncher";
     repo   = "albert";
     rev    = "v${version}";
-    sha256 = "12ag30l3dd05hg0d08ax4c8dvp24lgd677szkq445xzvvhggxr37";
+    sha256 = "120l7hli2l4qj2s126nawc4dsy4qvwvb0svc42hijry4l8imdhkq";
   };
 
-  nativeBuildInputs = [ cmake makeQtWrapper ];
+  nativeBuildInputs = [ cmake makeWrapper ];
 
   buildInputs = [ qtbase qtsvg qtx11extras muparser ];
 
   enableParallelBuilding = true;
 
-  fixupPhase = ''
-    wrapQtProgram $out/bin/albert
+  postPatch = ''
+    sed -i "/QStringList dirs = {/a    \"$out/lib\"," \
+      src/lib/albert/src/albert/extensionmanager.cpp
   '';
 
-  meta = with stdenv.lib; {
-    homepage    = https://github.com/manuelSchneid3r/albert;
+  preBuild = ''
+    mkdir -p "$out/"
+    ln -s "$PWD/lib" "$out/lib"
+  '';
+
+  postBuild = ''
+    rm "$out/lib"
+  '';
+
+  postInstall = ''
+    wrapProgram $out/bin/albert \
+      --prefix XDG_DATA_DIRS : $out/share
+  '';
+
+  meta = with lib; {
+    homepage    = https://albertlauncher.github.io/;
     description = "Desktop agnostic launcher";
     license     = licenses.gpl3Plus;
     maintainers = with maintainers; [ ericsagnes ];

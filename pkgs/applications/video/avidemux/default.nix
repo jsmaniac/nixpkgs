@@ -14,11 +14,11 @@
 }:
 
 let
-  version = "2.6.12";
+  version = "2.7.0";
 
   src = fetchurl {
     url = "mirror://sourceforge/avidemux/avidemux/${version}/avidemux_${version}.tar.gz";
-    sha256 = "0nz52yih8sff53inndkh2dba759xjzsh4b8xjww419lcpk0qp6kn";
+    sha256 = "1bf4l9qwxq3smc1mx5pybydc742a4qqsk17z50j9550d9iwnn7gy";
   };
 
   common = {
@@ -88,6 +88,8 @@ let
 
       fixupPhase
     '';
+
+    meta = common.meta // args.meta or {};
   });
 
 in {
@@ -114,6 +116,8 @@ in {
     pluginUi = "GTK";
     isUi = true;
     buildDirs = [ "avidemux/gtk" ];
+    # Code seems unmaintained.
+    meta.broken = true;
   };
 
   avidemux_common = buildPlugin {

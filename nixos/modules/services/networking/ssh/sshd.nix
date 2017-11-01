@@ -21,6 +21,8 @@ let
           daemon reads in addition to the the user's authorized_keys file.
           You can combine the <literal>keys</literal> and
           <literal>keyFiles</literal> options.
+          Warning: If you are using <literal>NixOps</literal> then don't use this 
+          option since it will replace the key required for deployment via ssh.
         '';
       };
 
@@ -98,6 +100,15 @@ in
           Whether to enable the SFTP subsystem in the SSH daemon.  This
           enables the use of commands such as <command>sftp</command> and
           <command>sshfs</command>.
+        '';
+      };
+
+      sftpFlags = mkOption {
+        type = with types; listOf str;
+        default = [];
+        example = [ "-f AUTHPRIV" "-l INFO" ];
+        description = ''
+          Commandline flags to add to sftp-server.
         '';
       };
 
@@ -206,7 +217,7 @@ in
       };
 
       moduliFile = mkOption {
-        example = "services.openssh.moduliFile = /etc/my-local-ssh-moduli;";
+        example = "/etc/my-local-ssh-moduli;";
         type = types.path;
         description = ''
           Path to <literal>moduli</literal> file to install in
@@ -240,7 +251,7 @@ in
 
     systemd =
       let
-        sshd-service =
+        service =
           { description = "SSH Daemon";
 
             wantedBy = optional (!cfg.startWhenNeeded) "multi-user.target";
@@ -251,8 +262,20 @@ in
 
             environment.LD_LIBRARY_PATH = nssModulesPath;
 
-            wants = [ "sshd-keygen.service" ];
-            after = [ "sshd-keygen.service" ];
+            preStart =
+              ''
+                # Make sure we don't write to stdout, since in case of
+                # socket activation, it goes to the remote side (#19589).
+                exec >&2
+
+                mkdir -m 0755 -p /etc/ssh
+
+                ${flip concatMapStrings cfg.hostKeys (k: ''
+                  if ! [ -f "${k.path}" ]; then
+                      ssh-keygen -t "${k.type}" ${if k ? bits then "-b ${toString k.bits}" else ""} -f "${k.path}" -N ""
+                  fi
+                '')}
+              '';
 
             serviceConfig =
               { ExecStart =
@@ -262,32 +285,12 @@ in
                 KillMode = "process";
               } // (if cfg.startWhenNeeded then {
                 StandardInput = "socket";
+                StandardError = "journal";
               } else {
                 Restart = "always";
-                Type = "forking";
-                PIDFile = "/run/sshd.pid";
+                Type = "simple";
               });
           };
-
-        sshd-keygen-service =
-          { description = "SSH Host Key Generation";
-            path = [ cfgc.package ];
-            script =
-            ''
-              mkdir -m 0755 -p /etc/ssh
-              ${flip concatMapStrings cfg.hostKeys (k: ''
-                if ! [ -f "${k.path}" ]; then
-                  ssh-keygen -t "${k.type}" ${if k ? bits then "-b ${toString k.bits}" else ""} -f "${k.path}" -N ""
-                fi
-              '')}
-            '';
-
-            serviceConfig = {
-              Type = "oneshot";
-              RemainAfterExit = "yes";
-            };
-          };
-
       in
 
       if cfg.startWhenNeeded then {
@@ -299,13 +302,11 @@ in
             socketConfig.Accept = true;
           };
 
-        services.sshd-keygen = sshd-keygen-service;
-        services."sshd@" = sshd-service;
+        services."sshd@" = service;
 
       } else {
 
-        services.sshd-keygen = sshd-keygen-service;
-        services.sshd = sshd-service;
+        services.sshd = service;
 
       };
 
@@ -322,13 +323,9 @@ in
 
     services.openssh.extraConfig = mkOrder 0
       ''
-        PidFile /run/sshd.pid
-
         Protocol 2
 
         UsePAM yes
-
-        UsePrivilegeSeparation sandbox
 
         AddressFamily ${if config.networking.enableIPv6 then "any" else "inet"}
         ${concatMapStrings (port: ''
@@ -350,7 +347,7 @@ in
         ''}
 
         ${optionalString cfg.allowSFTP ''
-          Subsystem sftp ${cfgc.package}/libexec/sftp-server
+          Subsystem sftp ${cfgc.package}/libexec/sftp-server ${concatStringsSep " " cfg.sftpFlags}
         ''}
 
         PermitRootLogin ${cfg.permitRootLogin}

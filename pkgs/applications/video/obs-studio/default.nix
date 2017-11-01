@@ -1,16 +1,23 @@
 { stdenv
 , fetchFromGitHub
 , cmake
+, fdk_aac
 , ffmpeg
 , jansson
+, libjack2
 , libxkbcommon
+, libpthreadstubs
+, libXdmcp
 , qtbase
 , qtx11extras
+, speex
 , libv4l
 , x264
 , curl
 , xorg
 , makeWrapper
+, pkgconfig
+, vlc
 
 , alsaSupport ? false
 , alsaLib
@@ -22,26 +29,35 @@ let
   optional = stdenv.lib.optional;
 in stdenv.mkDerivation rec {
   name = "obs-studio-${version}";
-  version = "0.15.2";
+  version = "20.1.0";
 
   src = fetchFromGitHub {
     owner = "jp9000";
     repo = "obs-studio";
     rev = "${version}";
-    sha256 = "0vw203a1zj2npras589ml6gr5s11h9bhaica90plrh5ajayg0qwj";
+    sha256 = "1366nl301rhz8cfbq89ixiq1hdxdn8iimz9xyln274anghz02sbr";
   };
 
+  patches = [ ./find-xcb.patch ];
+
   nativeBuildInputs = [ cmake
+                        pkgconfig
                       ];
 
   buildInputs = [ curl
+                  fdk_aac
                   ffmpeg
                   jansson
+                  libjack2
                   libv4l
                   libxkbcommon
+                  libpthreadstubs
+                  libXdmcp
                   qtbase
                   qtx11extras
+                  speex
                   x264
+                  vlc
                   makeWrapper
                 ]
                 ++ optional alsaSupport alsaLib
@@ -64,8 +80,8 @@ in stdenv.mkDerivation rec {
       Software", software originally designed for recording and streaming live
       video content, efficiently
     '';
-    homepage = "https://obsproject.com";
-    maintainers = with maintainers; [ jb55 ];
+    homepage = https://obsproject.com;
+    maintainers = with maintainers; [ jb55 MP2E ];
     license = licenses.gpl2;
     platforms = with platforms; linux;
   };

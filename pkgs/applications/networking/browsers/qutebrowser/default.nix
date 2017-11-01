@@ -1,17 +1,22 @@
-{ stdenv, fetchurl, unzip, buildPythonApplication, makeQtWrapper, wrapGAppsHook
-, qtbase, pyqt5, jinja2, pygments, pyyaml, pypeg2, cssutils, glib_networking
+{ stdenv, lib, fetchurl, unzip, buildPythonApplication, makeWrapper, wrapGAppsHook
+, qtbase, pyqt5, jinja2, pygments, pyyaml, pypeg2, pyopengl, cssutils, glib_networking
 , asciidoc, docbook_xml_dtd_45, docbook_xsl, libxml2, libxslt
 , gst-plugins-base, gst-plugins-good, gst-plugins-bad, gst-plugins-ugly, gst-libav
-, qtwebkit-plugins }:
+, qtwebkit-plugins ? null
+, attrs
+, withWebEngineDefault ? true
+}:
+
+assert (! withWebEngineDefault) -> qtwebkit-plugins != null;
 
 let
   pdfjs = stdenv.mkDerivation rec {
     name = "pdfjs-${version}";
-    version = "1.4.20";
+    version = "1.7.225";
 
     src = fetchurl {
       url = "https://github.com/mozilla/pdf.js/releases/download/v${version}/${name}-dist.zip";
-      sha256 = "1ca1fzyc5qnan6gavcd8bnfqriqqvgdsf4m8ka4nayf50k64xxj9";
+      sha256 = "1n8ylmv60r0qbw2vilp640a87l4lgnrsi15z3iihcs6dj1n1yy67";
     };
 
     nativeBuildInputs = [ unzip ];
@@ -24,29 +29,30 @@ let
 
 in buildPythonApplication rec {
   name = "qutebrowser-${version}";
-  version = "0.8.4";
+  version = "1.0.2";
   namePrefix = "";
 
   src = fetchurl {
     url = "https://github.com/The-Compiler/qutebrowser/releases/download/v${version}/${name}.tar.gz";
-    sha256 = "0wc6iq7rw89625v595bs4y8spzhid6nnz2gq67f2kbjppk2rikpm";
+    sha256 = "093nmvl9x3ykrpmvnmx98g9npg4wmq0mmf7qzgbzmg93dnyq2cpk";
   };
 
   # Needs tox
   doCheck = false;
 
   buildInputs = [
-    qtbase qtwebkit-plugins
+    qtbase
     gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
     glib_networking
-  ];
+  ]
+    ++ lib.optional (! withWebEngineDefault) qtwebkit-plugins;
 
   nativeBuildInputs = [
-    makeQtWrapper wrapGAppsHook asciidoc docbook_xml_dtd_45 docbook_xsl libxml2 libxslt
+    makeWrapper wrapGAppsHook asciidoc docbook_xml_dtd_45 docbook_xsl libxml2 libxslt
   ];
 
   propagatedBuildInputs = [
-    pyyaml pyqt5 jinja2 pygments pypeg2 cssutils
+    pyyaml pyqt5 jinja2 pygments pypeg2 cssutils pyopengl attrs
   ];
 
   postPatch = ''
@@ -60,7 +66,7 @@ in buildPythonApplication rec {
 
   postInstall = ''
     install -Dm644 doc/qutebrowser.1 "$out/share/man/man1/qutebrowser.1"
-    install -Dm644 qutebrowser.desktop \
+    install -Dm644 misc/qutebrowser.desktop \
         "$out/share/applications/qutebrowser.desktop"
     for i in 16 24 32 48 64 128 256 512; do
         install -Dm644 "icons/qutebrowser-''${i}x''${i}.png" \
@@ -71,11 +77,8 @@ in buildPythonApplication rec {
     install -Dm755 -t "$out/share/qutebrowser/userscripts/" misc/userscripts/*
   '';
 
-  postFixup = ''
-    mv $out/bin/qutebrowser $out/bin/.qutebrowser-noqtpath
-    makeQtWrapper $out/bin/.qutebrowser-noqtpath $out/bin/qutebrowser
-
-    sed -i 's/\.qutebrowser-wrapped/qutebrowser/g' $out/bin/..qutebrowser-wrapped-wrapped
+  postFixup = lib.optionalString (! withWebEngineDefault) ''
+    wrapProgram $out/bin/qutebrowser --add-flags "--backend webkit"
   '';
 
   meta = {

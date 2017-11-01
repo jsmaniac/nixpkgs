@@ -29,7 +29,10 @@ mkDerivation {
     tasty-hunit tasty-quickcheck text union-find wl-pprint
   ];
   jailbreak = true;
-  homepage = "http://elm-lang.org";
+  postInstall = ''
+    ln -s $out/bin/elm-format-0.18 $out/bin/elm-format
+  '';
+  homepage = http://elm-lang.org;
   description = "A source code formatter for Elm";
   license = stdenv.lib.licenses.bsd3;
 }

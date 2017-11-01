@@ -1,5 +1,5 @@
 # This module declares the options to define a *display manager*, the
-# program responsible for handling X logins (such as xdm, kdm, gdb, or
+# program responsible for handling X logins (such as xdm, gdb, or
 # SLiM).  The display manager allows the user to select a *session
 # type*.  When the user logs in, the display manager starts the
 # *session script* ("xsession" below) to launch the selected session
@@ -24,13 +24,40 @@ let
     Xft.lcdfilter: lcd${fontconfig.subpixel.lcdfilter}
     Xft.hinting: ${if fontconfig.hinting.enable then "1" else "0"}
     Xft.autohint: ${if fontconfig.hinting.autohint then "1" else "0"}
-    Xft.hintstyle: hint${fontconfig.hinting.style}
+    Xft.hintstyle: hintslight
   '';
 
   # file provided by services.xserver.displayManager.session.script
   xsession = wm: dm: pkgs.writeScript "xsession"
     ''
       #! ${pkgs.bash}/bin/bash
+
+      # Expected parameters:
+      #   $1 = <desktop-manager>+<window-manager>
+
+      # Actual parameters (FIXME):
+      # SDDM is calling this script like the following:
+      #   $1 = /nix/store/xxx-xsession (= $0)
+      #   $2 = <desktop-manager>+<window-manager>
+      # SLiM is using the following parameter:
+      #   $1 = /nix/store/xxx-xsession <desktop-manager>+<window-manager>
+      # LightDM keeps the double quotes:
+      #   $1 = /nix/store/xxx-xsession "<desktop-manager>+<window-manager>"
+      # The fake/auto display manager doesn't use any parameters and GDM is
+      # broken.
+      # If you want to "debug" this script don't print the parameters to stdout
+      # or stderr because this script will be executed multiple times and the
+      # output won't be visible in the log when the script is executed for the
+      # first time (e.g. append them to a file instead)!
+
+      # All of the above cases are handled by the following hack (FIXME).
+      # Since this line is *very important* for *all display managers* it is
+      # very important to test changes to the following line with all display
+      # managers:
+      if [ "''${1:0:1}" = "/" ]; then eval exec "$1" "$2" ; fi
+
+      # Now it should be safe to assume that the script was called with the
+      # expected parameters.
 
       ${optionalString cfg.displayManager.logToJournal ''
         if [ -z "$_DID_SYSTEMD_CAT" ]; then
@@ -55,9 +82,6 @@ let
         fi
       ''}
 
-      # Handle being called by kdm.
-      if test "''${1:0:1}" = /; then eval exec "$1"; fi
-
       # Start PulseAudio if enabled.
       ${optionalString (config.hardware.pulseaudio.enable) ''
         ${optionalString (!config.hardware.pulseaudio.systemWide)
@@ -68,9 +92,12 @@ let
         ${config.hardware.pulseaudio.package.out}/bin/pactl load-module module-x11-publish "display=$DISPLAY"
       ''}
 
-      # Tell systemd about our $DISPLAY. This is needed by the
-      # ssh-agent unit.
-      ${config.systemd.package}/bin/systemctl --user import-environment DISPLAY
+      # Tell systemd about our $DISPLAY and $XAUTHORITY.
+      # This is needed by the ssh-agent unit.
+      #
+      # Also tell systemd about the dbus session bus address.
+      # This is required by user units using the session bus.
+      ${config.systemd.package}/bin/systemctl --user import-environment DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS
 
       # Load X defaults.
       ${xorg.xrdb}/bin/xrdb -merge ${xresourcesXft}
@@ -82,12 +109,12 @@ let
 
       # Speed up application start by 50-150ms according to
       # http://kdemonkey.blogspot.nl/2008/04/magic-trick.html
-      rm -rf $HOME/.compose-cache
-      mkdir $HOME/.compose-cache
+      rm -rf "$HOME/.compose-cache"
+      mkdir "$HOME/.compose-cache"
 
       # Work around KDE errors when a user first logs in and
       # .local/share doesn't exist yet.
-      mkdir -p $HOME/.local/share
+      mkdir -p "$HOME/.local/share"
 
       unset _DID_SYSTEMD_CAT
 
@@ -98,6 +125,9 @@ let
           source ~/.xprofile
       fi
 
+      # Start systemd user services for graphical sessions
+      ${config.systemd.package}/bin/systemctl --user start graphical-session.target
+
       # Allow the user to setup a custom session type.
       if test -x ~/.xsession; then
           exec ~/.xsession
@@ -107,15 +137,16 @@ let
           fi
       fi
 
-      # The session type is "<desktop-manager> + <window-manager>", so
-      # extract those.
-      windowManager="''${sessionType##* + }"
+      # The session type is "<desktop-manager>+<window-manager>", so
+      # extract those (see:
+      # http://wiki.bash-hackers.org/syntax/pe#substring_removal).
+      windowManager="''${sessionType##*+}"
       : ''${windowManager:=${cfg.windowManager.default}}
-      desktopManager="''${sessionType% + *}"
+      desktopManager="''${sessionType%%+*}"
       : ''${desktopManager:=${cfg.desktopManager.default}}
 
       # Start the window manager.
-      case $windowManager in
+      case "$windowManager" in
         ${concatMapStrings (s: ''
           (${s.name})
             ${s.start}
@@ -125,7 +156,7 @@ let
       esac
 
       # Start the desktop manager.
-      case $desktopManager in
+      case "$desktopManager" in
         ${concatMapStrings (s: ''
           (${s.name})
             ${s.start}
@@ -139,23 +170,29 @@ let
       ''}
 
       test -n "$waitPID" && wait "$waitPID"
+
+      ${config.systemd.package}/bin/systemctl --user stop graphical-session.target
+
       exit 0
     '';
 
+  # Desktop Entry Specification:
+  # - https://standards.freedesktop.org/desktop-entry-spec/latest/
+  # - https://standards.freedesktop.org/desktop-entry-spec/latest/ar01s06.html
   mkDesktops = names: pkgs.runCommand "desktops"
     { # trivial derivation
       preferLocalBuild = true;
       allowSubstitutes = false;
     }
     ''
-      mkdir -p $out
+      mkdir -p "$out"
       ${concatMapStrings (n: ''
         cat - > "$out/${n}.desktop" << EODESKTOP
         [Desktop Entry]
         Version=1.0
         Type=XSession
         TryExec=${cfg.displayManager.session.script}
-        Exec=${cfg.displayManager.session.script} '${n}'
+        Exec=${cfg.displayManager.session.script} "${n}"
         X-GDM-BypassXsession=true
         Name=${n}
         Comment=
@@ -187,7 +224,6 @@ in
         default = [];
         example = [ "-ac" "-logverbose" "-verbose" "-nolisten tcp" ];
         description = "List of arguments for the X server.";
-        apply = toString;
       };
 
       sessionCommands = mkOption {
@@ -239,7 +275,7 @@ in
           wm = filter (s: s.manage == "window") list;
           dm = filter (s: s.manage == "desktop") list;
           names = flip concatMap dm
-            (d: map (w: d.name + optionalString (w.name != "none") (" + " + w.name))
+            (d: map (w: d.name + optionalString (w.name != "none") ("+" + w.name))
               (filter (w: d.name != "none" || w.name != "none") wm));
           desktops = mkDesktops names;
           script = xsession wm dm;
@@ -298,6 +334,13 @@ in
 
   config = {
     services.xserver.displayManager.xserverBin = "${xorg.xorgserver.out}/bin/X";
+
+    systemd.user.targets.graphical-session = {
+      unitConfig = {
+        RefuseManualStart = false;
+        StopWhenUnneeded = false;
+      };
+    };
   };
 
   imports = [

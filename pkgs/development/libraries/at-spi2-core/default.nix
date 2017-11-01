@@ -2,20 +2,21 @@
 , libX11, xextproto, libSM, libICE, libXtst, libXi, gobjectIntrospection }:
 
 stdenv.mkDerivation rec {
-  versionMajor = "2.22";
+  versionMajor = "2.26";
   versionMinor = "0";
   moduleName   = "at-spi2-core";
   name = "${moduleName}-${versionMajor}.${versionMinor}";
 
   src = fetchurl {
     url = "mirror://gnome/sources/${moduleName}/${versionMajor}/${name}.tar.xz";
-    sha256 = "415ea3af21318308798e098be8b3a17b2f0cf2fe16cecde5ad840cf4e0f2c80a";
+    sha256 = "511568a65fda11fdd5ba5d4adfd48d5d76810d0e6ba4f7460f1b2ec0dbbbc337";
   };
 
   outputs = [ "out" "dev" ];
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    python pkgconfig popt  intltool dbus_glib
+    python popt  intltool dbus_glib
     libX11 xextproto libSM libICE libXtst libXi
     gobjectIntrospection
   ];

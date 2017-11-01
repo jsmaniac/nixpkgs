@@ -1,8 +1,8 @@
 { stdenv, fetchurl, fetchpatch, dpkg, curl, libarchive, openssl, ruby, buildRubyGem, libiconv
-, libxml2, libxslt, makeWrapper, p7zip, xar, gzip, cpio }:
+, libxml2, libxslt, libffi, makeWrapper, p7zip, xar, gzip, cpio }:
 
 let
-  version = "1.8.7";
+  version = "2.0.0";
   rake = buildRubyGem {
     inherit ruby;
     gemName = "rake";
@@ -13,16 +13,16 @@ let
   url = if stdenv.isLinux
     then "https://releases.hashicorp.com/vagrant/${version}/vagrant_${version}_${arch}.deb"
     else if stdenv.isDarwin
-      then "https://releases.hashicorp.com/vagrant/${version}/vagrant_${version}.dmg"
+      then "https://releases.hashicorp.com/vagrant/${version}/vagrant_${version}_${arch}.dmg"
       else "system ${stdenv.system} not supported";
 
   sha256 = {
-    "x86_64-linux"  = "10c77b643b73dd3ad7a45a89d8ab95b58b79dc10e0cf6e760fe24abc436b2fdb";
-    "i686-linux"    = "9d2a70f34ab65d8d2cb013917f221835432aa63cd4ef781c9fd1404cfcfe7898";
-    "x86_64-darwin" = "14d68f599a620cf421838ed037f0a1c4467e1b67475deeff62330a21fda4937b";
+    "x86_64-linux"  = "184amybyxqlxqr8fk6lyx2znmci1fazsiby90q7d1xx2ihz3hm5x";
+    "i686-linux"    = "19r1m5jila40x69m1qz2hslz7v1hdg8wwdhcq8d5qjnzwfmlw2qz";
+    "x86_64-darwin" = "154400iqs01235bclr8ic7g9jv01lfs766bmv7p8784r3xsblvsr";
   }."${stdenv.system}" or (throw "system ${stdenv.system} not supported");
 
-  arch = builtins.replaceStrings ["-linux"] [""] stdenv.system;
+  arch = builtins.replaceStrings ["-linux" "-darwin"] ["" ""] stdenv.system;
 
 in stdenv.mkDerivation rec {
   name = "vagrant-${version}";
@@ -85,20 +85,6 @@ in stdenv.mkDerivation rec {
     ln -s ${openssl.bin}/bin/c_rehash opt/vagrant/embedded/bin
     ln -s ${openssl.bin}/bin/openssl opt/vagrant/embedded/bin
 
-    # ruby: erb, gem, irb, rake, rdoc, ri, ruby
-    rm opt/vagrant/embedded/bin/{erb,gem,irb,rake,rdoc,ri,ruby}
-    ln -s ${ruby}/bin/erb opt/vagrant/embedded/bin
-    ln -s ${ruby}/bin/gem opt/vagrant/embedded/bin
-    ln -s ${ruby}/bin/irb opt/vagrant/embedded/bin
-    ln -s ${rake}/bin/rake opt/vagrant/embedded/bin
-    ln -s ${ruby}/bin/rdoc opt/vagrant/embedded/bin
-    ln -s ${ruby}/bin/ri opt/vagrant/embedded/bin
-    ln -s ${ruby}/bin/ruby opt/vagrant/embedded/bin
-
-    # ruby libs
-    rm -rf opt/vagrant/embedded/lib
-    ln -s ${ruby}/lib opt/vagrant/embedded/lib
-
     # libiconv: iconv
     rm opt/vagrant/embedded/bin/iconv
     ln -s ${libiconv}/bin/iconv opt/vagrant/embedded/bin
@@ -114,20 +100,43 @@ in stdenv.mkDerivation rec {
     ln -s ${libxslt.dev}/bin/xslt-config opt/vagrant/embedded/bin
     ln -s ${libxslt.bin}/bin/xsltproc opt/vagrant/embedded/bin
 
+  '' + (stdenv.lib.optionalString (! stdenv.isDarwin) ''
+    # ruby: erb, gem, irb, rake, rdoc, ri, ruby
+    rm opt/vagrant/embedded/bin/{erb,gem,irb,rake,rdoc,ri,ruby}
+    ln -s ${ruby}/bin/erb opt/vagrant/embedded/bin
+    ln -s ${ruby}/bin/gem opt/vagrant/embedded/bin
+    ln -s ${ruby}/bin/irb opt/vagrant/embedded/bin
+    ln -s ${rake}/bin/rake opt/vagrant/embedded/bin
+    ln -s ${ruby}/bin/rdoc opt/vagrant/embedded/bin
+    ln -s ${ruby}/bin/ri opt/vagrant/embedded/bin
+    ln -s ${ruby}/bin/ruby opt/vagrant/embedded/bin
+
+    # ruby libs
+    rm -rf opt/vagrant/embedded/lib/*
+    for lib in ${ruby}/lib/*; do
+      ln -s $lib opt/vagrant/embedded/lib/''${lib##*/}
+    done
+
+    # libffi
+    ln -s ${libffi}/lib/libffi.so.6 opt/vagrant/embedded/lib/libffi.so.6
+
+  '') + ''
     mkdir -p "$out"
     cp -r opt "$out"
     cp -r usr/bin "$out"
-    wrapProgram "$out/bin/vagrant" --prefix LD_LIBRARY_PATH : "$out/opt/vagrant/embedded/lib"
+    wrapProgram "$out/bin/vagrant" --prefix LD_LIBRARY_PATH : "${stdenv.lib.makeLibraryPath [ libxml2 libxslt ]}" \
+                                   --prefix LD_LIBRARY_PATH : "$out/opt/vagrant/embedded/lib"
+
+    install -D "opt/vagrant/embedded/gems/gems/vagrant-$version/contrib/bash/completion.sh" \
+      "$out/share/bash-completion/completions/vagrant"
   '';
 
   preFixup = ''
     # 'hide' the template file from shebang-patching
-    chmod -x "$out/opt/vagrant/embedded/gems/gems/bundler-1.12.5/lib/bundler/templates/Executable"
     chmod -x "$out/opt/vagrant/embedded/gems/gems/vagrant-$version/plugins/provisioners/salt/bootstrap-salt.sh"
   '';
 
   postFixup = ''
-    chmod +x "$out/opt/vagrant/embedded/gems/gems/bundler-1.12.5/lib/bundler/templates/Executable"
     chmod +x "$out/opt/vagrant/embedded/gems/gems/vagrant-$version/plugins/provisioners/salt/bootstrap-salt.sh"
   '' +
   (stdenv.lib.optionalString stdenv.isDarwin ''

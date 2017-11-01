@@ -1,4 +1,7 @@
-{ stdenv, fetchurl, groff }:
+{ stdenv
+, fetchurl, groff
+, buildPlatform, hostPlatform
+}:
 
 assert stdenv.isLinux;
 
@@ -19,8 +22,9 @@ stdenv.mkDerivation rec {
   makeFlags = [
     "NIXOS=1" "INSTALL=install" "INSTALL_BINDIR=$(out)/sbin"
     "MANDIR=$(out)/share/man" "RUN_DIR=/dev/.mdadm"
-  ] ++ stdenv.lib.optionals (stdenv ? cross) [
-    "CROSS_COMPILE=${stdenv.cross.config}-"
+    "STRIP="
+  ] ++ stdenv.lib.optionals (hostPlatform != buildPlatform) [
+    "CROSS_COMPILE=${stdenv.cc.prefix}"
   ];
 
   nativeBuildInputs = [ groff ];
@@ -31,7 +35,7 @@ stdenv.mkDerivation rec {
   preConfigure = ''
     sed -e 's@/lib/udev@''${out}/lib/udev@' \
         -e 's@ -Werror @ @' \
-        -e 's@/usr/sbin/sendmail@/var/setuid-wrappers/sendmail@' -i Makefile
+        -e 's@/usr/sbin/sendmail@/run/wrappers/bin/sendmail@' -i Makefile
   '';
 
   meta = {

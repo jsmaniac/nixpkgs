@@ -1,33 +1,37 @@
-{ stdenv, lib, fetchgit, cmake, llvmPackages, openssl, writeScript, apple_sdk, bash, emacs }:
+{ stdenv, lib, fetchgit, cmake, llvmPackages, openssl, writeScript, apple_sdk, bash, emacs, pkgconfig }:
 
 stdenv.mkDerivation rec {
   name = "rtags-${version}";
-  version = "2.3";
+  version = "2.12";
 
-  buildInputs = [ cmake llvmPackages.llvm openssl llvmPackages.clang emacs ]
-    ++ lib.optional stdenv.isDarwin apple_sdk.sdk;
+  nativeBuildInputs = [ cmake pkgconfig ];
+  buildInputs = [ llvmPackages.llvm openssl emacs ]
+    ++ lib.optionals stdenv.cc.isGNU [ llvmPackages.clang-unwrapped ]
+    ++ lib.optionals stdenv.isDarwin [ apple_sdk.libs.xpc apple_sdk.frameworks.CoreServices ];
 
-  preConfigure = ''
-    export LIBCLANG_CXXFLAGS="-isystem ${llvmPackages.clang.cc}/include $(llvm-config --cxxflags) " \
-           LIBCLANG_LIBDIR="${llvmPackages.clang.cc}/lib" \
-
-  '' + lib.optionalString stdenv.isDarwin ''
-    export CXXFLAGS="-isysroot ${apple_sdk.sdk}/" \
-           MACOSX_DEPLOYMENT_TARGET="10.9"
-  '';
 
   src = fetchgit {
     rev = "refs/tags/v${version}";
     fetchSubmodules = true;
     url = "https://github.com/andersbakken/rtags.git";
-    sha256 = "05kzch88x2wiimygfli6vsr9i5hzgkybsya8qx4zvb6daip4b7yf";
+    sha256 = "0bgjcvyvkpqcgw4571iz39sqydmcaz6ymx7kxcmq6j7rffs6qs7l";
+    # unicode file names lead to different checksums on HFS+ vs. other
+    # filesystems because of unicode normalisation
+    postFetch = ''
+      rm $out/src/rct/tests/testfile_*.txt
+    '';
   };
+
+  preConfigure = ''
+    export LIBCLANG_CXXFLAGS="-isystem ${llvmPackages.clang.cc}/include $(llvm-config --cxxflags) -fexceptions" \
+           LIBCLANG_LIBDIR="${llvmPackages.clang.cc}/lib"
+  '';
+
+  enableParallelBuilding = true;
 
   meta = {
     description = "C/C++ client-server indexer based on clang";
-
     homepage = https://github.com/andersbakken/rtags;
-
     license = stdenv.lib.licenses.gpl3;
     platforms = stdenv.lib.platforms.allBut [ "i686-linux" ];
   };

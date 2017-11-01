@@ -4,6 +4,7 @@
 , ldapSupport ? false, openldap ? null
 , zlibSupport ? false, zlib ? null
 , sslSupport ? false, openssl ? null
+, gnutlsSupport ? false, gnutls ? null
 , scpSupport ? false, libssh2 ? null
 , gssSupport ? false, gss ? null
 , c-aresSupport ? false, c-ares ? null
@@ -14,18 +15,23 @@ assert idnSupport -> libidn != null;
 assert ldapSupport -> openldap != null;
 assert zlibSupport -> zlib != null;
 assert sslSupport -> openssl != null;
+assert !(gnutlsSupport && sslSupport);
+assert gnutlsSupport -> gnutls != null;
 assert scpSupport -> libssh2 != null;
 assert c-aresSupport -> c-ares != null;
 
 stdenv.mkDerivation rec {
-  name = "curl-7.51.0";
+  name = "curl-7.56.0";
 
   src = fetchurl {
     url = "http://curl.haxx.se/download/${name}.tar.bz2";
-    sha256 = "1pldg1d8606p4q83k8fcp61kfcsbphln22mycw7h7r87i42410kz";
+    sha256 = "1pvr2bqfhk46bzq2x2hskmnq3wc8qxlps7apm9q1qiixb9ra8q6y";
   };
 
   outputs = [ "bin" "dev" "out" "man" "devdoc" ];
+  separateDebugInfo = stdenv.isLinux;
+
+  enableParallelBuilding = true;
 
   nativeBuildInputs = [ pkgconfig perl ];
 
@@ -40,18 +46,20 @@ stdenv.mkDerivation rec {
     optional gssSupport gss ++
     optional c-aresSupport c-ares ++
     optional sslSupport openssl ++
+    optional gnutlsSupport gnutls ++
     optional scpSupport libssh2;
 
-  # for the second line see http://curl.haxx.se/mail/tracker-2014-03/0087.html
+  # for the second line see https://curl.haxx.se/mail/tracker-2014-03/0087.html
   preConfigure = ''
     sed -e 's|/usr/bin|/no-such-path|g' -i.bak configure
     rm src/tool_hugehelp.c
   '';
 
   configureFlags = [
-      "--with-ca-bundle=/etc/ssl/certs/ca-certificates.crt"
+      "--with-ca-fallback"
       "--disable-manual"
       ( if sslSupport then "--with-ssl=${openssl.dev}" else "--without-ssl" )
+      ( if gnutlsSupport then "--with-gnutls=${gnutls.dev}" else "--without-gnutls" )
       ( if scpSupport then "--with-libssh2=${libssh2.dev}" else "--without-libssh2" )
       ( if ldapSupport then "--enable-ldap" else "--disable-ldap" )
       ( if ldapSupport then "--enable-ldaps" else "--disable-ldaps" )
@@ -60,12 +68,16 @@ stdenv.mkDerivation rec {
     ++ stdenv.lib.optional c-aresSupport "--enable-ares=${c-ares}"
     ++ stdenv.lib.optional gssSupport "--with-gssapi=${gss}";
 
-  CXX = "g++";
-  CXXCPP = "g++ -E";
+  CXX = "c++";
+  CXXCPP = "c++ -E";
 
   postInstall = ''
     moveToOutput bin/curl-config "$dev"
     sed '/^dependency_libs/s|${libssh2.dev}|${libssh2.out}|' -i "$out"/lib/*.la
+  '' + stdenv.lib.optionalString gnutlsSupport ''
+    ln $out/lib/libcurl.so $out/lib/libcurl-gnutls.so
+    ln $out/lib/libcurl.so $out/lib/libcurl-gnutls.so.4
+    ln $out/lib/libcurl.so $out/lib/libcurl-gnutls.so.4.4.0
   '';
 
   crossAttrs = {
@@ -73,6 +85,7 @@ stdenv.mkDerivation rec {
     # For the 'urandom', maybe it should be a cross-system option
     configureFlags = [
         ( if sslSupport then "--with-ssl=${openssl.crossDrv}" else "--without-ssl" )
+        ( if gnutlsSupport then "--with-gnutls=${gnutls.crossDrv}" else "--without-gnutls" )
         "--with-random /dev/urandom"
       ];
   };
@@ -83,7 +96,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A command line tool for transferring files with URL syntax";
-    homepage    = http://curl.haxx.se/;
+    homepage    = https://curl.haxx.se/;
     maintainers = with maintainers; [ lovek323 ];
     platforms   = platforms.all;
   };

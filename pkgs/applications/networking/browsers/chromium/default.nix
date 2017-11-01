@@ -1,8 +1,8 @@
 { newScope, stdenv, makeWrapper, makeDesktopItem, ed
+, glib, gtk3, gnome3, gsettings_desktop_schemas
 
 # package customization
 , channel ? "stable"
-, enableSELinux ? false
 , enableNaCl ? false
 , enableHotwording ? false
 , gnomeSupport ? false, gnome ? null
@@ -12,6 +12,7 @@
 , enableWideVine ? false
 , cupsSupport ? true
 , pulseSupport ? false
+, commandLineArgs ? ""
 }:
 
 let
@@ -21,7 +22,7 @@ let
     upstream-info = (callPackage ./update.nix {}).getChannel channel;
 
     mkChromiumDerivation = callPackage ./common.nix {
-      inherit enableSELinux enableNaCl enableHotwording gnomeSupport gnome
+      inherit enableNaCl enableHotwording gnomeSupport gnome
               gnomeKeyringSupport proprietaryCodecs cupsSupport pulseSupport
               enableWideVine;
     };
@@ -62,10 +63,23 @@ let
 
   sandboxExecutableName = chromium.browser.passthru.sandboxExecutableName;
 
-in stdenv.mkDerivation {
-  name = "chromium${suffix}-${chromium.browser.version}";
+  version = chromium.browser.version;
 
-  buildInputs = [ makeWrapper ed ];
+  inherit (stdenv.lib) versionAtLeast;
+
+in stdenv.mkDerivation {
+  name = "chromium${suffix}-${version}";
+  inherit version;
+
+  buildInputs = [
+    makeWrapper ed
+
+    # needed for GSETTINGS_SCHEMAS_PATH
+    gsettings_desktop_schemas glib gtk3
+
+    # needed for XDG_ICON_DIRS
+    gnome3.defaultIconTheme
+  ];
 
   outputs = ["out" "sandbox"];
 
@@ -76,20 +90,23 @@ in stdenv.mkDerivation {
     mkdir -p "$out/bin"
 
     eval makeWrapper "${browserBinary}" "$out/bin/chromium" \
+      ${commandLineArgs} \
       ${concatMapStringsSep " " getWrapperFlags chromium.plugins.enabled}
 
     ed -v -s "$out/bin/chromium" << EOF
     2i
 
-    if [ -x "/var/setuid-wrappers/${sandboxExecutableName}" ]
+    if [ -x "/run/wrappers/bin/${sandboxExecutableName}" ]
     then
-      export CHROME_DEVEL_SANDBOX="/var/setuid-wrappers/${sandboxExecutableName}"
+      export CHROME_DEVEL_SANDBOX="/run/wrappers/bin/${sandboxExecutableName}"
     else
       export CHROME_DEVEL_SANDBOX="$sandbox/bin/${sandboxExecutableName}"
     fi
 
     # libredirect causes chromium to deadlock on startup
     export LD_PRELOAD="\$(echo -n "\$LD_PRELOAD" | tr ':' '\n' | grep -v /lib/libredirect\\\\.so$ | tr '\n' ':')"
+
+    export XDG_DATA_DIRS=$XDG_ICON_DIRS:$GSETTINGS_SCHEMAS_PATH\''${XDG_DATA_DIRS:+:}\$XDG_DATA_DIRS
 
     .
     w

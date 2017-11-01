@@ -25,6 +25,7 @@
   kernelPatches ? []
 , ignoreConfigErrors ? stdenv.platform.name != "pc"
 , extraMeta ? {}
+, hostPlatform
 , ...
 }:
 
@@ -34,6 +35,22 @@ assert stdenv.isLinux;
 let
 
   lib = stdenv.lib;
+
+  # Combine the `features' attribute sets of all the kernel patches.
+  kernelFeatures = lib.fold (x: y: (x.features or {}) // y) ({
+    iwlwifi = true;
+    efiBootStub = true;
+    needsCifsUtils = true;
+    netfilterRPFilter = true;
+  } // features) kernelPatches;
+
+  configWithPlatform = kernelPlatform: import ./common-config.nix {
+    inherit stdenv version kernelPlatform extraConfig;
+    features = kernelFeatures; # Ensure we know of all extra patches, etc.
+  };
+
+  config = configWithPlatform stdenv.platform;
+  configCross = configWithPlatform hostPlatform.platform;
 
   kernelConfigFun = baseConfig:
     let
@@ -55,10 +72,11 @@ let
     kernelBaseConfig = stdenv.platform.kernelBaseConfig;
     kernelTarget = stdenv.platform.kernelTarget;
     autoModules = stdenv.platform.kernelAutoModules;
+    preferBuiltin = stdenv.platform.kernelPreferBuiltin or false;
     arch = stdenv.platform.kernelArch;
 
     crossAttrs = let
-        cp = stdenv.cross.platform;
+        cp = hostPlatform.platform;
       in {
         arch = cp.kernelArch;
         platformName = cp.name;
@@ -92,7 +110,7 @@ let
       echo "generating kernel configuration..."
       echo "$kernelConfig" > kernel-config
       DEBUG=1 ARCH=$arch KERNEL_CONFIG=kernel-config AUTO_MODULES=$autoModules \
-           SRC=../$sourceRoot perl -w $generateConfig
+           PREFER_BUILTIN=$preferBuiltin SRC=../$sourceRoot perl -w $generateConfig
     '';
 
     installPhase = "mv .config $out";
@@ -101,7 +119,7 @@ let
   };
 
   kernel = buildLinux {
-    inherit version modDirVersion src kernelPatches;
+    inherit version modDirVersion src kernelPatches stdenv;
 
     configfile = configfile.nativeDrv or configfile;
 
@@ -113,23 +131,17 @@ let
   };
 
   passthru = {
-    # Combine the `features' attribute sets of all the kernel patches.
-    features = lib.fold (x: y: (x.features or {}) // y) features kernelPatches;
+    features = kernelFeatures;
 
     meta = kernel.meta // extraMeta;
 
     passthru = kernel.passthru // (removeAttrs passthru [ "passthru" "meta" ]);
   };
 
-  configWithPlatform = kernelPlatform: import ./common-config.nix
-    { inherit stdenv version kernelPlatform extraConfig;
-      features = passthru.features; # Ensure we know of all extra patches, etc.
-    };
-
-  config = configWithPlatform stdenv.platform;
-  configCross = configWithPlatform stdenv.cross.platform;
-
   nativeDrv = lib.addPassthru kernel.nativeDrv passthru;
 
   crossDrv = lib.addPassthru kernel.crossDrv passthru;
-in if kernel ? crossDrv then nativeDrv // { inherit nativeDrv crossDrv; } else lib.addPassthru kernel passthru
+
+in if kernel ? crossDrv
+   then nativeDrv // { inherit nativeDrv crossDrv; }
+   else lib.addPassthru kernel passthru

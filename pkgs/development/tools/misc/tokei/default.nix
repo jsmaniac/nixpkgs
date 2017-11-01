@@ -1,16 +1,17 @@
-{ stdenv, fetchurl, rustPlatform }:
+{ stdenv, fetchFromGitHub, rustPlatform }:
 
-with rustPlatform;
-
-buildRustPackage rec {
+rustPlatform.buildRustPackage rec {
   name = "tokei-${version}";
-  version = "4.0.0";
-  src = fetchurl {
-    url = "https://github.com/Aaronepower/tokei/archive/${version}.tar.gz";
-    sha256 = "1c7z3dgxr76dq6cvan3hgqlkcv61gmg6fkv6b98viymh4fy9if68";
+  version = "6.1.2";
+
+  src = fetchFromGitHub {
+    owner = "Aaronepower";
+    repo = "tokei";
+    rev = "v${version}";
+    sha256 = "1bzs3mr6f9bna39b9ddwwq0raas07nbn106mnq3widxg59i0gxhd";
   };
 
-  depsSha256 = "0v4gplk7mkkik9vr1lqsr0yl1kqkqh14ncw95yb9iv7hcxvmcqn3";
+  cargoSha256 = "0y0rkxhkv31v5sa0425dwskd80i6srwbqhqkrw1g1kbmbs9y0vxz";
 
   installPhase = ''
     mkdir -p $out/bin
@@ -18,6 +19,7 @@ buildRustPackage rec {
   '';
 
   meta = with stdenv.lib; {
+    broken = true;
     description = "Count code, quickly";
     homepage = https://github.com/Aaronepower/tokei;
     license = licenses.mit;

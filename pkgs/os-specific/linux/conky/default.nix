@@ -26,6 +26,7 @@
 , toluapp ? null
 
 , wirelessSupport     ? true      , wirelesstools ? null
+, nvidiaSupport       ? false     , libXNVCtrl ? null
 
 , curlSupport         ? true      , curl ? null
 , rssSupport          ? curlSupport
@@ -52,6 +53,7 @@ assert luaCairoSupport || luaImlib2Support
                            -> lua.luaversion == "5.1";
 
 assert wirelessSupport     -> wirelesstools != null;
+assert nvidiaSupport       -> libXNVCtrl != null;
 
 assert curlSupport         -> curl != null;
 assert rssSupport          -> curlSupport && libxml2 != null;
@@ -62,13 +64,13 @@ with stdenv.lib;
 
 stdenv.mkDerivation rec {
   name = "conky-${version}";
-  version = "1.10.5";
+  version = "1.10.6";
 
   src = fetchFromGitHub {
     owner = "brndnmtthws";
     repo = "conky";
     rev = "v${version}";
-    sha256 = "1x1b7h4s8f8qbiyas7sw5v2nq5h2wy3q7hsp1ah4l7191jjidqix";
+    sha256 = "15j8h251v9jpdg6h6wn1vb45pkk806pf9s5n3rdrps9r185w8hn8";
   };
 
   postPatch = ''
@@ -78,17 +80,14 @@ stdenv.mkDerivation rec {
     # Drop examples, since they contain non-ASCII characters that break docbook2x :(
     sed -i 's/ Example: .*$//' doc/config_settings.xml
 
-    substituteInPlace cmake/Docbook.cmake \
-      --replace "http://docbook.sourceforge.net/release/xsl/current/html/docbook.xsl" "${docbook_xsl}/xml/xsl/docbook/html/docbook.xsl"
-    substituteInPlace doc/docs.xml \
-      --replace "http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" "${docbook_xml_dtd_44}/xml/dtd/docbook/docbookx.dtd"
     substituteInPlace cmake/Conky.cmake --replace "#set(RELEASE true)" "set(RELEASE true)"
   '';
 
   NIX_LDFLAGS = "-lgcc_s";
 
-  buildInputs = [ pkgconfig glib cmake libXinerama ]
-    ++ optionals docsSupport        [ docbook2x libxslt man less ]
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ glib cmake libXinerama ]
+    ++ optionals docsSupport        [ docbook2x docbook_xsl docbook_xml_dtd_44 libxslt man less ]
     ++ optional  ncursesSupport     ncurses
     ++ optional  x11Support         xlibsWrapper
     ++ optional  xdamageSupport     libXdamage
@@ -100,6 +99,7 @@ stdenv.mkDerivation rec {
     ++ optional  curlSupport        curl
     ++ optional  rssSupport         libxml2
     ++ optional  weatherXoapSupport libxml2
+    ++ optional  nvidiaSupport      libXNVCtrl
     ;
 
   cmakeFlags = []
@@ -118,6 +118,7 @@ stdenv.mkDerivation rec {
     ++ optional weatherMetarSupport "-DBUILD_WEATHER_METAR=ON"
     ++ optional weatherXoapSupport  "-DBUILD_WEATHER_XOAP=ON"
     ++ optional wirelessSupport     "-DBUILD_WLAN=ON"
+    ++ optional nvidiaSupport       "-DBUILD_NVIDIA=ON"
     ;
 
   meta = with stdenv.lib; {

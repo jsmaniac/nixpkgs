@@ -2,16 +2,17 @@
 
 stdenv.mkDerivation rec {
   name = "pkcs11-helper-${version}";
-  version = "1.11";
+  version = "1.21";
 
   src = fetchFromGitHub {
     owner = "OpenSC";
     repo = "pkcs11-helper";
     rev = "${name}";
-    sha256 = "1bfsmy9w2qf7avvs3rsc1ycqczzzw0j2wsqkd2fj4dc1fqzigq2q";
+    sha256 = "17a2cssycl7fh44xikmhszigx57vvn0h2sjsnmsy3772kfj796b1";
   };
 
-  buildInputs = [ pkgconfig openssl autoreconfHook ];
+  nativeBuildInputs = [ autoreconfHook pkgconfig ];
+  buildInputs = [ openssl ];
 
   meta = with stdenv.lib; {
     homepage = https://www.opensc-project.org/opensc/wiki/pkcs11-helper;

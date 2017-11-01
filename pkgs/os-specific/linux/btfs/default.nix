@@ -3,17 +3,18 @@
 
 stdenv.mkDerivation rec {
   name = "btfs-${version}";
-  version = "2.12";
+  version = "2.17";
 
   src = fetchFromGitHub {
-    owner = "johang";
-    repo = "btfs";
-    rev = "daeb2fd43795f0bb9a4861279b6064b35186ff25";
-    sha256 = "1apvf1gp5973s4wlzwndxp711yd9pj9zf2ypdssfxv2a3rihly2b";
+    owner  = "johang";
+    repo   = "btfs";
+    rev    = "v${version}";
+    sha256 = "0v0mypwnx832f7vg52wmiw0lyz7rrkhqsgi7zc261ak1gfaw4nwd";
   };
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    boost autoreconfHook pkgconfig
+    boost autoreconfHook
     fuse libtorrentRasterbar curl
   ];
 

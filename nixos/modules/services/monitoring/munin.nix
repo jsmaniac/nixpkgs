@@ -26,7 +26,9 @@ let
 
       for file in $out/*; do
         case "$file" in
-            plugin.sh) continue;;
+            */plugin.sh|*/plugins.history)
+              chmod +x "$file"
+              continue;;
         esac
 
         # read magic makers from the file
@@ -34,7 +36,7 @@ let
         cap=$(sed -nr 's/.*#%#\s+capabilities\s*=\s*(.+)/\1/p' $file)
 
         wrapProgram $file \
-          --set PATH "/var/setuid-wrappers:/run/current-system/sw/bin:/run/current-system/sw/bin" \
+          --set PATH "/run/wrappers/bin:/run/current-system/sw/bin" \
           --set MUNIN_LIBDIR "${pkgs.munin}/lib" \
           --set MUNIN_PLUGSTATE "/var/run/munin"
 
@@ -76,6 +78,7 @@ let
       # wrapped plugins by makeWrapper being with dots
       ignore_file ^\.
 
+      allow ^::1$
       allow ^127\.0\.0\.1$
 
       ${nodeCfg.extraConfig}
@@ -183,23 +186,40 @@ in
 
         mkdir -p /etc/munin/plugins
         rm -rf /etc/munin/plugins/*
-        PATH="/var/setuid-wrappers:/run/current-system/sw/bin:/run/current-system/sw/bin" ${pkgs.munin}/sbin/munin-node-configure --shell --families contrib,auto,manual --config ${nodeConf} --libdir=${muninPlugins} --servicedir=/etc/munin/plugins 2>/dev/null | ${pkgs.bash}/bin/bash
+        PATH="/run/wrappers/bin:/run/current-system/sw/bin" ${pkgs.munin}/sbin/munin-node-configure --shell --families contrib,auto,manual --config ${nodeConf} --libdir=${muninPlugins} --servicedir=/etc/munin/plugins 2>/dev/null | ${pkgs.bash}/bin/bash
       '';
       serviceConfig = {
         ExecStart = "${pkgs.munin}/sbin/munin-node --config ${nodeConf} --servicedir /etc/munin/plugins/";
       };
     };
 
+    # munin_stats plugin breaks as of 2.0.33 when this doesn't exist
+    systemd.tmpfiles.rules = [ "d /var/run/munin 0755 munin munin -" ];
+
   }) (mkIf cronCfg.enable {
 
-    services.cron.systemCronJobs = [
-      "*/5 * * * * munin ${pkgs.munin}/bin/munin-cron --config ${muninConf}"
+    systemd.timers.munin-cron = {
+      description = "batch Munin master programs";
+      wantedBy = [ "timers.target" ];
+      timerConfig.OnCalendar = "*:0/5";
+    };
+
+    systemd.services.munin-cron = {
+      description = "batch Munin master programs";
+      unitConfig.Documentation = "man:munin-cron(8)";
+
+      serviceConfig = {
+        Type = "oneshot";
+        User = "munin";
+        ExecStart = "${pkgs.munin}/bin/munin-cron --config ${muninConf}";
+      };
+    };
+
+    systemd.tmpfiles.rules = [
+      "d /var/run/munin 0755 munin munin -"
+      "d /var/log/munin 0755 munin munin -"
+      "d /var/www/munin 0755 munin munin -"
+      "d /var/lib/munin 0755 munin munin -"
     ];
-
-    system.activationScripts.munin-cron = stringAfter [ "users" "groups" ] ''
-      mkdir -p /var/{run,log,www,lib}/munin
-      chown -R munin:munin /var/{run,log,www,lib}/munin
-    '';
-
   })];
 }

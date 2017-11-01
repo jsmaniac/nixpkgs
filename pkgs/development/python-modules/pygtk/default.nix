@@ -3,7 +3,7 @@
 
 buildPythonPackage rec {
   name = "pygtk-2.24.0";
-  
+
   disabled = isPy3k;
 
   src = fetchurl {
@@ -11,7 +11,8 @@ buildPythonPackage rec {
     sha256 = "04k942gn8vl95kwf0qskkv6npclfm31d78ljkrkgyqxxcni1w76d";
   };
 
-  buildInputs = [ pkgconfig ]
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ ]
     ++ stdenv.lib.optional (libglade != null) libglade;
 
   propagatedBuildInputs = [ gtk2 pygobject2 pycairo ];
@@ -19,6 +20,8 @@ buildPythonPackage rec {
   configurePhase = "configurePhase";
 
   buildPhase = "buildPhase";
+
+  NIX_CFLAGS_COMPILE = stdenv.lib.optionalString stdenv.isDarwin "-ObjC";
 
   installPhase = "installPhase";
 

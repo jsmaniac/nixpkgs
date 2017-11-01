@@ -1,7 +1,7 @@
 {stdenv, androidsdk, titaniumsdk, titanium, alloy, xcodewrapper, jdk, python, nodejs, which, xcodeBaseDir}:
 { name, src, target, androidPlatformVersions ? [ "23" ], androidAbiVersions ? [ "armeabi" "armeabi-v7a" ], tiVersion ? null
 , release ? false, androidKeyStore ? null, androidKeyAlias ? null, androidKeyStorePassword ? null
-, iosMobileProvisioningProfile ? null, iosCertificateName ? null, iosCertificate ? null, iosCertificatePassword ? null, iosVersion ? "9.2"
+, iosMobileProvisioningProfile ? null, iosCertificateName ? null, iosCertificate ? null, iosCertificatePassword ? null, iosVersion ? "10.2"
 , enableWirelessDistribution ? false, installURL ? null
 }:
 
@@ -21,7 +21,7 @@ let
     security delete-keychain $keychainName
   '';
   
-  # On Mac OS X, the java executable shows an -unoffical postfix in the version
+  # On macOS, the java executable shows an -unoffical postfix in the version
   # number. This confuses the build script's version detector.
   # We fix this by creating a wrapper that strips it out of the output.
   
@@ -72,7 +72,7 @@ stdenv.mkDerivation {
     ${if target == "android" then
         ''
           ${stdenv.lib.optionalString (stdenv.system == "x86_64-darwin") ''
-            # Hack to make version detection work with OpenJDK on Mac OS X
+            # Hack to make version detection work with OpenJDK on macOS
             export PATH=${javaVersionFixWrapper}/bin:$PATH
             export JAVA_HOME=${javaVersionFixWrapper}
             javac -version
@@ -99,6 +99,7 @@ stdenv.mkDerivation {
               security default-keychain -s $keychainName
               security unlock-keychain -p "" $keychainName
               security import ${iosCertificate} -k $keychainName -P "${iosCertificatePassword}" -A
+              security set-key-partition-list -S apple-tool:,apple: -s -k "" $keychainName
               provisioningId=$(grep UUID -A1 -a ${iosMobileProvisioningProfile} | grep -o "[-A-Za-z0-9]\{36\}")
    
               # Ensure that the requested provisioning profile can be found
@@ -130,7 +131,7 @@ stdenv.mkDerivation {
               fi
               
               # Do the actual build
-              titanium build --config-file $TMPDIR/config.json --force --no-colors --platform ios --target dist-adhoc --pp-uuid $provisioningId --distribution-name "${iosCertificateName}" --keychain $HOME/Library/Keychains/$keychainName --device-family universal --ios-version ${iosVersion} --output-dir $out
+              titanium build --config-file $TMPDIR/config.json --force --no-colors --platform ios --target dist-adhoc --pp-uuid $provisioningId --distribution-name "${iosCertificateName}" --keychain $HOME/Library/Keychains/$keychainName-db --device-family universal --ios-version ${iosVersion} --output-dir $out
             
               # Remove our generated keychain
               ${deleteKeychain}

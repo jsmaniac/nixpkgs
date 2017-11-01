@@ -4,16 +4,17 @@
 let
   version = "${major}.11";
   major = "0.3";
-in pythonPackages.mkPythonDerivation rec {
+in pythonPackages.buildPythonApplication rec {
   name = "d-feet-${version}";
-  namePrefix = "";
+  format = "other";
 
   src = fetchurl {
     url = "mirror://gnome/sources/d-feet/${major}/d-feet-${version}.tar.xz";
     sha256 = "a3dc940c66f84b996c328531e3034d475ec690d7ff639445ff7ca746aa8cb9c2";
   };
 
-  buildInputs = [ pkgconfig libxml2 itstool intltool glib gtk3
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ libxml2 itstool intltool glib gtk3
     gnome3.defaultIconTheme makeWrapper libwnck3
   ];
 

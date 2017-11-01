@@ -2,13 +2,13 @@
 
 stdenv.mkDerivation rec {
   name = "raspberrypi-firmware-${version}";
-  version = "1.20160620";
+  version = "1.20170811";
 
   src = fetchFromGitHub {
     owner = "raspberrypi";
     repo = "firmware";
     rev = version;
-    sha256 = "06g691px0abndp5zvz2ba1g675rcqb64n055h5ahgnlck5cdpawg";
+    sha256 = "1lrbbslpwjgvrn7hk3l104gkl07qxh7qd4cdyqccqhqzip9wqhkn";
   };
 
   dontStrip = true;    # Stripping breaks some of the binaries
@@ -31,7 +31,7 @@ stdenv.mkDerivation rec {
     description = "Firmware for the Raspberry Pi board";
     homepage = https://github.com/raspberrypi;
     license = licenses.unfree;
-    platforms = [ "armv6l-linux" "armv7l-linux" ];
+    platforms = [ "armv6l-linux" "armv7l-linux" "aarch64-linux" ];
     maintainers = with maintainers; [ viric tavyc ];
   };
 }

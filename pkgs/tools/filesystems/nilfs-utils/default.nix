@@ -1,9 +1,9 @@
 { stdenv, fetchurl, libuuid, libselinux }:
 let 
   sourceInfo = rec {
-    version = "2.2.5";
+    version = "2.2.6";
     url = "http://nilfs.sourceforge.net/download/nilfs-utils-${version}.tar.bz2";
-    sha256 = "0a5iavbjj8c255mfl968ljmj3cb217k7803cc1sdaskacwnykdq2";
+    sha256 = "1rjj6pv7yx5wm7b3w6hv88v6r53jqaam5nrnkw2and4ifhsprf3y";
     baseName = "nilfs-utils";
     name = "${baseName}-${version}";
   };
@@ -23,8 +23,14 @@ stdenv.mkDerivation rec {
     sed -e 's@/sbin/@'"$out"'/sbin/@' -i ./lib/cleaner*.c
   '';
 
-  # FIXME: Remove after https://github.com/NixOS/patchelf/pull/98 is in
-  dontPatchELF = true;
+  # FIXME: https://github.com/NixOS/patchelf/pull/98 is in, but stdenv
+  # still doesn't use it
+  #
+  # To make sure patchelf doesn't mistakenly keep the reference via
+  # build directory
+  postInstall = ''
+    find . -name .libs | xargs rm -rf
+  '';
 
   meta = {
     description = "NILFS utilities";

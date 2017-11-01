@@ -26,11 +26,20 @@ stdenv.mkDerivation rec {
     }' run/*.conf
   '';
 
-  preConfigure = "cd src";
+  preConfigure = ''
+    cd src
+    # Makefile.in depends on AS and LD being set to CC, which is set by default in configure.ac.
+    # This ensures we override the environment variables set in cc-wrapper/setup-hook.sh
+    export AS=$CC
+    export LD=$CC
+  '';
   configureFlags = [ "--disable-native-macro" ];
 
   buildInputs = [ openssl nss nspr kerberos gmp zlib libpcap re2 gcc ];
-  enableParallelBuilding = true;
+
+  # gcc -DAC_BUILT -Wall vncpcap2john.o memdbg.o -g    -lpcap -fopenmp -o ../run/vncpcap2john
+  # gcc: error: memdbg.o: No such file or directory
+  enableParallelBuilding = false;
 
   NIX_CFLAGS_COMPILE = [ "-DJOHN_SYSTEMWIDE=1" ];
 

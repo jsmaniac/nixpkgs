@@ -56,7 +56,7 @@ let
   };
 
   melpaPackages = import ../applications/editors/emacs-modes/melpa-packages.nix {
-    inherit lib;
+    inherit external lib;
   };
 
   orgPackages = import ../applications/editors/emacs-modes/org-packages.nix {
@@ -94,7 +94,8 @@ let
       rev = "v${version}";
       sha256 = "19sy49r3ijh36m7hl4vspw5c4i8pnfqdn4ldm2sqchxigkw56ayl";
     };
-    buildInputs = with external; [ autoconf automake libpng zlib poppler pkgconfig ];
+    nativeBuildInputs = [ external.pkgconfig ];
+    buildInputs = with external; [ autoconf automake libpng zlib poppler ];
     preBuild = "make server/epdfinfo";
     fileSpecs = [ "lisp/pdf-*.el" "server/epdfinfo" ];
     packageRequires = [ tablist let-alist ];
@@ -238,6 +239,22 @@ let
     };
   };
 
+  haskell-unicode-input-method = melpaBuild rec {
+    pname = "emacs-haskell-unicode-input-method";
+    version = "20110905.2307";
+    src = fetchFromGitHub {
+      owner = "roelvandijk";
+      repo = "emacs-haskell-unicode-input-method";
+      rev = "d8d168148c187ed19350bb7a1a190217c2915a63";
+      sha256 = "09b7bg2s9aa4s8f2kdqs4xps3jxkq5wsvbi87ih8b6id38blhf78";
+    };
+    packageRequires = [];
+    meta = {
+      homepage = "https://melpa.org/#haskell-unicode-input-method/";
+      license = lib.licenses.free;
+    };
+  };
+
   hindent = melpaBuild rec {
     pname = "hindent";
     version = external.hindent.version;
@@ -253,8 +270,11 @@ let
 
   rtags = melpaBuild rec {
     pname = "rtags";
-    version = "2.0"; # really, it's some arbitrary git hash
+    version = "2.12";
     src = external.rtags.src;
+
+    configurePhase = ":";
+
     propagatedUserEnvPkgs = [ external.rtags ];
     fileSpecs = [ "src/*.el" ];
     inherit (external.rtags) meta;
@@ -286,6 +306,8 @@ let
   nyan-mode = callPackage ../applications/editors/emacs-modes/nyan-mode {
     inherit lib;
   };
+
+  gn = callPackage ../applications/editors/emacs-modes/gn { };
 
   shorten = melpaBuild rec {
     pname   = "shorten";

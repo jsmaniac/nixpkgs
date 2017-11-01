@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, alsaLib, bzip2, cairo, dpkg, freetype, gdk_pixbuf
+{ stdenv, fetchurl, alsaLib, bzip2, cairo, dpkg, ffmpeg, freetype, gdk_pixbuf
 , glib, gtk2, harfbuzz, jdk, lib, libX11, libXau, libXcursor, libXdmcp
 , libXext, libXfixes, libXrender, libbsd, libjack2, libpng, libxcb
 , libxkbcommon, libxkbfile, makeWrapper, pixman, xcbutil, xcbutilwm
@@ -6,11 +6,11 @@
 
 stdenv.mkDerivation rec {
   name = "bitwig-studio-${version}";
-  version = "1.3.12";
+  version = "2.1.3";
 
   src = fetchurl {
     url = "https://downloads.bitwig.com/stable/${version}/bitwig-studio-${version}.deb";
-    sha256 = "01z6yia4a6lfsf3rqq379l7xzqfbpz27mf1mr8sx9z1a8rzzyhld";
+    sha256 = "0blfw7dayl1wzys11mdixlkbr1p1d5rnwrvim1hblfpnw2zmlslb";
   };
 
   nativeBuildInputs = [ dpkg makeWrapper ];
@@ -29,7 +29,7 @@ stdenv.mkDerivation rec {
   ];
 
   binPath = lib.makeBinPath [
-    xdg_utils zenity
+    ffmpeg xdg_utils zenity
   ];
 
   installPhase = ''
@@ -80,6 +80,9 @@ stdenv.mkDerivation rec {
     ln -s $out/libexec/bitwig-studio $out/bin/bitwig-studio
 
     cp -r usr/share $out/share
+    substitute usr/share/applications/bitwig-studio.desktop \
+      $out/share/applications/bitwig-studio.desktop \
+      --replace /usr/bin/bitwig-studio $out/bin/bitwig-studio
   '';
 
   meta = with stdenv.lib; {

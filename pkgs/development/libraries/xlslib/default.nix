@@ -1,8 +1,8 @@
 { stdenv, fetchurl, autoreconfHook, unzip }:
 
 stdenv.mkDerivation rec {
-  version = "2.5.0";
   name = "xlslib-${version}";
+  version = "2.5.0";
 
   src = fetchurl {
     url = "mirror://sourceforge/xlslib/xlslib-package-${version}.zip";

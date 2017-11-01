@@ -1,11 +1,12 @@
-{ lib, fetchurl, pythonPackages, pkgconfig, qtbase, qtsvg, qtwebkit, dbus_libs
-, lndir, makeWrapper, qmakeHook }:
+{ lib, fetchurl, pythonPackages, pkgconfig, qtbase, qtsvg, qtwebkit, qtwebengine, dbus_libs
+, lndir, makeWrapper, qmake }:
 
 let
-  version = "5.6";
-  inherit (pythonPackages) mkPythonDerivation python dbus-python sip;
-in mkPythonDerivation {
+  version = "5.9";
+  inherit (pythonPackages) buildPythonPackage python dbus-python sip;
+in buildPythonPackage {
   name = "PyQt-${version}";
+  format = "other";
 
   meta = with lib; {
     description = "Python bindings for Qt5";
@@ -17,12 +18,13 @@ in mkPythonDerivation {
 
   src = fetchurl {
     url = "mirror://sourceforge/pyqt/PyQt5/PyQt-${version}/PyQt5_gpl-${version}.tar.gz";
-    sha256 = "1qgh42zsr9jppl9k7fcdbhxcd1wrb7wyaj9lng9nxfa19in1lj1f";
+    sha256 = "15hh4z5vd45dcswjla58q6rrfr6ic7jfz2n7c8lwfb10rycpj3mb";
   };
 
+  nativeBuildInputs = [ pkgconfig makeWrapper qmake ];
+
   buildInputs = [
-    pkgconfig makeWrapper lndir
-    qtbase qtsvg qtwebkit dbus_libs qmakeHook
+    lndir qtbase qtsvg qtwebkit qtwebengine dbus_libs
   ];
 
   propagatedBuildInputs = [ sip ];

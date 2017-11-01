@@ -11,6 +11,7 @@
 , qt4 ? null
 , withQt5 ? false, qtbase ? null, qtx11extras ? null
 , jackSupport ? false
+, fetchpatch
 }:
 
 with stdenv.lib;
@@ -20,12 +21,20 @@ assert (!withQt5 -> qt4 != null);
 
 stdenv.mkDerivation rec {
   name = "vlc-${version}";
-  version = "2.2.4";
+  version = "2.2.6";
 
   src = fetchurl {
     url = "http://get.videolan.org/vlc/${version}/${name}.tar.xz";
-    sha256 = "1gjkrwlg8ab3skzl67cxb9qzg4187ifckd1z9kpy11q058fyjchn";
+    sha256 = "1a22b913p2227ljz89c4fgjlyln5gcz8z58w32r0wh4srnnd60y4";
   };
+
+  patches = [
+    (fetchpatch {
+      name = "CVE-2017-9300.patch";
+      url = "https://git.videolan.org/?p=vlc/vlc-2.2.git;a=patch;h=55a82442cfea9dab8b853f3a4610f2880c5fadf3;hp=dbe888f9ca9c3b102478b4a16a3d1d985c267899";
+      sha256 = "0l0fwqkn31lggwc5dkhb58gkv8pc6ng51y0izjigqvfqvhwdnzxn";
+    })
+  ];
 
   # Comment-out the Qt 5.5 version check, as we do apply the relevant patch.
   # https://trac.videolan.org/vlc/ticket/16497
@@ -50,6 +59,15 @@ stdenv.mkDerivation rec {
 
   LIVE555_PREFIX = live555;
 
+  preConfigure = ''
+    sed -e "s@/bin/echo@echo@g" -i configure
+  '' + optionalString withQt5 ''
+    # Make sure we only *add* "-std=c++11" to CXXFLAGS instead of overriding the
+    # values figured out by configure (for example "-g -O2").
+    sed -i -re '/^ *CXXFLAGS=("[^$"]+")? *$/s/CXXFLAGS="?/&-std=c++11 /' \
+      configure
+  '';
+
   configureFlags =
     [ "--enable-alsa"
       "--with-kde-solid=$out/share/apps/solid/actions"
@@ -60,8 +78,6 @@ stdenv.mkDerivation rec {
       "--enable-samplerate"
     ]
     ++ optional onlyLibVLC  "--disable-vlc";
-
-  preConfigure = ''sed -e "s@/bin/echo@echo@g" -i configure'';
 
   enableParallelBuilding = true;
 
@@ -76,9 +92,5 @@ stdenv.mkDerivation rec {
     homepage = http://www.videolan.org/vlc/;
     platforms = platforms.linux;
     license = licenses.lgpl21Plus;
-    broken =
-      if withQt5
-      then builtins.compareVersions qtbase.version "5.7.0" >= 0
-      else false;
   };
 }

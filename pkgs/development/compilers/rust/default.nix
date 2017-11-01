@@ -1,34 +1,36 @@
-{ stdenv, callPackage, recurseIntoAttrs, makeRustPlatform,
-  targets ? [], targetToolchains ? [], targetPatches ? [] }:
+{ stdenv, callPackage, recurseIntoAttrs, makeRustPlatform, llvm, fetchurl
+, targets ? []
+, targetToolchains ? []
+, targetPatches ? []
+}:
 
 let
   rustPlatform = recurseIntoAttrs (makeRustPlatform (callPackage ./bootstrap.nix {}));
+  version = "1.20.0";
 in
-
 rec {
   rustc = callPackage ./rustc.nix {
-    shortVersion = "1.13";
-    isRelease = true;
-    forceBundledLLVM = false;
+    inherit llvm targets targetPatches targetToolchains rustPlatform version;
+
+    forceBundledLLVM = true;
+
     configureFlags = [ "--release-channel=stable" ];
-    srcRev = "2c6933acc05c61e041be764cb1331f6281993f3f";
-    srcSha = "1w0alyyc29cy2lczrqvg1kfycjxy0xg8fpzdac80m88fxpv23glp";
+
+    src = fetchurl {
+      url = "https://static.rust-lang.org/dist/rustc-${version}-src.tar.gz";
+      sha256 = "0542y4rnzlsrricai130mqyxl8r6rd991frb4qsnwb27yigqg91a";
+    };
 
     patches = [
-      ./patches/disable-lockfile-check.patch
+      ./patches/0001-Disable-fragile-tests-libstd-net-tcp-on-Darwin-Linux.patch
     ] ++ stdenv.lib.optional stdenv.needsPax ./patches/grsec.patch;
 
-    inherit targets;
-    inherit targetPatches;
-    inherit targetToolchains;
-    inherit rustPlatform;
   };
 
   cargo = callPackage ./cargo.nix rec {
-    version = "0.14.0";
-    srcRev = "eca9e159b6b0d484788ac757cf23052eba75af55";
-    srcSha = "1zm5rzw1mvixnkzr4775pcxx6k235qqxbysyp179cbxsw3dm045s";
-    depsSha256 = "0gpn0cpwgpzwhc359qn6qplx371ag9pqbwayhqrsydk1zm5bm3zr";
+    version = "0.22.0";
+    srcSha = "0x9pm73hkkd1hq4qrmz8iv91djgpdsxzwll7jari0h77vpwajmw4";
+    cargoSha256 = "0xd0rb8gcqy6xngsx9l30jg3fqrcwccgv904ksqs9c4d44hga0gd";
 
     inherit rustc; # the rustc that will be wrapped by cargo
     inherit rustPlatform; # used to build cargo

@@ -59,15 +59,16 @@ let
         srcs = [ rubySrc rubygemsSrc ];
         sourceRoot =
           if useRailsExpress then
-            "ruby-${tag}-src"
+            rubySrc.name
           else
             unpackdir rubySrc;
 
         # Have `configure' avoid `/usr/bin/nroff' in non-chroot builds.
         NROFF = "${groff}/bin/nroff";
 
-        buildInputs = ops useRailsExpress [ autoreconfHook bison ]
-          ++ (op fiddleSupport libffi)
+        nativeBuildInputs = ops useRailsExpress [ autoreconfHook bison ];
+        buildInputs =
+             (op fiddleSupport libffi)
           ++ (ops cursesSupport [ ncurses readline ])
           ++ (op docSupport groff)
           ++ (op zlibSupport zlib)
@@ -83,7 +84,7 @@ let
 
         enableParallelBuilding = true;
 
-        hardeningDisable = lib.optional isRuby20 [ "format" ];
+        hardeningDisable = lib.optional isRuby20 "format";
 
         patches =
           (import ./patchsets.nix {
@@ -113,6 +114,7 @@ let
 
         configureFlags = ["--enable-shared" "--enable-pthread"]
           ++ op useRailsExpress "--with-baseruby=${baseruby}/bin/ruby"
+          ++ op (!docSupport) "--disable-install-doc"
           ++ ops stdenv.isDarwin [
             # on darwin, we have /usr/include/tk.h -- so the configure script detects
             # that tk is installed
@@ -150,12 +152,12 @@ let
           sed -i "s|'--with-baseruby=${baseruby}/bin/ruby'||" $rbConfig
         '';
 
-        meta = {
-          license = stdenv.lib.licenses.ruby;
-          homepage = http://www.ruby-lang.org/en/;
+        meta = with stdenv.lib; {
           description = "The Ruby language";
-          maintainers = [ stdenv.lib.maintainers.vrthra ];
-          platforms = stdenv.lib.platforms.all;
+          homepage    = http://www.ruby-lang.org/en/;
+          license     = licenses.ruby;
+          maintainers = with maintainers; [ vrthra manveru ];
+          platforms   = platforms.all;
         };
 
         passthru = rec {
@@ -179,19 +181,11 @@ let
     ) args; in self;
 
 in {
-  ruby_1_9_3 = generic {
-    version = rubyVersion "1" "9" "3" "p551";
-    sha256 = {
-      src = "1s2ibg3s2iflzdv7rfxi1qqkvdbn2dq8gxdn0nxrb77ls5ffanxv";
-      git = "1r9xzzxmci2ajb34qb4y1w424mz878zdgzxkfp9w60agldxnb36s";
-    };
-  };
-
   ruby_2_0_0 = generic {
-    version = rubyVersion "2" "0" "0" "p647";
+    version = rubyVersion "2" "0" "0" "p648";
     sha256 = {
-      src = "1v2vbvydarcx5801gx9lc6gr6dfi0i7qbzwhsavjqbn79rdsz2n8";
-      git = "186pf4q9xymzn4zn1sjppl1skrl5f0159ixz5cz8g72dmmynq3g3";
+      src = "1y3n4c6xw2wki7pyjpq5zpbgxnw5i3jc8mcpj6rk7hs995mvv446";
+      git = "0ncjfq4hfqj9kcr8pbll6kypwnmcgs8w7l4466qqfyv7jj3yjd76";
     };
   };
 
@@ -203,19 +197,27 @@ in {
     };
   };
 
-  ruby_2_2_5 = generic {
-    version = rubyVersion "2" "2" "5" "";
+  ruby_2_2_8 = generic {
+    version = rubyVersion "2" "2" "8" "";
     sha256 = {
-      src = "1qrmlcyc0cy9hgafb1wny2h90rjyyh6d72nvr2h4xjm4jwbb7i1h";
-      git = "0k0av6ypyq08c9axm721f0xi2bcp1443l7ydbxv4v8x4vsxdkmq2";
+      src = "12i6v5i0djl4xx3x7fq12snqb5d4drqjmnwqs05fby4bagcbjdwg";
+      git = "16nw0795nhrj13crp5x4jis8hmi3gsyjl96pwk698wlrb89lf9bw";
     };
   };
 
-  ruby_2_3_1 = generic {
-    version = rubyVersion "2" "3" "1" "";
+  ruby_2_3_5 = generic {
+    version = rubyVersion "2" "3" "5" "";
     sha256 = {
-      src = "1kbxg72las93w0y553cxv3lymy2wvij3i3pg1y9g8aq3na676z5q";
-      git = "0dv1rf5f9lj3icqs51bq7ljdcf17sdclmxm9hilwxps5l69v5q9r";
+      src = "1k6x4g68lq30i0myip5bn56rcbwjxmqq95j1fkdgbvwbnaxzfqjl";
+      git = "0spwqz4b5xxqzs13azsd4xz4jkc3is7d9q4s6s2qilb8ib4863jl";
+    };
+  };
+
+  ruby_2_4_2 = generic {
+    version = rubyVersion "2" "4" "2" "";
+    sha256 = {
+      src = "174cdiz3am1f76vsnm3iqi9c5vqphypbf9kbxx6vqqmj01gfgfck";
+      git = "1w83kzak3m6vv3k09ynfw9vpgc7vpmij3x3zmgrhwm4ds1sp5irl";
     };
   };
 }

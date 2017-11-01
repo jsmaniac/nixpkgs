@@ -30,35 +30,27 @@ let
   });
 
 in {
-
-  tomcat6 = common {
-    versionMajor = "6";
-    versionMinor = "0.45";
-    sha256 = "0ba8h86padpk23xmscp7sg70g0v8ji2jbwwriz59hxqy5zhd76wg";
-  };
-
   tomcat7 = common {
     versionMajor = "7";
-    versionMinor = "0.72";
-    sha256 = "1nx5pmz3bq3n20fdspqh8ljqy1nj67rwi1vsqjpkrvd996x7p73p";
+    versionMinor = "0.81";
+    sha256 = "0mcr3caizqk6qrc0j9p91apdsg65ksawg0l6xpqk1fq6071nd5rq";
   };
 
   tomcat8 = common {
     versionMajor = "8";
-    versionMinor = "0.37";
-    sha256 = "0f9d4yxjzwdrayj5l3jyiclnmpb5lffvmsnp54qpf6m3gm7cj5i6";
+    versionMinor = "0.46";
+    sha256 = "14wb9mgb7z02j6wvvmcsfc2zkcqnijc40gzyg1mnxcy5fvf8nzpk";
   };
 
   tomcat85 = common {
     versionMajor = "8";
-    versionMinor = "5.5";
-    sha256 = "0idfxjrw5q45f531gyjnv6xjkbj9nhy2v1w4z7558z96230a0fqj";
+    versionMinor = "5.20";
+    sha256 = "1l5cgxzaassjnfbr4rbr3wzz45idcqa8aqhphhvlx1xl8xqv6p8a";
   };
 
   tomcatUnstable = common {
     versionMajor = "9";
-    versionMinor = "0.0.M10";
-    sha256 = "0p3pqwz9zjvr9w73divsyaa53mbazf0icxfs06wvgxsvkbgj5gq9";
+    versionMinor = "0.0.M17";
+    sha256 = "1ilvka2062m7412bj2fsdwvfxbrjyj9qxcia40hhv22prvkxw3cg";
   };
-
 }

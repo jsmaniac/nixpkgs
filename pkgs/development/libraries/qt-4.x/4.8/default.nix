@@ -1,12 +1,14 @@
 { stdenv, fetchurl, fetchpatch, substituteAll
+, hostPlatform
 , libXrender, libXinerama, libXcursor, libXmu, libXv, libXext
 , libXfixes, libXrandr, libSM, freetype, fontconfig, zlib, libjpeg, libpng
 , libmng, which, mesaSupported, mesa, mesa_glu, openssl, dbus, cups, pkgconfig
 , libtiff, glib, icu, mysql, postgresql, sqlite, perl, coreutils, libXi
-, buildMultimedia ? stdenv.isLinux, alsaLib, gstreamer, gst_plugins_base
-, buildWebkit ? stdenv.isLinux
+, buildMultimedia ? stdenv.isLinux, alsaLib, gstreamer, gst-plugins-base
+, buildWebkit ? (stdenv.isLinux || stdenv.isDarwin)
 , flashplayerFix ? false, gdk_pixbuf
-, gtkStyle ? false, libgnomeui, gtk2, GConf, gnome_vfs
+, gtkStyle ? true, gtk2
+, gnomeStyle ? false, libgnomeui, GConf, gnome_vfs
 , developerBuild ? false
 , docs ? false
 , examples ? false
@@ -54,6 +56,12 @@ stdenv.mkDerivation rec {
     # there might be more references, but this is the only one I could find
     substituteInPlace tools/macdeployqt/tests/tst_deployment_mac.cpp \
       --replace /usr/lib/libstdc++.6.dylib "${stdenv.cc}/lib/libstdc++.6.dylib"
+  '' + stdenv.lib.optionalString stdenv.cc.isClang ''
+    substituteInPlace src/3rdparty/webkit/Source/WebCore/html/HTMLImageElement.cpp \
+      --replace 'optionalHeight > 0' 'optionalHeight != NULL'
+
+    substituteInPlace ./tools/linguist/linguist/messagemodel.cpp \
+      --replace 'm->comment()) >= 0' 'm->comment()) != NULL'
   '';
 
   patches =
@@ -61,31 +69,43 @@ stdenv.mkDerivation rec {
       ./libressl.patch
       (substituteAll {
         src = ./dlopen-absolute-paths.diff;
-        cups = if cups != null then cups.out else null;
+        cups = if cups != null then stdenv.lib.getLib cups else null;
         icu = icu.out;
         libXfixes = libXfixes.out;
         glibc = stdenv.cc.libc.out;
         openglDriver = if mesaSupported then mesa.driverLink else "/no-such-path";
       })
-    ] ++ stdenv.lib.optional gtkStyle (substituteAll {
+    ] ++ stdenv.lib.optional gtkStyle (substituteAll ({
         src = ./dlopen-gtkstyle.diff;
         # substituteAll ignores env vars starting with capital letter
-        gconf = GConf.out;
         gtk = gtk2.out;
+      } // stdenv.lib.optionalAttrs gnomeStyle {
+        gconf = GConf.out;
         libgnomeui = libgnomeui.out;
         gnome_vfs = gnome_vfs.out;
-      })
+      }))
     ++ stdenv.lib.optional flashplayerFix (substituteAll {
         src = ./dlopen-webkit-nsplugin.diff;
         gtk = gtk2.out;
         gdk_pixbuf = gdk_pixbuf.out;
       })
-    ++ [(fetchpatch {
+    ++ stdenv.lib.optional stdenv.isAarch64 (fetchpatch {
+        url = "https://src.fedoraproject.org/rpms/qt/raw/ecf530486e0fb7fe31bad26805cde61115562b2b/f/qt-aarch64.patch";
+        sha256 = "1fbjh78nmafqmj7yk67qwjbhl3f6ylkp6x33b1dqxfw9gld8b3gl";
+      })
+    ++ [
+      (fetchpatch {
         name = "fix-medium-font.patch";
         url = "http://anonscm.debian.org/cgit/pkg-kde/qt/qt4-x11.git/plain/debian/patches/"
           + "kubuntu_39_fix_medium_font.diff?id=21b342d71c19e6d68b649947f913410fe6129ea4";
         sha256 = "0bli44chn03c2y70w1n8l7ss4ya0b40jqqav8yxrykayi01yf95j";
-      })];
+      })
+      (fetchpatch {
+        name = "qt4-gcc6.patch";
+        url = "https://git.archlinux.org/svntogit/packages.git/plain/trunk/qt4-gcc6.patch?h=packages/qt4&id=ca773a144f5abb244ac4f2749eeee9333cac001f";
+        sha256 = "07lrva7bjh6i40p7b3ml26a2jlznri8bh7y7iyx5zmvb1gfxmj34";
+      })
+    ];
 
   preConfigure = ''
     export LD_LIBRARY_PATH="`pwd`/lib:$LD_LIBRARY_PATH"
@@ -98,6 +118,7 @@ stdenv.mkDerivation rec {
       -datadir $out/share/${name}
       -translationdir $out/share/${name}/translations
     "
+    unset LD # Makefile uses gcc for linking; setting LD interferes
   '' + optionalString stdenv.cc.isClang ''
     sed -i 's/QMAKE_CC = gcc/QMAKE_CC = clang/' mkspecs/common/g++-base.conf
     sed -i 's/QMAKE_CXX = g++/QMAKE_CXX = clang++/' mkspecs/common/g++-base.conf
@@ -131,7 +152,7 @@ stdenv.mkDerivation rec {
         # Qt doesn't directly need GLU (just GL), but many apps use, it's small and doesn't remain a runtime-dep if not used
     ++ optional mesaSupported mesa_glu
     ++ optional ((buildWebkit || buildMultimedia) && stdenv.isLinux ) alsaLib
-    ++ optionals (buildWebkit || buildMultimedia) [ gstreamer gst_plugins_base ];
+    ++ optionals (buildWebkit || buildMultimedia) [ gstreamer gst-plugins-base ];
 
   # The following libraries are only used in plugins
   buildInputs =
@@ -145,8 +166,10 @@ stdenv.mkDerivation rec {
 
   enableParallelBuilding = false;
 
-  NIX_CFLAGS_COMPILE = optionalString (stdenv.isFreeBSD || stdenv.isDarwin)
-    "-I${glib.dev}/include/glib-2.0 -I${glib.out}/lib/glib-2.0/include"
+  NIX_CFLAGS_COMPILE =
+    optionalString stdenv.isLinux "-std=gnu++98" # gnu++ in (Obj)C flags is no good on Darwin
+    + optionalString (stdenv.isFreeBSD || stdenv.isDarwin)
+      " -I${glib.dev}/include/glib-2.0 -I${glib.out}/lib/glib-2.0/include"
     + optionalString stdenv.isDarwin " -I${libcxx}/include/c++/v1";
 
   NIX_LDFLAGS = optionalString (stdenv.isFreeBSD || stdenv.isDarwin)
@@ -160,14 +183,40 @@ stdenv.mkDerivation rec {
     sed -i 's/^\(LIBS[[:space:]]*=.*$\)/\1 -lobjc/' ./src/corelib/Makefile.Release
   '';
 
-  postInstall =
-    ''
-      rm -rf $out/tests
-    '';
+  installPhase = optionalString stdenv.isDarwin ''
+    runHook preInstall
+    cp -r lib $out
 
-  crossAttrs = let
-    isMingw = stdenv.cross.libc == "msvcrt";
-  in {
+    mkdir -p $out/Applications
+    mv bin/*.app $out/Applications
+    rm -rf bin/*.app
+
+    cp -r bin $out
+
+    mkdir -p $out/share/doc/${name}
+    mkdir -p $out/lib
+    mkdir -p $out/lib/qt4/plugins
+    mkdir -p $out/lib/qt4/imports
+    mkdir -p $out/bin
+    mkdir -p $out/include
+    mkdir -p $out/share/${name}
+
+    cp -r mkspecs $out/share/${name}
+    cp -r translations $out/share/${name}
+    cp -r tools/linguist/phrasebooks $out/share/${name}
+    cp tools/porting/src/q3porting.xml $out/share/${name}
+
+    cp -r plugins $out/lib/qt4
+    cp -r imports $out/lib/qt4
+    cp -r doc/* $out/share/doc/${name}
+    runHook postInstall
+  '';
+
+  postInstall = optionalString (!stdenv.isDarwin) ''
+      rm -rf $out/tests
+  '';
+
+  crossAttrs = {
     # I've not tried any case other than i686-pc-mingw32.
     # -nomake tools:   it fails linking some asian language symbols
     # -no-svg: it fails to build on mingw64
@@ -177,14 +226,14 @@ stdenv.mkDerivation rec {
       -no-svg
       -make qmake -make libs -nomake tools
       -nomake demos -nomake examples -nomake docs
-    '' + optionalString isMingw " -xplatform win32-g++-4.6";
+    '' + optionalString hostPlatform.isMinGW " -xplatform win32-g++-4.6";
     patches = [];
     preConfigure = ''
-      sed -i -e 's/ g++/ ${stdenv.cross.config}-g++/' \
-        -e 's/ gcc/ ${stdenv.cross.config}-gcc/' \
-        -e 's/ ar/ ${stdenv.cross.config}-ar/' \
-        -e 's/ strip/ ${stdenv.cross.config}-strip/' \
-        -e 's/ windres/ ${stdenv.cross.config}-windres/' \
+      sed -i -e 's/ g++/ ${stdenv.cc.prefix}g++/' \
+        -e 's/ gcc/ ${stdenv.cc.prefix}gcc/' \
+        -e 's/ ar/ ${stdenv.cc.prefix}ar/' \
+        -e 's/ strip/ ${stdenv.cc.prefix}strip/' \
+        -e 's/ windres/ ${stdenv.cc.prefix}windres/' \
         mkspecs/win32-g++/qmake.conf
     '';
 
@@ -192,9 +241,9 @@ stdenv.mkDerivation rec {
     postInstall = ''
       cp bin/qmake* $out/bin
     '';
-    dontSetConfigureCross = true;
+    configurePlatforms = [];
     dontStrip = true;
-  } // optionalAttrs isMingw {
+  } // optionalAttrs hostPlatform.isMinGW {
     propagatedBuildInputs = [ ];
   };
 
@@ -202,7 +251,7 @@ stdenv.mkDerivation rec {
     homepage    = http://qt-project.org/;
     description = "A cross-platform application framework for C++";
     license     = licenses.lgpl21Plus; # or gpl3
-    maintainers = with maintainers; [ lovek323 phreedom sander urkud ];
+    maintainers = with maintainers; [ lovek323 phreedom sander ];
     platforms   = platforms.unix;
   };
 }

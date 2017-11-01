@@ -1,37 +1,30 @@
-{ stdenv, fetchdarcs, rustPlatform, openssl, libssh }:
+{ stdenv, fetchurl, rustPlatform, darwin }:
 
 with rustPlatform;
 
 buildRustPackage rec {
   name = "pijul-${version}";
-  version = "0.2-6ab9ba";
+  version = "0.7.3";
 
-  src = fetchdarcs {
-    url = "http://pijul.org/";
-    context = ./pijul.org.context;
-    sha256 = "1cgkcr5wdkwj7s0rda90bfchbwmchgi60w5d637894w20hkplsr4";
+  src = fetchurl {
+    url = "https://pijul.org/releases/${name}.tar.gz";
+    sha256 = "08cffv6nfp1iv9m2qhr9hggy9kg8xp07p8kqkjypfsdsb983vz5n";
   };
 
-  sourceRoot = "fetchdarcs/pijul";
+  sourceRoot = "${name}/pijul";
 
-  depsSha256 = "110bj2lava1xs75z6k34aip7zb7rcmnxk5hmiyi32i9hs0ddsdrz";
+  buildInputs = stdenv.lib.optionals stdenv.isDarwin
+    (with darwin.apple_sdk.frameworks; [ Security ]);
 
-  cargoUpdateHook = ''
-    cp -r ../libpijul src/
-  '';
+  doCheck = false;
 
-  setSourceRoot = ''
-    chmod -R u+w "$sourceRoot"
-    cp -r "$sourceRoot"/../libpijul "$sourceRoot"/src/
-  '';
-
-  buildInputs = [ openssl libssh ];
+  cargoSha256 = "0r69vghjd6b30v0qjsipyv56n92iwvyxmllrnwjzjf5pzhhjl7sy";
 
   meta = with stdenv.lib; {
-    homepage = https://pijul.org/;
-    description = "Fast DVCS based on a categorical theory of patches";
-    license = licenses.gpl3;
-    platforms = stdenv.lib.platforms.x86_64;  # i686 builds fail due to lmdb
-    maintainers = with maintainers; [ puffnfresh ];
+    description = "A distributed version control system";
+    homepage = https://pijul.org;
+    license = with licenses; [ gpl2Plus ];
+    maintainers = [ maintainers.gal_bolle ];
+    platforms = platforms.all;
   };
 }

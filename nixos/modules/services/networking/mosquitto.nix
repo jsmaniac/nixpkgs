@@ -16,7 +16,7 @@ let
     pid_file /run/mosquitto/pid
     acl_file ${aclFile}
     persistence true
-    allow_anonymous ${if cfg.allowAnonymous then "true" else "false"}
+    allow_anonymous ${boolToString cfg.allowAnonymous}
     bind_address ${cfg.host}
     port ${toString cfg.port}
     ${listenerConf}
@@ -125,8 +125,8 @@ in
               description = ''
                 Specifies the hashed password for the MQTT User.
                 <option>hashedPassword</option> overrides <option>password</option>.
-                To generate hashed password install <literal>mkpasswd</literal>
-                package and run <literal>mkpasswd -m sha-512</literal>.
+                To generate hashed password install <literal>mosquitto</literal>
+                package and use <literal>mosquitto_passwd</literal>.
               '';
             };
 
@@ -147,7 +147,6 @@ in
 
       allowAnonymous = mkOption {
         default = false;
-        example = true;
         type = types.bool;
         description = ''
           Allow clients to connect without authentication.

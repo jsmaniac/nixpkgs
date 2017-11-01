@@ -4,10 +4,10 @@
 }:
 
 stdenv.mkDerivation rec {
-  name = "gparted-0.26.1";
+  name = "gparted-0.29.0";
 
   src = fetchurl {
-    sha256 = "1h9d6x335wxpm49yphzm9n1hbh2hcg0p2rphv76mrvsss91bcm1g";
+    sha256 = "1kf3ly7m3bikyzapjw8q1rlia0kg5zzgp59akhabx1rnnimvyl12";
     url = "mirror://sourceforge/gparted/${name}.tar.gz";
   };
 

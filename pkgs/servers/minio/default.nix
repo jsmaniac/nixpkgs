@@ -1,14 +1,13 @@
 { lib, stdenv, fetchurl, go }:
 
 stdenv.mkDerivation rec {
-  name = "minio-${shortVersion}";
+  name = "minio-${version}";
 
-  shortVersion = "20160821";
-  longVersion = "2016-08-21T02:44:47Z";
+  version = "2017-09-29T19-16-56Z";
 
   src = fetchurl {
-    url = "https://github.com/minio/minio/archive/RELEASE.${lib.replaceStrings [":"] ["-"] longVersion}.tar.gz";
-    sha256 = "159196bnb4b7f00jh9gll9kqqxq1ifxv1kg5bd6yjpqf5qca4pkn";
+    url = "https://github.com/minio/minio/archive/RELEASE.${version}.tar.gz";
+    sha256 = "1h028gyfvyh5x6k4fsj4s64sgzqy7jgln6kvs27bnxzigj6dp2wx";
   };
 
   buildInputs = [ go ];
@@ -24,7 +23,7 @@ stdenv.mkDerivation rec {
   buildPhase = ''
     mkdir -p $out/bin
     go build -o $out/bin/minio \
-      --ldflags "-X github.com/minio/minio/cmd.Version=${longVersion}"
+      --ldflags "-X github.com/minio/minio/cmd.Version=${version}"
   '';
 
   installPhase = "true";
@@ -32,8 +31,8 @@ stdenv.mkDerivation rec {
   meta = {
     homepage = https://www.minio.io/;
     description = "An S3-compatible object storage server";
-    maintainers = [ lib.maintainers.eelco ];
-    platforms = lib.platforms.linux;
+    maintainers = with lib.maintainers; [ eelco bachp ];
+    platforms = lib.platforms.x86_64;
     license = lib.licenses.asl20;
   };
 }

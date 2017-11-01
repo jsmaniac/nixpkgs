@@ -1,17 +1,19 @@
-{ fetchurl, stdenv }:
+{ stdenv, fetchurl, lzip
+, buildPlatform, hostPlatform
+}:
 
 stdenv.mkDerivation rec {
-  name = "ed-1.13";
+  name = "ed-${version}";
+  version = "1.14.2";
 
   src = fetchurl {
-    # gnu only provides *.lz tarball, which is unfriendly for stdenv bootstrapping
-    #url = "mirror://gnu/ed/${name}.tar.gz";
-    # When updating, please make sure the sources pulled match those upstream by
-    # Unpacking both tarballs and running `find . -type f -exec sha256sum \{\} \; | sha256sum`
-    # in the resulting directory
-    url = "http://fossies.org/linux/privat/${name}.tar.bz2";
-    sha256 = "1iym2fsamxr886l3sz8lqzgf00bip5cr0aly8jp04f89kf5mvl0j";
+    url = "mirror://gnu/ed/${name}.tar.lz";
+    sha256 = "1nqhk3n1s1p77g2bjnj55acicsrlyb2yasqxqwpx0w0djfx64ygm";
   };
+
+  unpackCmd = "tar --lzip -xf";
+
+  nativeBuildInputs = [ lzip ];
 
   /* FIXME: Tests currently fail on Darwin:
 
@@ -22,11 +24,14 @@ stdenv.mkDerivation rec {
        make: *** [check] Error 127
 
     */
-  doCheck = !stdenv.isDarwin;
+  doCheck = !(hostPlatform.isDarwin || hostPlatform != buildPlatform);
 
-  crossAttrs = {
-    compileFlags = [ "CC=${stdenv.cross.config}-gcc" ];
-  };
+  installFlags = [ "DESTDIR=$(out)" ];
+
+  configureFlags = [
+    "--exec-prefix=${stdenv.cc.prefix}"
+    "CC=${stdenv.cc.prefix}cc"
+  ];
 
   meta = {
     description = "An implementation of the standard Unix editor";

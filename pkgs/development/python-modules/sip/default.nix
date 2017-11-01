@@ -1,11 +1,14 @@
-{ lib, fetchurl, mkPythonDerivation, python, isPyPy }:
+{ lib, fetchurl, buildPythonPackage, python, isPyPy }:
 
-if isPyPy then throw "sip not supported for interpreter ${python.executable}" else mkPythonDerivation rec {
-  name = "sip-4.18.1";
+if isPyPy then throw "sip not supported for interpreter ${python.executable}" else buildPythonPackage rec {
+  pname = "sip";
+  version = "4.19.3";
+  name = "${pname}-${version}";
+  format = "other";
 
   src = fetchurl {
     url = "mirror://sourceforge/pyqt/sip/${name}/${name}.tar.gz";
-    sha256 = "1452zy3g0qv4fpd9c0y4gq437kn0xf7bbfniibv5n43zpwnpmklv";
+    sha256 = "0x2bghbprwl3az1ni3p87i0bq8r99694la93kg65vi0cz12gh3bl";
   };
 
   configurePhase = ''
@@ -18,7 +21,7 @@ if isPyPy then throw "sip not supported for interpreter ${python.executable}" el
     description = "Creates C++ bindings for Python modules";
     homepage    = "http://www.riverbankcomputing.co.uk/";
     license     = licenses.gpl2Plus;
-    maintainers = with maintainers; [ lovek323 sander urkud ];
+    maintainers = with maintainers; [ lovek323 sander ];
     platforms   = platforms.all;
   };
 }

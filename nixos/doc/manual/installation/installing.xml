@@ -16,7 +16,8 @@
   hardware.</para></listitem>
 
   <listitem><para>The NixOS manual is available on virtual console 8
-  (press Alt+F8 to access).</para></listitem>
+  (press Alt+F8 to access) or by running <command>nixos-help</command>.
+  </para></listitem>
 
   <listitem><para>You get logged in as <literal>root</literal>
   (with empty password).</para></listitem>
@@ -36,6 +37,11 @@
   <para>To manually configure the network on the graphical installer,
   first disable network-manager with
   <command>systemctl stop network-manager</command>.</para></listitem>
+
+  <listitem><para>If you would like to continue the installation from a different
+  machine you need to activate the SSH daemon via <literal>systemctl start sshd</literal>.
+  In order to be able to login you also need to set a password for
+  <literal>root</literal> using <literal>passwd</literal>.</para></listitem>
 
   <listitem><para>The NixOS installer doesn’t do any partitioning or
   formatting yet, so you need to do that yourself.  Use the following
@@ -133,6 +139,11 @@
     <option>boot.loader.grub.device</option> to specify on which disk
     the GRUB boot loader is to be installed.  Without it, NixOS cannot
     boot.</para>
+
+    <para>If there are other operating systems running on the machine before
+    installing NixOS, the
+    <option>boot.loader.grub.useOSProber</option> option can be set to
+    <literal>true</literal> to automatically add them to the grub menu.</para>
 
     <para>Another critical option is <option>fileSystems</option>,
     specifying the file systems that need to be mounted by NixOS.

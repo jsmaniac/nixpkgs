@@ -2,18 +2,19 @@
 
 stdenv.mkDerivation rec {
   name = "rivet-${version}";
-  version = "2.5.2";
+  version = "2.5.4";
 
   src = fetchurl {
     url = "http://www.hepforge.org/archive/rivet/Rivet-${version}.tar.bz2";
-    sha256 = "01agf0bswqvci8nwp67kvrlwc2k0sg1s0lxpq2a9q58l99v2gakh";
+    sha256 = "1qi7am60f2l4krd3sbj95mbzfk82lir0wy8z27yr9ncq6qcm48kp";
   };
+
+  postPatch = "patchShebangs ./src/Analyses/cat_with_lines";
 
   pythonPath = []; # python wrapper support
 
   patches = [
-    ./key_val.patch
-    ./zaxis_fix.patch
+    ./darwin.patch # configure relies on impure sw_vers to -Dunix
   ];
 
   latex = texlive.combine { inherit (texlive)
@@ -27,8 +28,8 @@ stdenv.mkDerivation rec {
     xcolor
     xkeyval
     ;};
-  buildInputs = [ ghostscript hepmc imagemagick python2 latex makeWrapper ];
-  propagatedBuildInputs = [ fastjet gsl yoda ];
+  buildInputs = [ hepmc imagemagick python2 latex makeWrapper ];
+  propagatedBuildInputs = [ fastjet ghostscript gsl yoda ];
 
   preInstall = ''
     substituteInPlace bin/make-plots \

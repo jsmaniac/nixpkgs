@@ -2,13 +2,13 @@
 
 stdenv.mkDerivation rec {
   name = "icestorm-${version}";
-  version = "2016.08.18";
+  version = "2017.10.16";
 
   src = fetchFromGitHub {
     owner = "cliffordwolf";
     repo = "icestorm";
-    rev = "12b2295c9087d94b75e374bb205ae4d76cf17e2f";
-    sha256 = "1mmzlqvap6w8n4qzv3idvy51arkgn03692ssplwncy3akjrbsd2b";
+    rev = "d9d2a3dcaa749014f5b9a539768b8368bb529b28";
+    sha256 = "1a755jnbjq3v7a3l90qjlgihmrpbdfiiabb4g8sw3ay3qmvzwh6b";
   };
 
   buildInputs = [ python3 libftdi ];
@@ -26,7 +26,7 @@ stdenv.mkDerivation rec {
     '';
     homepage = http://www.clifford.at/icestorm/;
     license = stdenv.lib.licenses.isc;
-    maintainers = [ stdenv.lib.maintainers.shell ];
+    maintainers = with stdenv.lib.maintainers; [ shell thoughtpolice ];
     platforms = stdenv.lib.platforms.linux;
   };
 }

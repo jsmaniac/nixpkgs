@@ -6,29 +6,38 @@ let
   luks = config.boot.initrd.luks;
 
   openCommand = name': { name, device, header, keyFile, keyFileSize, allowDiscards, yubikey, ... }: assert name' == name; ''
-    # Wait for luksRoot to appear, e.g. if on a usb drive.
-    # XXX: copied and adapted from stage-1-init.sh - should be
-    # available as a function.
-    if ! test -e ${device}; then
-        echo -n "waiting 10 seconds for device ${device} to appear..."
-        for try in $(seq 10); do
-            sleep 1
-            if test -e ${device}; then break; fi
-            echo -n .
-        done
-        echo "ok"
-    fi
+
+    # Wait for a target (e.g. device, keyFile, header, ...) to appear.
+    wait_target() {
+        local name="$1"
+        local target="$2"
+
+        if [ ! -e $target ]; then
+            echo -n "Waiting 10 seconds for $name $target to appear"
+            local success=false;
+            for try in $(seq 10); do
+                echo -n "."
+                sleep 1
+                if [ -e $target ]; then success=true break; fi
+            done
+            if [ $success = true ]; then
+                echo " - success";
+            else
+                echo " - failure";
+            fi
+        fi
+    }
+
+    # Wait for luksRoot (and optionally keyFile and/or header) to appear, e.g.
+    # if on a USB drive.
+    wait_target "device" ${device}
 
     ${optionalString (keyFile != null) ''
-    if ! test -e ${keyFile}; then
-        echo -n "waiting 10 seconds for key file ${keyFile} to appear..."
-        for try in $(seq 10); do
-            sleep 1
-            if test -e ${keyFile}; then break; fi
-            echo -n .
-        done
-        echo "ok"
-    fi
+      wait_target "key file" ${keyFile}
+    ''}
+
+    ${optionalString (header != null) ''
+      wait_target "header" ${header}
     ''}
 
     open_normally() {
@@ -226,13 +235,23 @@ in
       '';
     };
 
+    boot.initrd.luks.forceLuksSupportInInitrd = mkOption {
+      type = types.bool;
+      default = false;
+      internal = true;
+      description = ''
+        Whether to configure luks support in the initrd, when no luks
+        devices are configured.
+      '';
+    };
+
     boot.initrd.luks.devices = mkOption {
       default = { };
       example = { "luksroot".device = "/dev/disk/by-uuid/430e9eff-d852-4f68-aa3b-2fa3599ebe08"; };
       description = ''
         The encrypted disk that should be opened before the root
         filesystem is mounted. Both LVM-over-LUKS and LUKS-over-LVM
-        setups are sypported. The unencrypted devices can be accessed as
+        setups are supported. The unencrypted devices can be accessed as
         <filename>/dev/mapper/<replaceable>name</replaceable></filename>.
       '';
 
@@ -408,7 +427,7 @@ in
     };
   };
 
-  config = mkIf (luks.devices != {}) {
+  config = mkIf (luks.devices != {} || luks.forceLuksSupportInInitrd) {
 
     # actually, sbp2 driver is the one enabling the DMA attack, but this needs to be tested
     boot.blacklistedKernelModules = optionals luks.mitigateDMAAttacks
@@ -425,7 +444,7 @@ in
       #!$out/bin/sh -e
       if [ -e /.luksopen_args ]; then
         cryptsetup \$(cat /.luksopen_args)
-        killall cryptsetup
+        killall -q cryptsetup
       else
         echo "Passphrase is not requested now"
         exit 1
@@ -434,8 +453,8 @@ in
       chmod +x $out/bin/cryptsetup-askpass
 
       ${optionalString luks.yubikeySupport ''
-        copy_bin_and_libs ${pkgs.ykpers}/bin/ykchalresp
-        copy_bin_and_libs ${pkgs.ykpers}/bin/ykinfo
+        copy_bin_and_libs ${pkgs.yubikey-personalization}/bin/ykchalresp
+        copy_bin_and_libs ${pkgs.yubikey-personalization}/bin/ykinfo
         copy_bin_and_libs ${pkgs.openssl.bin}/bin/openssl
 
         cc -O3 -I${pkgs.openssl.dev}/include -L${pkgs.openssl.out}/lib ${./pbkdf2-sha512.c} -o pbkdf2-sha512 -lcrypto

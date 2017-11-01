@@ -1,16 +1,17 @@
 { stdenv, fetchurl, bison, m4 }:
 
 stdenv.mkDerivation rec {
-  name = "flex-2.6.1";
+  name = "flex-${version}";
+  version = "2.6.4";
 
   src = fetchurl {
-    url = "https://github.com/westes/flex/releases/download/v2.6.1/flex-2.6.1.tar.gz";
-    sha256 = "0fy14c35yz2m1n1m4f02by3501fn0cca37zn7jp8lpp4b3kgjhrw";
+    url = "https://github.com/westes/flex/releases/download/v${version}/flex-${version}.tar.gz";
+    sha256 = "15g9bv236nzi665p9ggqjlfn4dwck5835vf0bbw2cz7h5c1swyp8";
   };
 
   buildInputs = [ bison ];
 
-  propagatedNativeBuildInputs = [ m4 ];
+  propagatedBuildInputs = [ m4 ];
 
   postConfigure = stdenv.lib.optionalString (stdenv.isDarwin || stdenv.isCygwin) ''
     sed -i Makefile -e 's/-no-undefined//;'

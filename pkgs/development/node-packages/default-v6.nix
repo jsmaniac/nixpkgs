@@ -1,4 +1,4 @@
-{pkgs, system, nodejs}:
+{pkgs, system, nodejs, stdenv}:
 
 let
   nodePackages = import ./composition-v6.nix {
@@ -41,8 +41,24 @@ nodePackages // {
     buildInputs = oldAttrs.buildInputs ++ [ pkgs.makeWrapper ];
     postInstall = ''
       for prog in bower2nix fetch-bower; do
-        wrapProgram "$out/bin/$prog" --prefix PATH : "${pkgs.git}/bin"
+        wrapProgram "$out/bin/$prog" --prefix PATH : ${stdenv.lib.makeBinPath [ pkgs.git pkgs.nix ]}
       done
     '';
+  });
+
+  ios-deploy = nodePackages.ios-deploy.override (oldAttrs: {
+    preRebuild = ''
+      tmp=$(mktemp -d)
+      ln -s /usr/bin/xcodebuild $tmp
+      export PATH="$PATH:$tmp"
+    '';
+  });
+
+  fast-cli = nodePackages.fast-cli.override (oldAttrs: {
+    preRebuild = ''
+      # Simply ignore the phantomjs --version check. It seems to need a display but it is safe to ignore
+      sed -i -e "s|console.error('Error verifying phantomjs, continuing', err)|console.error('Error verifying phantomjs, continuing', err); return true;|" node_modules/phantomjs-prebuilt/lib/util.js
+    '';
+    buildInputs = oldAttrs.buildInputs ++ [ pkgs.phantomjs2 ];
   });
 }

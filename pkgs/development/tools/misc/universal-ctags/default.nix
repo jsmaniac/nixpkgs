@@ -1,17 +1,18 @@
-{ stdenv, fetchFromGitHub, autoreconfHook, pkgconfig, perl }:
+{ stdenv, fetchFromGitHub, autoreconfHook, pkgconfig, perl, pythonPackages, libiconv }:
 
 stdenv.mkDerivation rec {
   name = "universal-ctags-${version}";
-  version = "2016-07-06";
+  version = "2017-09-22";
 
   src = fetchFromGitHub {
     owner = "universal-ctags";
     repo = "ctags";
-    rev = "44a325a9db23063b231f6f041af9aaf19320d9b9";
-    sha256 = "11vq901h121ckqgw52k9x7way3q38b7jd08vr1n2sjz7kxh0zdd0";
+    rev = "b9537289952cc7b26526aaff3094599d714d1729";
+    sha256 = "1kbw9ycl2ddzpfs1v4rbqa4gdhw4inrisf4awyaxb7zxfxmbzk1g";
   };
 
-  buildInputs = [ autoreconfHook pkgconfig ];
+  nativeBuildInputs = [ autoreconfHook pkgconfig pythonPackages.docutils ];
+  buildInputs = stdenv.lib.optional stdenv.isDarwin libiconv;
 
   autoreconfPhase = ''
     ./autogen.sh --tmpdir
@@ -21,9 +22,13 @@ stdenv.mkDerivation rec {
     sed -i 's|/usr/bin/env perl|${perl}/bin/perl|' misc/optlib2c
   '';
 
+  doCheck = true;
+
+  checkFlags = "units";
+
   meta = with stdenv.lib; {
     description = "A maintained ctags implementation";
-    homepage = "https://ctags.io/";
+    homepage = https://ctags.io/;
     license = licenses.gpl2Plus;
     platforms = platforms.unix;
     # universal-ctags is preferred over emacs's ctags

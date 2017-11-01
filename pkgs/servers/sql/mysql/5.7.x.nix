@@ -1,15 +1,15 @@
 { stdenv, fetchurl, cmake, bison, ncurses, openssl, readline, zlib, perl
-, boost, cctools, CoreServices }:
+, boost, cctools, CoreServices, developer_cmds }:
 
 # Note: zlib is not required; MySQL can use an internal zlib.
 
 stdenv.mkDerivation rec {
   name = "mysql-${version}";
-  version = "5.7.16";
+  version = "5.7.20";
 
   src = fetchurl {
     url = "mirror://mysql/MySQL-5.7/${name}.tar.gz";
-    sha256 = "198qhd9bdm0fnpp307mgby2aar92yzya0937kxi7bcpdfjcvada9";
+    sha256 = "11v4g3igigv3zvknv67qml8in6fjrbs2vnr3q6bg6f62nydm95sk";
   };
 
   preConfigure = stdenv.lib.optional stdenv.isDarwin ''
@@ -18,7 +18,7 @@ stdenv.mkDerivation rec {
   '';
 
   buildInputs = [ cmake bison ncurses openssl readline zlib boost ]
-     ++ stdenv.lib.optionals stdenv.isDarwin [ perl cctools CoreServices ];
+     ++ stdenv.lib.optionals stdenv.isDarwin [ perl cctools CoreServices developer_cmds ];
 
   enableParallelBuilding = true;
 

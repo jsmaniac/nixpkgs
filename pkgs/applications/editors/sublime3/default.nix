@@ -1,12 +1,12 @@
 { fetchurl, stdenv, glib, xorg, cairo, gtk2, pango, makeWrapper, openssl, bzip2,
-  pkexecPath ? "/var/setuid-wrappers/pkexec", libredirect,
-  gksuSupport ? false, gksu}:
+  pkexecPath ? "/run/wrappers/bin/pkexec", libredirect,
+  gksuSupport ? false, gksu, unzip, zip, bash }:
 
 assert stdenv.system == "i686-linux" || stdenv.system == "x86_64-linux";
 assert gksuSupport -> gksu != null;
 
 let
-  build = "3126";
+  build = "3143";
   libPath = stdenv.lib.makeLibraryPath [glib xorg.libX11 gtk2 cairo pango];
   redirects = [ "/usr/bin/pkexec=${pkexecPath}" ]
     ++ stdenv.lib.optional gksuSupport "/usr/bin/gksudo=${gksu}/bin/gksudo";
@@ -20,18 +20,32 @@ in let
         fetchurl {
           name = "sublimetext-${build}.tar.bz2";
           url = "https://download.sublimetext.com/sublime_text_3_build_${build}_x32.tar.bz2";
-          sha256 = "0acff4wj1s61x3xszdd93lkhaqa26lb7ryqdxnbphxzhf2jfzzwj";
+          sha256 = "0dgpx4wij2m77f478p746qadavab172166bghxmj7fb61nvw9v5i";
         }
       else
         fetchurl {
           name = "sublimetext-${build}.tar.bz2";
           url = "https://download.sublimetext.com/sublime_text_3_build_${build}_x64.tar.bz2";
-          sha256 = "0ykj33fq86iv7f9zx76h90pl9y86iri0idhlj09a6prhk8p17nqq";
+          sha256 = "06b554d2cvpxc976rvh89ix3kqc7klnngvk070xrs8wbyb221qcw";
         };
 
     dontStrip = true;
     dontPatchELF = true;
-    buildInputs = [ makeWrapper ];
+    buildInputs = [ makeWrapper zip unzip ];
+
+    # make exec.py in Default.sublime-package use own bash with
+    # an LD_PRELOAD instead of "/bin/bash"
+    patchPhase = ''
+      mkdir Default.sublime-package-fix
+      ( cd Default.sublime-package-fix
+        unzip -q ../Packages/Default.sublime-package
+        substituteInPlace "exec.py" --replace \
+          "[\"/bin/bash\"" \
+          "[\"$out/sublime_bash\""
+        zip -q ../Packages/Default.sublime-package **/*
+      )
+      rm -r Default.sublime-package-fix
+    '';
 
     buildPhase = ''
       for i in sublime_text plugin_host crash_reporter; do
@@ -52,6 +66,12 @@ in let
       mkdir -p $out
       cp -prvd * $out/
 
+      # We can't just call /usr/bin/env bash because a relocation error occurs
+      # when trying to run a build from within Sublime Text
+      ln -s ${bash}/bin/bash $out/sublime_bash
+      wrapProgram $out/sublime_bash \
+        --set LD_PRELOAD "${stdenv.cc.cc.lib}/lib${stdenv.lib.optionalString stdenv.is64bit "64"}/libgcc_s.so.1"
+
       wrapProgram $out/sublime_text \
         --set LD_PRELOAD "${libredirect}/lib/libredirect.so" \
         --set NIX_REDIRECTS ${builtins.concatStringsSep ":" redirects}
@@ -64,13 +84,17 @@ in stdenv.mkDerivation {
   name = "sublimetext3-${build}";
 
   phases = [ "installPhase" ];
+
+  inherit sublime;
+
   installPhase = ''
     mkdir -p $out/bin
-    ln -s ${sublime}/sublime_text $out/bin/sublime
-    ln -s ${sublime}/sublime_text $out/bin/sublime3
+    ln -s $sublime/sublime_text $out/bin/subl
+    ln -s $sublime/sublime_text $out/bin/sublime
+    ln -s $sublime/sublime_text $out/bin/sublime3
     mkdir -p $out/share/applications
-    ln -s ${sublime}/sublime_text.desktop $out/share/applications/sublime_text.desktop
-    ln -s ${sublime}/Icon/256x256/ $out/share/icons
+    ln -s $sublime/sublime_text.desktop $out/share/applications/sublime_text.desktop
+    ln -s $sublime/Icon/256x256/ $out/share/icons
   '';
 
   meta = with stdenv.lib; {

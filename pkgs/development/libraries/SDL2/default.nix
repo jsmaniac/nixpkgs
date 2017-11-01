@@ -24,12 +24,14 @@ let
 in
 stdenv.mkDerivation rec {
   name = "SDL2-${version}";
-  version = "2.0.4";
+  version = "2.0.7";
 
   src = fetchurl {
     url = "http://www.libsdl.org/release/${name}.tar.gz";
-    sha256 = "0jqp46mxxbh9lhpx1ih6sp93k752j2smhpc0ad0q4cb3px0famfs";
+    sha256 = "0pjdpxla5kh1w1b0shxrx97a116vyy31njxi0jhyvqhk8d6cfdgf";
   };
+
+  outputs = [ "out" "dev" ];
 
   patches = [ ./find-headers.patch ];
 
@@ -50,6 +52,8 @@ stdenv.mkDerivation rec {
   # https://bugzilla.libsdl.org/show_bug.cgi?id=1431
   dontDisableStatic = true;
 
+  enableParallelBuilding = true;
+
   # XXX: By default, SDL wants to dlopen() PulseAudio, in which case
   # we must arrange to add it to its RPATH; however, `patchelf' seems
   # to fail at doing this, hence `--disable-pulseaudio-shared'.
@@ -60,7 +64,9 @@ stdenv.mkDerivation rec {
   };
 
   postInstall = ''
+    moveToOutput lib/libSDL2main.a "$dev"
     rm $out/lib/*.a
+    moveToOutput bin/sdl2-config "$dev"
   '';
 
   setupHook = ./setup-hook.sh;
@@ -69,9 +75,9 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A cross-platform multimedia library";
-    homepage = "http://www.libsdl.org/";
+    homepage = http://www.libsdl.org/;
     license = licenses.zlib;
     platforms = platforms.all;
-    maintainers = with maintainers; [ page ];
+    maintainers = with maintainers; [ cpages ];
   };
 }

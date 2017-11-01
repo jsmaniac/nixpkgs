@@ -1,6 +1,5 @@
 # Functions for copying sources to the Nix store.
-
-let lib = import ./default.nix; in
+{ lib }:
 
 rec {
 
@@ -15,8 +14,11 @@ rec {
   cleanSourceFilter = name: type: let baseName = baseNameOf (toString name); in ! (
     # Filter out Subversion and CVS directories.
     (type == "directory" && (baseName == ".git" || baseName == ".svn" || baseName == "CVS" || baseName == ".hg")) ||
-    # Filter out backup files.
+    # Filter out editor backup / swap files.
     lib.hasSuffix "~" baseName ||
+    builtins.match "^\\.sw[a-z]$" baseName != null ||
+    builtins.match "^\\..*\\.sw[a-z]$" baseName != null ||
+
     # Filter out generates files.
     lib.hasSuffix ".o" baseName ||
     lib.hasSuffix ".so" baseName ||
@@ -26,6 +28,12 @@ rec {
 
   cleanSource = builtins.filterSource cleanSourceFilter;
 
+  # Filter sources by a list of regular expressions.
+  #
+  # E.g. `src = sourceByRegex ./my-subproject [".*\.py$" "^database.sql$"]`
+  sourceByRegex = src: regexes: builtins.filterSource (path: type:
+    let relPath = lib.removePrefix (toString src + "/") (toString path);
+    in lib.any (re: builtins.match re relPath != null) regexes) src;
 
   # Get all files ending with the specified suffices from the given
   # directory or its descendants.  E.g. `sourceFilesBySuffices ./dir

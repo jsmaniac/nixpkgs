@@ -41,7 +41,7 @@ stdenv.mkDerivation rec {
     inherit sha256;
   };
 
-  outputs = [ "out" "doc" ];
+  outputs = [ "out" "man" "doc" ];
 
   enableParallelBuilding = true;
 
@@ -92,6 +92,10 @@ stdenv.mkDerivation rec {
     mv "$out/share/ghostscript/${version}"/{doc,examples} "$doc/share/ghostscript/${version}/"
 
     ln -s "${fonts}" "$out/share/ghostscript/fonts"
+  '' + stdenv.lib.optionalString stdenv.isDarwin ''
+    for file in $out/lib/*.dylib* ; do
+      install_name_tool -id "$file" $file
+    done
   '';
 
   preFixup = lib.optionalString stdenv.isDarwin ''
@@ -101,7 +105,7 @@ stdenv.mkDerivation rec {
   passthru = { inherit version; };
 
   meta = {
-    homepage = "http://www.ghostscript.com/";
+    homepage = https://www.ghostscript.com/;
     description = "PostScript interpreter (mainline version)";
 
     longDescription = ''
