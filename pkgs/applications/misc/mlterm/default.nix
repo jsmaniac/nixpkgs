@@ -1,36 +1,34 @@
 { stdenv, fetchurl, pkgconfig, autoconf, makeDesktopItem
-, libX11, gdk_pixbuf, cairo, libXft, gtk3, vte
+, libX11, gdk-pixbuf, cairo, libXft, gtk3, vte
 , harfbuzz #substituting glyphs with opentype fonts
 , fribidi, m17n_lib #bidi and encoding
 , openssl, libssh2 #build-in ssh
 }:
 
 stdenv.mkDerivation rec {
-  name = "mlterm-${version}";
-  version = "3.7.2";
+  pname = "mlterm";
+  version = "3.9.0";
 
   src = fetchurl {
-    url = "mirror://sourceforge/project/mlterm/01release/${name}/${name}.tar.gz";
-    sha256 = "1b24w8hfck1ylfkdz9z55vlmsb36q9iyfr0i9q9y98dfk0f0rrw8";
+    url = "mirror://sourceforge/project/mlterm/01release/${pname}-${version}/${pname}-${version}.tar.gz";
+    sha256 = "17h6j4nmbyvsx2shm8mqm7smzq9i7mbqxjw19c2m0rhf5yzqhr3k";
   };
 
   nativeBuildInputs = [ pkgconfig autoconf ];
   buildInputs = [
-    libX11 gdk_pixbuf.dev cairo libXft gtk3 vte
+    libX11 gdk-pixbuf.dev cairo libXft gtk3 vte
     harfbuzz fribidi m17n_lib openssl libssh2
   ];
-
-  patches = [ ./x_shortcut.c.patch ]; #fixes numlock in 3.7.2. should be safe to remove by 3.7.3 since it's already in the trunk: https://bitbucket.org/arakiken/mlterm/commits/4820d42c7abfe1760a5ea35492c83be469c642b3
 
   #bad configure.ac and Makefile.in everywhere
   preConfigure = ''
     sed -ie 's;-L/usr/local/lib -R/usr/local/lib;;g' \
-      xwindow/libtype/Makefile.in \
       main/Makefile.in \
       tool/mlfc/Makefile.in \
       tool/mlimgloader/Makefile.in \
       tool/mlconfig/Makefile.in \
-      xwindow/libotl/Makefile.in
+      uitoolkit/libtype/Makefile.in \
+      uitoolkit/libotl/Makefile.in
     sed -ie 's;cd ..srcdir. && rm -f ...lang..gmo.*;;g' \
       tool/mlconfig/po/Makefile.in.in
     #utmp and mlterm-fb
@@ -63,22 +61,15 @@ stdenv.mkDerivation rec {
     "--with-tools=mlclient,mlconfig,mlcc,mlterm-menu,mlimgloader,registobmp,mlfc"
      #mlterm-menu and mlconfig depend on enabling gnome3.at-spi2-core
      #and configuring ~/.mlterm/key correctly.
- ] ++ stdenv.lib.optional (libssh2 == null) [
-    "--disable-ssh2"
- ];
+ ] ++ stdenv.lib.optional (libssh2 == null) "--disable-ssh2";
 
   postInstall = ''
-    mkdir -p "$out/share/icons/hicolor/scalable/apps"
-    cp contrib/icon/mlterm-icon.svg "$out/share/icons/hicolor/scalable/apps/mlterm.svg"
-
-    mkdir -p "$out/share/icons/hicolor/48x48/apps"
-    cp contrib/icon/mlterm-icon-gnome2.png "$out/share/icons/hicolor/48x48/apps/mlterm.png"
-
-    mkdir -p "$out/share/applications"
-    cp $desktopItem/share/applications/* $out/share/applications
+    install -D contrib/icon/mlterm-icon.svg "$out/share/icons/hicolor/scalable/apps/mlterm.svg"
+    install -D contrib/icon/mlterm-icon-gnome2.png "$out/share/icons/hicolor/48x48/apps/mlterm.png"
+    install -D -t $out/share/applications $desktopItem/share/applications/*
   '';
 
-  desktopItem = makeDesktopItem rec {
+  desktopItem = makeDesktopItem {
     name = "mlterm";
     exec = "mlterm %U";
     icon = "mlterm";
@@ -93,8 +84,9 @@ stdenv.mkDerivation rec {
   };
 
   meta = with stdenv.lib; {
-    homepage = http://mlterm.sourceforge.net/;
-    license = licenses.bsd2;
+    description = "Multi Lingual TERMinal emulator on X11";
+    homepage = "http://mlterm.sourceforge.net/";
+    license = licenses.bsd3;
     maintainers = with maintainers; [ vrthra ramkromberg ];
     platforms = with platforms; linux;
   };

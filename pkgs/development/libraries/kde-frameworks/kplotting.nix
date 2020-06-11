@@ -1,9 +1,14 @@
-{ kdeFramework, lib
-, ecm
+{ mkDerivation, lib
+, extra-cmake-modules, qttools, qtbase
 }:
 
-kdeFramework {
+mkDerivation {
   name = "kplotting";
-  meta = { maintainers = [ lib.maintainers.ttuegel ]; };
-  nativeBuildInputs = [ ecm ];
+  meta = {
+    maintainers = [ lib.maintainers.ttuegel ];
+    broken = builtins.compareVersions qtbase.version "5.7.0" < 0;
+  };
+  nativeBuildInputs = [ extra-cmake-modules ];
+  propagatedBuildInputs = [ qtbase qttools ];
+  outputs = [ "out" "dev" ];
 }

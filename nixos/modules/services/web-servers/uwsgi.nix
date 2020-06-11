@@ -5,10 +5,6 @@ with lib;
 let
   cfg = config.services.uwsgi;
 
-  uwsgi = pkgs.uwsgi.override {
-    plugins = cfg.plugins;
-  };
-
   buildCfg = name: c:
     let
       plugins =
@@ -23,18 +19,11 @@ let
       python =
         if hasPython2 && hasPython3 then
           throw "`plugins` attribute in UWSGI configuration shouldn't contain both python2 and python3"
-        else if hasPython2 then uwsgi.python2
-        else if hasPython3 then uwsgi.python3
+        else if hasPython2 then cfg.package.python2
+        else if hasPython3 then cfg.package.python3
         else null;
 
-      pythonPackages = pkgs.pythonPackages.override {
-        inherit python;
-        self = pythonPackages;
-      };
-
-      penv = python.buildEnv.override {
-        extraLibs = (c.pythonPackages or (self: [])) pythonPackages;
-      };
+      pythonEnv = python.withPackages (c.pythonPackages or (self: []));
 
       uwsgiCfg = {
         uwsgi =
@@ -43,7 +32,7 @@ let
               inherit plugins;
             } // removeAttrs c [ "type" "pythonPackages" ]
               // optionalAttrs (python != null) {
-                pythonpath = "${penv}/${python.sitePackages}";
+                pyhome = "${pythonEnv}";
                 env =
                   # Argh, uwsgi expects list of key-values there instead of a dictionary.
                   let env' = c.env or [];
@@ -52,7 +41,7 @@ let
                            then substring (stringLength "PATH=") (stringLength x) x
                            else null;
                       oldPaths = filter (x: x != null) (map getPath env');
-                  in env' ++ [ "PATH=${optionalString (oldPaths != []) "${last oldPaths}:"}${penv}/bin" ];
+                  in env' ++ [ "PATH=${optionalString (oldPaths != []) "${last oldPaths}:"}${pythonEnv}/bin" ];
               }
           else if c.type == "emperor"
             then {
@@ -79,13 +68,36 @@ in {
       };
 
       runDir = mkOption {
-        type = types.string;
+        type = types.path;
         default = "/run/uwsgi";
         description = "Where uWSGI communication sockets can live";
       };
 
+      package = mkOption {
+        type = types.package;
+        internal = true;
+      };
+
       instance = mkOption {
-        type = types.attrs;
+        type =  with lib.types; let
+          valueType = nullOr (oneOf [
+            bool
+            int
+            float
+            str
+            (lazyAttrsOf valueType)
+            (listOf valueType)
+            (mkOptionType {
+              name = "function";
+              description = "function";
+              check = x: isFunction x;
+              merge = mergeOneOption;
+            })
+          ]) // {
+            description = "Json value or lambda";
+            emptyValue.value = {};
+          };
+        in valueType;
         default = {
           type = "normal";
         };
@@ -145,7 +157,7 @@ in {
       '';
       serviceConfig = {
         Type = "notify";
-        ExecStart = "${uwsgi}/bin/uwsgi --uid ${cfg.user} --gid ${cfg.group} --json ${buildCfg "server" cfg.instance}/server.json";
+        ExecStart = "${cfg.package}/bin/uwsgi --uid ${cfg.user} --gid ${cfg.group} --json ${buildCfg "server" cfg.instance}/server.json";
         ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
         ExecStop = "${pkgs.coreutils}/bin/kill -INT $MAINPID";
         NotifyAccess = "main";
@@ -153,15 +165,19 @@ in {
       };
     };
 
-    users.extraUsers = optionalAttrs (cfg.user == "uwsgi") (singleton
-      { name = "uwsgi";
+    users.users = optionalAttrs (cfg.user == "uwsgi") {
+      uwsgi = {
         group = cfg.group;
         uid = config.ids.uids.uwsgi;
-      });
+      };
+    };
 
-    users.extraGroups = optionalAttrs (cfg.group == "uwsgi") (singleton
-      { name = "uwsgi";
-        gid = config.ids.gids.uwsgi;
-      });
+    users.groups = optionalAttrs (cfg.group == "uwsgi") {
+      uwsgi.gid = config.ids.gids.uwsgi;
+    };
+
+    services.uwsgi.package = pkgs.uwsgi.override {
+      inherit (cfg) plugins;
+    };
   };
 }

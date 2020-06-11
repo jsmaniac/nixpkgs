@@ -1,94 +1,142 @@
-# Handbrake normally uses its own copies of the libraries it uses, for better
-# control over library patches.
+# Upstream distributes HandBrake with bundle of according versions of libraries and patches to them.
 #
-# This derivation patches HB so it doesn't do that. The relevant patches
-# are added to the Nix packages and proposed upstream instead. In several cases
-# upstream already incorporated these patches.
-# This has the benefits of providing improvements to other packages,
-# making licenses more clear and reducing compile time/install size.
+# Derivation patches HandBrake to use Nix closure dependencies.
 #
-# Only tested on Linux
-#
-# TODO: package and use libappindicator
+# NOTE: 2019-07-19: This derivation does not currently support the native macOS
+# GUI--it produces the "HandbrakeCLI" CLI version only. In the future it would
+# be nice to add the native GUI (and/or the GTK GUI) as an option too, but that
+# requires invoking the Xcode build system, which is non-trivial for now.
 
-{ stdenv, config, fetchurl,
-  python2, pkgconfig, yasm,
-  autoconf, automake, libtool, m4,
-  libass, libsamplerate, fribidi, libxml2, bzip2,
-  libogg, libtheora, libvorbis, libdvdcss, a52dec, fdk_aac,
-  lame, ffmpeg, libdvdread, libdvdnav, libbluray,
-  mp4v2, mpeg2dec, x264, x265, libmkv,
-  fontconfig, freetype, hicolor_icon_theme,
-  glib, gtk3, intltool, libnotify,
-  gst_all_1, dbus_glib, udev, libgudev, libvpx,
-  wrapGAppsHook,
-  useGtk ? true
+{ stdenv, lib, fetchFromGitHub,
+  # Main build tools
+  pkgconfig, autoconf, automake, libtool, m4, lzma, python3,
+  numactl,
+  # Processing, video codecs, containers
+  ffmpeg-full, nv-codec-headers, libogg, x264, x265, libvpx, libtheora, dav1d,
+  # Codecs, audio
+  libopus, lame, libvorbis, a52dec, speex, libsamplerate,
+  # Text processing
+  libiconv, fribidi, fontconfig, freetype, libass, jansson, libxml2, harfbuzz,
+  # Optical media
+  libdvdread, libdvdnav, libdvdcss, libbluray,
+  # Darwin-specific
+  AudioToolbox ? null,
+  Foundation ? null,
+  libobjc ? null,
+  VideoToolbox ? null,
+  # GTK
+  # NOTE: 2019-07-19: The gtk3 package has a transitive dependency on dbus,
+  # which in turn depends on systemd. systemd is not supported on Darwin, so
+  # for now we disable GTK GUI support on Darwin. (It may be possible to remove
+  # this restriction later.)
+  useGtk ? !stdenv.isDarwin, wrapGAppsHook ? null,
+  intltool ? null,
+  glib ? null,
+  gtk3 ? null,
+  libappindicator-gtk3 ? null,
+  libnotify ? null,
+  gst_all_1 ? null,
+  dbus-glib ? null,
+  udev ? null,
+  libgudev ? null,
+  hicolor-icon-theme ? null,
+  # FDK
+  useFdk ? false, fdk_aac ? null
 }:
 
+assert stdenv.isDarwin -> AudioToolbox != null
+       && Foundation != null
+       && libobjc != null
+       && VideoToolbox != null;
+
 stdenv.mkDerivation rec {
-  version = "0.10.5";
-  name = "handbrake-${version}";
+  pname = "handbrake";
+  version = "1.3.2";
 
-  buildInputsX = stdenv.lib.optionals useGtk [
-    glib gtk3 intltool libnotify
-    gst_all_1.gstreamer gst_all_1.gst-plugins-base dbus_glib udev
-    libgudev
-    wrapGAppsHook
-  ];
-
-  nativeBuildInputs = [ python2 pkgconfig yasm autoconf automake libtool m4 ];
-  buildInputs = [
-    fribidi fontconfig freetype hicolor_icon_theme
-    libass libsamplerate libxml2 bzip2
-    libogg libtheora libvorbis libdvdcss a52dec libmkv fdk_aac
-    lame ffmpeg libdvdread libdvdnav libbluray mp4v2 mpeg2dec x264 x265 libvpx
-  ] ++ buildInputsX;
-
-  src = fetchurl {
-    url = "http://download.handbrake.fr/releases/${version}/HandBrake-${version}.tar.bz2";
-    sha256 = "1w720y3bplkz187wgvy4a4xm0vpppg45mlni55l6yi8v2bfk14pv";
+  src = fetchFromGitHub {
+    owner = "HandBrake";
+    repo = "HandBrake";
+    rev = version;
+    sha256 = "04z3hcy7m5yvma849rlrsx2wdqmkilkl1qds9yrzr2ydpw697f85";
+    extraPostFetch = ''
+      echo "DATE=$(date +"%F %T %z" -r $out/NEWS.markdown)" > $out/version.txt
+    '';
   };
 
-  preConfigure = ''
-    # Fake wget to prevent downloads
-    mkdir wget
-    echo "#!/bin/sh" > wget/wget
-    echo "echo ===== Not fetching \$*" >> wget/wget
-    echo "exit 1" >> wget/wget
-    chmod +x wget/wget
-    export PATH=$PATH:$PWD/wget
+  # we put as little as possible in src.extraPostFetch as it's much easier to
+  # add to it here without having to fiddle with src.sha256
+  # only DATE and HASH are absolutely necessary
+  postPatch = ''
+    cat >> version.txt <<_EOF
+HASH=${src.rev}
+SHORTHASH=${src.rev}
+TAG=${version}
+URL=${src.meta.homepage}
+_EOF
+
+    patchShebangs scripts
+
+    substituteInPlace libhb/module.defs \
+      --replace /usr/include/libxml2 ${libxml2.dev}/include/libxml2
 
     # Force using nixpkgs dependencies
     sed -i '/MODULES += contrib/d' make/include/main.defs
-    sed -i '/PKG_CONFIG_PATH=/d' gtk/module.rules
-
-    patch -p1 -R < ${./handbrake-0.10.3-nolibav.patch}
+    sed -e 's/^[[:space:]]*\(meson\|ninja\|nasm\)[[:space:]]*= ToolProbe.*$//g' \
+        -e '/    ## Additional library and tool checks/,/    ## MinGW specific library and tool checks/d' \
+        -i make/configure.py
   '';
 
+  nativeBuildInputs = [
+    pkgconfig autoconf automake libtool m4 python3
+  ] ++ lib.optionals useGtk [ intltool wrapGAppsHook ];
+
+  buildInputs = [
+    ffmpeg-full libogg libtheora x264 x265 libvpx dav1d
+    libopus lame libvorbis a52dec speex libsamplerate
+    libiconv fribidi fontconfig freetype libass jansson libxml2 harfbuzz
+    libdvdread libdvdnav libdvdcss libbluray lzma numactl
+  ] ++ lib.optionals useGtk [
+    glib gtk3 libappindicator-gtk3 libnotify
+    gst_all_1.gstreamer gst_all_1.gst-plugins-base dbus-glib udev
+    libgudev hicolor-icon-theme
+  ] ++ lib.optional useFdk fdk_aac
+  ++ lib.optionals stdenv.isDarwin [ AudioToolbox Foundation libobjc VideoToolbox ]
+  # NOTE: 2018-12-27: Handbrake supports nv-codec-headers for Linux only,
+  # look at ./make/configure.py search "enable_nvenc"
+  ++ lib.optional stdenv.isLinux nv-codec-headers;
+
+  enableParallelBuilding = true;
+
   configureFlags = [
-    "--enable-fdk-aac"
-    (if useGtk then "--disable-gtk-update-checks" else "--disable-gtk")
+    "--disable-df-fetch"
+    "--disable-df-verify"
+    (if useGtk          then "--disable-gtk-update-checks" else "--disable-gtk")
+    (if useFdk          then "--enable-fdk-aac"            else "")
+    (if stdenv.isDarwin then "--disable-xcode"             else "")
+  ] ++ lib.optional (stdenv.isx86_32 || stdenv.isx86_64) "--harden";
+
+  # NOTE: 2018-12-27: Check NixOS HandBrake test if changing
+  NIX_LDFLAGS = [
+    "-lx265"
   ];
 
   preBuild = ''
     cd build
   '';
 
-  LD_LIBRARY_PATH = stdenv.lib.makeLibraryPath [ x265 ];
-  preFixup = ''
-    gappsWrapperArgs+=(--prefix LD_LIBRARY_PATH : "${LD_LIBRARY_PATH}")
-  '';
-
-  meta = {
-    homepage = http://handbrake.fr/;
-    description = "A tool for ripping DVDs into video files";
+  meta = with stdenv.lib; {
+    homepage = "http://handbrake.fr/";
+    description = "A tool for converting video files and ripping DVDs";
     longDescription = ''
-      Handbrake is a versatile transcoding DVD ripper. This package
-      provides the cli HandbrakeCLI and the GTK+ version ghb.
+      Tool for converting and remuxing video files
+      into selection of modern and widely supported codecs
+      and containers. Very versatile and customizable.
+      Package provides:
+      CLI - `HandbrakeCLI`
+      GTK GUI - `ghb`
     '';
-    license = stdenv.lib.licenses.gpl2;
-    maintainers = [ stdenv.lib.maintainers.wmertens ];
-    # Not tested on anything else
-    platforms = stdenv.lib.platforms.linux;
+    license = licenses.gpl2;
+    maintainers = with maintainers; [ Anton-Latukha wmertens ];
+    platforms = with platforms; unix;
   };
 }

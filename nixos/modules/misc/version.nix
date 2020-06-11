@@ -3,112 +3,115 @@
 with lib;
 
 let
-  cfg = config.system;
-
-  releaseFile  = "${toString pkgs.path}/.version";
-  suffixFile   = "${toString pkgs.path}/.version-suffix";
-  revisionFile = "${toString pkgs.path}/.git-revision";
-  gitRepo      = "${toString pkgs.path}/.git";
-  gitCommitId  = lib.substring 0 7 (commitIdFromGitRepo gitRepo);
+  cfg = config.system.nixos;
 in
 
 {
+  imports = [
+    (mkRenamedOptionModule [ "system" "nixosVersion" ] [ "system" "nixos" "version" ])
+    (mkRenamedOptionModule [ "system" "nixosVersionSuffix" ] [ "system" "nixos" "versionSuffix" ])
+    (mkRenamedOptionModule [ "system" "nixosRevision" ] [ "system" "nixos" "revision" ])
+    (mkRenamedOptionModule [ "system" "nixosLabel" ] [ "system" "nixos" "label" ])
+  ];
 
   options.system = {
 
-    stateVersion = mkOption {
-      type = types.str;
-      default = cfg.nixosRelease;
-      description = ''
-        Every once in a while, a new NixOS release may change
-        configuration defaults in a way incompatible with stateful
-        data. For instance, if the default version of PostgreSQL
-        changes, the new version will probably be unable to read your
-        existing databases. To prevent such breakage, you can set the
-        value of this option to the NixOS release with which you want
-        to be compatible. The effect is that NixOS will option
-        defaults corresponding to the specified release (such as using
-        an older version of PostgreSQL).
-      '';
-    };
-
-    nixosLabel = mkOption {
-      type = types.str;
-      description = ''
-        Label to be used in the names of generated outputs and boot
-        labels.
-      '';
-    };
-
-    nixosVersion = mkOption {
+    nixos.version = mkOption {
       internal = true;
       type = types.str;
       description = "The full NixOS version (e.g. <literal>16.03.1160.f2d4ee1</literal>).";
     };
 
-    nixosRelease = mkOption {
+    nixos.release = mkOption {
       readOnly = true;
       type = types.str;
-      default = fileContents releaseFile;
+      default = trivial.release;
       description = "The NixOS release (e.g. <literal>16.03</literal>).";
     };
 
-    nixosVersionSuffix = mkOption {
+    nixos.versionSuffix = mkOption {
       internal = true;
       type = types.str;
-      default = if pathExists suffixFile then fileContents suffixFile else "pre-git";
+      default = trivial.versionSuffix;
       description = "The NixOS version suffix (e.g. <literal>1160.f2d4ee1</literal>).";
     };
 
-    nixosRevision = mkOption {
+    nixos.revision = mkOption {
       internal = true;
-      type = types.str;
-      default = if pathIsDirectory gitRepo then commitIdFromGitRepo gitRepo
-                else if pathExists revisionFile then fileContents revisionFile
-                else "master";
+      type = types.nullOr types.str;
+      default = trivial.revisionWithDefault null;
       description = "The Git revision from which this NixOS configuration was built.";
     };
 
-    nixosCodeName = mkOption {
+    nixos.codeName = mkOption {
       readOnly = true;
       type = types.str;
+      default = trivial.codeName;
       description = "The NixOS release code name (e.g. <literal>Emu</literal>).";
+    };
+
+    stateVersion = mkOption {
+      type = types.str;
+      default = cfg.release;
+      description = ''
+        Every once in a while, a new NixOS release may change
+        configuration defaults in a way incompatible with stateful
+        data. For instance, if the default version of PostgreSQL
+        changes, the new version will probably be unable to read your
+        existing databases. To prevent such breakage, you should set the
+        value of this option to the NixOS release with which you want
+        to be compatible. The effect is that NixOS will use
+        defaults corresponding to the specified release (such as using
+        an older version of PostgreSQL).
+        It‘s perfectly fine and recommended to leave this value at the
+        release version of the first install of this system.
+        Changing this option will not upgrade your system. In fact it
+        is meant to stay constant exactly when you upgrade your system.
+        You should only bump this option, if you are sure that you can
+        or have migrated all state on your system which is affected
+        by this option.
+      '';
     };
 
     defaultChannel = mkOption {
       internal = true;
       type = types.str;
-      default = https://nixos.org/channels/nixos-unstable;
+      default = "https://nixos.org/channels/nixos-unstable";
       description = "Default NixOS channel to which the root user is subscribed.";
+    };
+
+    configurationRevision = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "The Git revision of the top-level flake from which this configuration was built.";
     };
 
   };
 
   config = {
 
-    system = {
+    system.nixos = {
       # These defaults are set here rather than up there so that
       # changing them would not rebuild the manual
-      nixosLabel   = mkDefault cfg.nixosVersion;
-      nixosVersion = mkDefault (cfg.nixosRelease + cfg.nixosVersionSuffix);
-      nixosRevision      = mkIf (pathIsDirectory gitRepo) (mkDefault            gitCommitId);
-      nixosVersionSuffix = mkIf (pathIsDirectory gitRepo) (mkDefault (".git." + gitCommitId));
-
-      # Note: code names must only increase in alphabetical order.
-      nixosCodeName = "Gorilla";
+      version = mkDefault (cfg.release + cfg.versionSuffix);
     };
 
     # Generate /etc/os-release.  See
-    # http://0pointer.de/public/systemd-man/os-release.html for the
+    # https://www.freedesktop.org/software/systemd/man/os-release.html for the
     # format.
-    environment.etc."os-release".text =
+    environment.etc.os-release.text =
       ''
         NAME=NixOS
         ID=nixos
-        VERSION="${config.system.nixosVersion} (${config.system.nixosCodeName})"
-        VERSION_ID="${config.system.nixosVersion}"
-        PRETTY_NAME="NixOS ${config.system.nixosVersion} (${config.system.nixosCodeName})"
-        HOME_URL="http://nixos.org/"
+        VERSION="${cfg.version} (${cfg.codeName})"
+        VERSION_CODENAME=${toLower cfg.codeName}
+        VERSION_ID="${cfg.version}"
+        PRETTY_NAME="NixOS ${cfg.release} (${cfg.codeName})"
+        LOGO="nix-snowflake"
+        HOME_URL="https://nixos.org/"
+        DOCUMENTATION_URL="https://nixos.org/learn.html"
+        SUPPORT_URL="https://nixos.org/community.html"
+        BUG_REPORT_URL="https://github.com/NixOS/nixpkgs/issues"
       '';
 
   };

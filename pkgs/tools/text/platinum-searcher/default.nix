@@ -1,9 +1,9 @@
-{ stdenv, lib, buildGoPackage, fetchFromGitHub }:
+{ stdenv, buildGoPackage, fetchFromGitHub }:
 
 buildGoPackage rec {
-  name = "the_platinum_searcher-${version}";
-  version = "2.1.3";
-  rev = "v2.1.3";
+  pname = "the_platinum_searcher";
+  version = "2.1.5";
+  rev = "v${version}";
 
   goPackagePath = "github.com/monochromegane/the_platinum_searcher";
 
@@ -11,13 +11,13 @@ buildGoPackage rec {
     inherit rev;
     owner = "monochromegane";
     repo = "the_platinum_searcher";
-    sha256 = "09pkdfh7fqn3x4l9zaw5wzk20k7nfdwry7br9vfy3vv3fwv61ynp";
+    sha256 = "1y7kl3954dimx9hp2bf1vjg1h52hj1v6cm4f5nhrqzwrawp0b6q0";
   };
 
   goDeps = ./deps.nix;
 
   meta = with stdenv.lib; {
-    homepage = https://github.com/monochromegane/the_platinum_searcher;
+    homepage = "https://github.com/monochromegane/the_platinum_searcher";
     description = "A code search tool similar to ack and the_silver_searcher(ag).";
     platforms = platforms.all;
     license = licenses.mit;

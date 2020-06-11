@@ -1,10 +1,10 @@
-{ config, lib, pkgs, timezone, ... }:
+{ config, lib, pkgs, ... }:
 
 with lib;
 
 let
   cfg = config.services.flexget;
-  pkg = pkgs.python27Packages.flexget;
+  pkg = pkgs.flexget;
   ymlFile = pkgs.writeText "flexget.yml" ''
     ${cfg.config}
 
@@ -19,7 +19,7 @@ in {
       user = mkOption {
         default = "deluge";
         example = "some_user";
-        type = types.string;
+        type = types.str;
         description = "The user under which to run flexget.";
       };
 
@@ -33,7 +33,7 @@ in {
       interval = mkOption {
         default = "10m";
         example = "1h";
-        type = types.string;
+        type = types.str;
         description = "When to perform a <command>flexget</command> run. See <command>man 7 systemd.time</command> for the format.";
       };
 
@@ -54,12 +54,12 @@ in {
 
   config = mkIf cfg.enable {
 
-    environment.systemPackages = [ pkgs.python27Packages.flexget ];
+    environment.systemPackages = [ pkg ];
 
     systemd.services = {
       flexget = {
         description = "FlexGet Daemon";
-        path = [ pkgs.pythonPackages.flexget ];
+        path = [ pkg ];
         serviceConfig = {
           User = cfg.user;
           Environment = "TZ=${config.time.timeZone}";

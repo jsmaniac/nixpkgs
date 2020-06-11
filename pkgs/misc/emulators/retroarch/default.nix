@@ -1,63 +1,66 @@
-{ stdenv, fetchFromGitHub, makeDesktopItem, coreutils, which, pkgconfig
-, ffmpeg, mesa, freetype, libxml2, python34
+{ stdenv, fetchFromGitHub, which, pkgconfig, makeWrapper
+, ffmpeg, libGLU, libGL, freetype, libxml2, python3
+, libobjc, AppKit, Foundation
+, alsaLib ? null
+, libdrm ? null
+, libpulseaudio ? null
+, libv4l ? null
+, libX11 ? null
+, libXdmcp ? null
+, libXext ? null
+, libXxf86vm ? null
+, mesa ? null
+, SDL2 ? null
+, udev ? null
 , enableNvidiaCgToolkit ? false, nvidia_cg_toolkit ? null
-, alsaLib ? null, libv4l ? null
-, udev ? null, libX11 ? null, libXext ? null, libXxf86vm ? null
-, libXdmcp ? null, SDL ? null, libpulseaudio ? null
+, withVulkan ? stdenv.isLinux, vulkan-loader ? null
+, fetchurl
+, wayland
+, libxkbcommon
 }:
 
 with stdenv.lib;
 
-let
-  desktopItem = makeDesktopItem {
-    name = "retroarch";
-    exec = "retroarch";
-    icon = "retroarch";
-    comment = "Multi-Engine Platform";
-    desktopName = "RetroArch";
-    genericName = "Libretro Frontend";
-    categories = "Game;Emulator;";
-    #keywords = "multi;engine;emulator;xmb;";
-  };
-in
-
 stdenv.mkDerivation rec {
-  name = "retroarch-bare-${version}";
-  version = "1.3.4";
+  pname = "retroarch-bare";
+  version = "1.8.5";
 
   src = fetchFromGitHub {
     owner = "libretro";
     repo = "RetroArch";
-    sha256 = "0ccp17580w0884baxj5kcynlm03jgd7i62dprz1ajxbi2s7b3mi3";
+    sha256 = "1pg8j9wvwgrzsv4xdai6i6jgdcc922v0m42rbqxvbghbksrc8la3";
     rev = "v${version}";
   };
 
-  buildInputs = [ pkgconfig ffmpeg mesa freetype libxml2 coreutils python34 which SDL ]
+  nativeBuildInputs = [ pkgconfig wayland ]
+                      ++ optional withVulkan makeWrapper;
+
+  buildInputs = [ ffmpeg freetype libxml2 libGLU libGL python3 SDL2 which ]
                 ++ optional enableNvidiaCgToolkit nvidia_cg_toolkit
-                ++ optionals stdenv.isLinux [ udev alsaLib libX11 libXext libXxf86vm libXdmcp libv4l libpulseaudio ];
+                ++ optional withVulkan vulkan-loader
+                ++ optionals stdenv.isDarwin [ libobjc AppKit Foundation ]
+                ++ optionals stdenv.isLinux [ alsaLib libdrm libpulseaudio libv4l libX11
+                                              libXdmcp libXext libXxf86vm mesa udev
+                                              wayland libxkbcommon ];
 
-  configureScript = "sh configure";
-
-  patchPhase = ''
-    export GLOBAL_CONFIG_DIR=$out/etc
-    sed -e 's#/bin/true#${coreutils}/bin/true#' -i qb/qb.libs.sh
-  '';
-
-  postInstall = ''
-    mkdir -p $out/share/icons/hicolor/scalable/apps
-    cp -p -T ./media/retroarch.svg $out/share/icons/hicolor/scalable/apps/retroarch.svg
-
-    mkdir -p "$out/share/applications"
-    cp ${desktopItem}/share/applications/* $out/share/applications
-  '';
+  # we use prefix-less pkg-config
+  PKG_CONF_PATH = "pkg-config";
 
   enableParallelBuilding = true;
 
+  configureFlags = stdenv.lib.optionals stdenv.isLinux [ "--enable-kms" "--enable-egl" ];
+
+  postInstall = optionalString withVulkan ''
+    wrapProgram $out/bin/retroarch --prefix LD_LIBRARY_PATH ':' ${vulkan-loader}/lib
+  '';
+
+  preFixup = "rm $out/bin/retroarch-cg2glsl";
+
   meta = {
-    homepage = http://libretro.org/;
+    homepage = "https://libretro.com";
     description = "Multi-platform emulator frontend for libretro cores";
     license = licenses.gpl3;
     platforms = platforms.all;
-    maintainers = with maintainers; [ MP2E edwtjo matthewbauer ];
+    maintainers = with maintainers; [ MP2E edwtjo matthewbauer kolbycrouch ];
   };
 }

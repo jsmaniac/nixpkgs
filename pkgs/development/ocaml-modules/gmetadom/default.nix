@@ -22,11 +22,12 @@ stdenv.mkDerivation rec {
   '';
 
 
-  buildInputs = [ocaml findlib pkgconfig gdome2 libxslt];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ocaml findlib gdome2 libxslt];
   propagatedBuildInputs = [gdome2];
 
   meta = {
-    homepage = http://gmetadom.sourceforge.net/;
+    homepage = "http://gmetadom.sourceforge.net/";
     description = "A collection of librares, each library providing a DOM implementation";
     license = stdenv.lib.licenses.lgpl21Plus;
     maintainers = [ stdenv.lib.maintainers.roconnor ];

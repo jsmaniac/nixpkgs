@@ -1,21 +1,39 @@
-{ stdenv, buildGoPackage, fetchFromGitHub }:
+{ buildGoModule, fetchFromGitHub, lib, installShellFiles }:
 
-buildGoPackage rec {
-  name = "lf-unstable-${version}";
-  version = "2016-10-02";
-
-  goPackagePath = "github.com/gokcehan/lf";
+buildGoModule rec {
+  pname = "lf";
+  version = "14";
 
   src = fetchFromGitHub {
     owner = "gokcehan";
     repo = "lf";
-    rev = "7a851f6c720380a6b9f715542906a56334e7e98b"; # nightly
-    sha256 = "0hdxcibly3algz0hgy65xr3dxchf4aarpxdgxsgc67m1knizksjr";
+    rev = "r${version}";
+    sha256 = "0kl9yrgph1i0jbxhlg3k0411436w80xw1s8dzd7v7h2raygkb4is";
   };
 
-  goDeps = ./deps.nix;
+  vendorSha256 = "1zb2z3c2w4gnq9cjczg1y7r7jg4mlrm2hsb12dqd9w8mh44rvr37";
 
-  meta = with stdenv.lib; {
+  nativeBuildInputs = [ installShellFiles ];
+
+  # TODO: Setting buildFlags probably isn't working properly. I've tried a few
+  # variants, e.g.:
+  # - buildFlags = [ "-ldflags" "\"-s" "-w"" ""-X 'main.gVersion=${version}'\"" ];
+  # - buildFlags = [ "-ldflags" "\\\"-X" "${goPackagePath}/main.gVersion=${version}\\\"" ];
+  # Override the build phase (to set buildFlags):
+  buildPhase = ''
+    runHook preBuild
+    runHook renameImports
+    go install -ldflags="-s -w -X main.gVersion=r${version}"
+    runHook postBuild
+  '';
+
+  postInstall = ''
+    install -D --mode=444 lf.desktop $out/share/applications/lf.desktop
+    installManPage lf.1
+    installShellCompletion etc/lf.{zsh,fish}
+  '';
+
+  meta = with lib; {
     description = "A terminal file manager written in Go and heavily inspired by ranger";
     longDescription = ''
       lf (as in "list files") is a terminal file manager written in Go. It is
@@ -24,8 +42,9 @@ buildGoPackage rec {
       are handled by external tools.
     '';
     homepage = "https://godoc.org/github.com/gokcehan/lf";
+    changelog = "https://github.com/gokcehan/lf/releases/tag/r${version}";
     license = licenses.mit;
-    platforms = platforms.linux;
+    platforms = platforms.unix;
     maintainers = with maintainers; [ primeos ];
   };
 }

@@ -1,37 +1,60 @@
-{ stdenv, fetchurl, pkgconfig, libXft, cairo, harfbuzz
-, libintlOrEmpty, gobjectIntrospection
+{ stdenv, fetchurl, fetchpatch, pkgconfig, cairo, harfbuzz
+, libintl, gobject-introspection, darwin, fribidi, gnome3
+, gtk-doc, docbook_xsl, docbook_xml_dtd_43, makeFontsConf, freefont_ttf
+, meson, ninja, glib
+, x11Support? !stdenv.isDarwin, libXft
 }:
 
 with stdenv.lib;
 
 let
-  ver_maj = "1.40";
-  ver_min = "2";
-in
-stdenv.mkDerivation rec {
-  name = "pango-${ver_maj}.${ver_min}";
+  pname = "pango";
+  version = "1.44.7";
+in stdenv.mkDerivation rec {
+  name = "${pname}-${version}";
 
   src = fetchurl {
-    url = "mirror://gnome/sources/pango/${ver_maj}/${name}.tar.xz";
-    sha256 = "90582a02bc89318d205814fc097f2e9dd164d26da5f27c53ea42d583b34c3cd1";
+    url = "mirror://gnome/sources/${pname}/${stdenv.lib.versions.majorMinor version}/${name}.tar.xz";
+    sha256 = "07qvxa2sk90chp1l12han6vxvy098mc37sdqcznyywyv2g6bd9b6";
   };
 
-  outputs = [ "bin" "dev" "out" "devdoc" ];
+  # FIXME: docs fail on darwin
+  outputs = [ "bin" "dev" "out" ] ++ optional (!stdenv.isDarwin) "devdoc";
 
-  buildInputs = [ gobjectIntrospection ];
-  nativeBuildInputs = [ pkgconfig ];
-  propagatedBuildInputs = [ cairo harfbuzz libXft ] ++ libintlOrEmpty;
+  nativeBuildInputs = [
+    meson ninja
+    glib # for glib-mkenum
+    pkgconfig gobject-introspection gtk-doc docbook_xsl docbook_xml_dtd_43
+  ];
+  buildInputs = [
+    fribidi
+  ] ++ optionals stdenv.isDarwin (with darwin.apple_sdk.frameworks; [
+    ApplicationServices
+    Carbon
+    CoreGraphics
+    CoreText
+  ]);
+  propagatedBuildInputs = [ cairo glib libintl harfbuzz ] ++
+    optional x11Support libXft;
+
+  mesonFlags = [
+    "-Dgtk_doc=${if stdenv.isDarwin then "false" else "true"}"
+  ];
 
   enableParallelBuilding = true;
 
-  doCheck = false; # test-layout fails on 1.38.0
-  # jww (2014-05-05): The tests currently fail on Darwin:
-  #
-  # ERROR:testiter.c:139:iter_char_test: assertion failed: (extents.width == x1 - x0)
-  # .../bin/sh: line 5: 14823 Abort trap: 6 srcdir=. PANGO_RC_FILE=./pangorc ${dir}$tst
-  # FAIL: testiter
+  # Fontconfig error: Cannot load default config file
+  FONTCONFIG_FILE = makeFontsConf {
+    fontDirectories = [ freefont_ttf ];
+  };
 
-  configureFlags = optional stdenv.isDarwin "--without-x";
+  doCheck = false; # /layout/valid-1.markup: FAIL
+
+  passthru = {
+    updateScript = gnome3.updateScript {
+      packageName = pname;
+    };
+  };
 
   meta = with stdenv.lib; {
     description = "A library for laying out and rendering of text, with an emphasis on internationalization";
@@ -40,14 +63,14 @@ stdenv.mkDerivation rec {
       Pango is a library for laying out and rendering of text, with an
       emphasis on internationalization.  Pango can be used anywhere
       that text layout is needed, though most of the work on Pango so
-      far has been done in the context of the GTK+ widget toolkit.
-      Pango forms the core of text and font handling for GTK+-2.x.
+      far has been done in the context of the GTK widget toolkit.
+      Pango forms the core of text and font handling for GTK.
     '';
 
-    homepage = http://www.pango.org/;
+    homepage = "https://www.pango.org/";
     license = licenses.lgpl2Plus;
 
-    maintainers = with maintainers; [ raskin urkud ];
-    platforms = with platforms; linux ++ darwin;
+    maintainers = with maintainers; [ raskin ];
+    platforms = platforms.linux ++ platforms.darwin;
   };
 }

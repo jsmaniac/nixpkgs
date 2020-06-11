@@ -5,17 +5,12 @@ with lib;
 let
 
   smbToString = x: if builtins.typeOf x == "bool"
-                   then (if x then "true" else "false")
+                   then boolToString x
                    else toString x;
 
   cfg = config.services.samba;
 
   samba = cfg.package;
-
-  setupScript =
-    ''
-      mkdir -p /var/lock/samba /var/log/samba /var/cache/samba /var/lib/samba/private
-    '';
 
   shareConfig = name:
     let share = getAttr name cfg.shares; in
@@ -28,9 +23,9 @@ let
   configFile = pkgs.writeText "smb.conf"
     (if cfg.configText != null then cfg.configText else
     ''
-      [ global ]
+      [global]
       security = ${cfg.securityType}
-      passwd program = /var/setuid-wrappers/passwd %u
+      passwd program = /run/wrappers/bin/passwd %u
       pam password change = ${smbToString cfg.syncPasswordsByPam}
       invalid users = ${smbToString cfg.invalidUsers}
 
@@ -45,6 +40,7 @@ let
   daemonService = appName: args:
     { description = "Samba Service Daemon ${appName}";
 
+      after = [ (mkIf (cfg.enableNmbd && "${appName}" == "smbd") "samba-nmbd.service") ];
       requiredBy = [ "samba.target" ];
       partOf = [ "samba.target" ];
 
@@ -54,10 +50,14 @@ let
       };
 
       serviceConfig = {
-        ExecStart = "${samba}/sbin/${appName} ${args}";
+        ExecStart = "${samba}/sbin/${appName} --foreground --no-process-group ${args}";
         ExecReload = "${pkgs.coreutils}/bin/kill -HUP $MAINPID";
+        LimitNOFILE = 16384;
+        PIDFile = "/run/${appName}.pid";
         Type = "notify";
+        NotifyAccess = "all"; #may not do anything...
       };
+      unitConfig.RequiresMountsFor = "/var/lib/samba";
 
       restartTriggers = [ configFile ];
     };
@@ -65,6 +65,9 @@ let
 in
 
 {
+  imports = [
+    (mkRemovedOptionModule [ "services" "samba" "defaultShare" ] "")
+  ];
 
   ###### interface
 
@@ -83,11 +86,31 @@ in
 
           <note>
             <para>If you use the firewall consider adding the following:</para>
-            <programlisting>
-              networking.firewall.allowedTCPPorts = [ 139 445 ];
-              networking.firewall.allowedUDPPorts = [ 137 138 ];
-            </programlisting>
+          <programlisting>
+            networking.firewall.allowedTCPPorts = [ 139 445 ];
+            networking.firewall.allowedUDPPorts = [ 137 138 ];
+          </programlisting>
           </note>
+        '';
+      };
+
+      enableNmbd = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Whether to enable Samba's nmbd, which replies to NetBIOS over IP name
+          service requests. It also participates in the browsing protocols
+          which make up the Windows "Network Neighborhood" view.
+        '';
+      };
+
+      enableWinbindd = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Whether to enable Samba's winbindd, which provides a number of services
+          to the Name Service Switch capability found in most modern C libraries,
+          to arbitrary applications via PAM and ntlm_auth and to Samba itself.
         '';
       };
 
@@ -95,7 +118,7 @@ in
         type = types.package;
         default = pkgs.samba;
         defaultText = "pkgs.samba";
-        example = literalExample "pkgs.samba3";
+        example = literalExample "pkgs.samba4Full";
         description = ''
           Defines which package should be used for the samba server.
         '';
@@ -166,7 +189,7 @@ in
           See <command>man smb.conf</command> for options.
         '';
         type = types.attrsOf (types.attrsOf types.unspecified);
-        example =
+        example = literalExample ''
           { public =
             { path = "/srv/public";
               "read only" = true;
@@ -174,7 +197,8 @@ in
               "guest ok" = "yes";
               comment = "Public samba share.";
             };
-          };
+          }
+        '';
       };
 
     };
@@ -185,40 +209,45 @@ in
   ###### implementation
 
   config = mkMerge
-    [ { # Always provide a smb.conf to shut up programs like smbclient and smbspool.
-        environment.etc = singleton
-          { source =
-              if cfg.enable then configFile
-              else pkgs.writeText "smb-dummy.conf" "# Samba is disabled.";
-            target = "samba/smb.conf";
-          };
+    [ { assertions =
+          [ { assertion = cfg.nsswins -> cfg.enableWinbindd;
+              message   = "If samba.nsswins is enabled, then samba.enableWinbindd must also be enabled";
+            }
+          ];
+        # Always provide a smb.conf to shut up programs like smbclient and smbspool.
+        environment.etc."samba/smb.conf".source = mkOptionDefault (
+          if cfg.enable then configFile
+          else pkgs.writeText "smb-dummy.conf" "# Samba is disabled."
+        );
       }
 
-      (mkIf config.services.samba.enable {
+      (mkIf cfg.enable {
 
         system.nssModules = optional cfg.nsswins samba;
+        system.nssDatabases.hosts = optional cfg.nsswins "wins";
 
         systemd = {
           targets.samba = {
             description = "Samba Server";
-            requires = [ "samba-setup.service" ];
-            after = [ "samba-setup.service" "network.target" ];
+            after = [ "network.target" ];
             wantedBy = [ "multi-user.target" ];
           };
-
+          # Refer to https://github.com/samba-team/samba/tree/master/packaging/systemd
+          # for correct use with systemd
           services = {
-            "samba-nmbd" = daemonService "nmbd" "-F";
-            "samba-smbd" = daemonService "smbd" "-F";
-            "samba-winbindd" = daemonService "winbindd" "-F";
-            "samba-setup" = {
-              description = "Samba Setup Task";
-              script = setupScript;
-              unitConfig.RequiresMountsFor = "/var/lib/samba";
-            };
+            samba-smbd = daemonService "smbd" "";
+            samba-nmbd = mkIf cfg.enableNmbd (daemonService "nmbd" "");
+            samba-winbindd = mkIf cfg.enableWinbindd (daemonService "winbindd" "");
           };
+          tmpfiles.rules = [
+            "d /var/lock/samba - - - - -"
+            "d /var/log/samba - - - - -"
+            "d /var/cache/samba - - - - -"
+            "d /var/lib/samba/private - - - - -"
+          ];
         };
 
-        security.pam.services.sambda = {};
+        security.pam.services.samba = {};
 
       })
     ];

@@ -1,29 +1,40 @@
-{ stdenv, fetchFromGitHub, pkgconfig, autoreconfHook }:
+{ stdenv, fetchFromGitHub, cmake, static ? false }:
 
 stdenv.mkDerivation rec {
-  name = "snappy-${version}";
-  version = "1.1.3";
-  
+  pname = "snappy";
+  version = "1.1.8";
+
   src = fetchFromGitHub {
     owner = "google";
     repo = "snappy";
     rev = version;
-    sha256 = "1w9pq8vag8c6m4ib0qbdbqzsnpwjvw01jbp15lgwg1rzwhvflm10";
+    sha256 = "1j0kslq2dvxgkcxl1gakhvsa731yrcvcaipcp5k8k7ayicvkv9jv";
   };
 
-  nativeBuildInputs = [ pkgconfig autoreconfHook ];
+  patches = [ ./disable-benchmark.patch ];
 
-  # -DNDEBUG for speed
-  configureFlags = [ "CXXFLAGS=-DNDEBUG" ];
+  outputs = [ "out" "dev" ];
 
-  # SIGILL on darwin
-  doCheck = !stdenv.isDarwin;
+  nativeBuildInputs = [ cmake ];
+
+  cmakeFlags = [
+    "-DBUILD_SHARED_LIBS=${if static then "OFF" else "ON"}"
+    "-DCMAKE_SKIP_BUILD_RPATH=OFF"
+  ];
+
+  postInstall = ''
+    substituteInPlace "$out"/lib/cmake/Snappy/SnappyTargets.cmake \
+      --replace 'INTERFACE_INCLUDE_DIRECTORIES "''${_IMPORT_PREFIX}/include"' 'INTERFACE_INCLUDE_DIRECTORIES "'$dev'"'
+  '';
+
+  checkTarget = "test";
+
+  doCheck = true;
 
   meta = with stdenv.lib; {
-    homepage = http://code.google.com/p/snappy/;
+    homepage = "https://google.github.io/snappy/";
     license = licenses.bsd3;
     description = "Compression/decompression library for very high speeds";
-    platforms = platforms.unix;
-    maintainers = with maintainers; [ wkennington ];
+    platforms = platforms.all;
   };
 }

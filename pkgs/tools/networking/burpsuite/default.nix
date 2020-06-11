@@ -1,23 +1,26 @@
-{ stdenv, fetchurl, jre }:
+{ stdenv, fetchurl, jre, runtimeShell }:
 
 let
-  version = "1.7.06";
+  version = "2020.1";
   jar = fetchurl {
     name = "burpsuite.jar";
     url = "https://portswigger.net/Burp/Releases/Download?productId=100&version=${version}&type=Jar";
-    sha256 = "13x3x0la2jmm7zr66mvczzlmsy1parfibnl9s4iwi1nls4ikv7kl";
+    sha256 = "12awfy0f8fyqjc0kza1gkmdx1g8bniw1xqaps2dhjimi6s0lq5jx";
   };
   launcher = ''
-    #!${stdenv.shell}
+    #!${runtimeShell}
     exec ${jre}/bin/java -jar ${jar} "$@"
   '';
 in stdenv.mkDerivation {
-  name = "burpsuite-${version}";
+  pname = "burpsuite";
+  inherit version;
   buildCommand = ''
     mkdir -p $out/bin
     echo "${launcher}" > $out/bin/burpsuite
     chmod +x $out/bin/burpsuite
   '';
+
+  preferLocalBuild = true;
 
   meta = {
     description = "An integrated platform for performing security testing of web applications";
@@ -30,9 +33,8 @@ in stdenv.mkDerivation {
     homepage = "https://portswigger.net/burp/";
     downloadPage = "https://portswigger.net/burp/freedownload";
     license = [ stdenv.lib.licenses.unfree ];
-    preferLocalBuild = true;
     platforms = jre.meta.platforms;
     hydraPlatforms = [];
-    maintainers = [ stdenv.lib.maintainers.bennofs ];
+    maintainers = with stdenv.lib.maintainers; [ bennofs ];
   };
 }

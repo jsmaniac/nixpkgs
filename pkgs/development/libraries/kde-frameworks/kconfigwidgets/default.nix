@@ -1,17 +1,15 @@
 {
-  kdeFramework, lib, ecm,
-  kauth, kcodecs, kconfig, kdoctools, kguiaddons, ki18n, kwidgetsaddons
+  mkDerivation, lib, extra-cmake-modules,
+  kauth, kcodecs, kconfig, kdoctools, kguiaddons, ki18n, kwidgetsaddons, qttools, qtbase,
 }:
 
-kdeFramework {
+mkDerivation {
   name = "kconfigwidgets";
   meta = { maintainers = [ lib.maintainers.ttuegel ]; };
-  nativeBuildInputs = [ ecm kdoctools ];
-  propagatedBuildInputs = [
-    kauth kconfig kcodecs kguiaddons ki18n kwidgetsaddons
-  ];
+  nativeBuildInputs = [ extra-cmake-modules kdoctools ];
+  buildInputs = [ kguiaddons ki18n qtbase qttools ];
+  propagatedBuildInputs = [ kauth kcodecs kconfig kwidgetsaddons ];
   patches = [ ./0001-qdiriterator-follow-symlinks.patch ];
-  postInstall = ''
-    moveToOutput "bin/preparetips5" "$dev"
-  '';
+  outputs = [ "out" "dev" ];
+  outputBin = "dev";
 }

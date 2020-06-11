@@ -1,22 +1,24 @@
-{ stdenv, fetchFromGitHub, bison, flex, geoip, geolite-legacy, libcli, libnet
-, libnetfilter_conntrack, libnl, libpcap, libsodium, liburcu, ncurses, perl
-, pkgconfig, zlib }:
+{ stdenv, fetchFromGitHub, makeWrapper, bison, flex, geoip, geolite-legacy
+, libcli, libnet, libnetfilter_conntrack, libnl, libpcap, libsodium
+, liburcu, ncurses, pkgconfig, zlib }:
 
 stdenv.mkDerivation rec {
-  name = "netsniff-ng-${version}";
-  version = "0.6.2";
+  pname = "netsniff-ng";
+  version = "0.6.7";
 
   # Upstream recommends and supports git
-  src = fetchFromGitHub rec {
-    repo = "netsniff-ng";
-    owner = repo;
+  src = fetchFromGitHub {
+    repo = pname;
+    owner = pname;
     rev = "v${version}";
-    sha256 = "1lz4hwgwdq3znlqjmvl7cw3g3ilbayn608h0hwqdf7v2jq6n67kg";
+    sha256 = "1jvihq30cwlpjqwny0lcrciysn40wscq6xik3s9b81nw2s7wiyqr";
   };
 
-  buildInputs = [ bison flex geoip geolite-legacy libcli libnet libnl
-    libnetfilter_conntrack libpcap libsodium liburcu ncurses perl
-    pkgconfig zlib ];
+  nativeBuildInputs = [ pkgconfig makeWrapper bison flex ];
+  buildInputs = [
+    geoip geolite-legacy libcli libnet libnl
+    libnetfilter_conntrack libpcap libsodium liburcu ncurses zlib
+  ];
 
   # ./configure is not autoGNU but some home-brewn magic
   configurePhase = ''
@@ -31,6 +33,10 @@ stdenv.mkDerivation rec {
   makeFlags = [ "PREFIX=$(out)" "ETCDIR=$(out)/etc" ];
 
   postInstall = ''
+    # trafgen and bpfc can call out to cpp to process config files.
+    wrapProgram "$out/sbin/trafgen" --prefix PATH ":" "${stdenv.cc}/bin"
+    wrapProgram "$out/sbin/bpfc" --prefix PATH ":" "${stdenv.cc}/bin"
+
     ln -sv ${geolite-legacy}/share/GeoIP/GeoIP.dat		$out/etc/netsniff-ng/country4.dat
     ln -sv ${geolite-legacy}/share/GeoIP/GeoIPv6.dat		$out/etc/netsniff-ng/country6.dat
     ln -sv ${geolite-legacy}/share/GeoIP/GeoIPCity.dat		$out/etc/netsniff-ng/city4.dat
@@ -49,9 +55,8 @@ stdenv.mkDerivation rec {
       to user space and vice versa. The toolkit can be used for network
       development and analysis, debugging, auditing or network reconnaissance.
     '';
-    homepage = http://netsniff-ng.org/;
+    homepage = "http://netsniff-ng.org/";
     license = licenses.gpl2;
     platforms = platforms.linux;
-    maintainers = with maintainers; [ nckx ];
   };
 }

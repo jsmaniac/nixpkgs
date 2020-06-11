@@ -2,16 +2,17 @@
 , crypto ? false, libgcrypt, gnutls, pkgconfig}:
 
 stdenv.mkDerivation rec {
-  pname = "ntfs-3g";
-  version = "2016.2.22";
-  name = "${pname}-${version}";
+  pname = "ntfs3g";
+  version = "2017.3.23";
+
+  outputs = [ "out" "dev" "man" "doc" ];
 
   buildInputs = [ libuuid ] ++ stdenv.lib.optionals crypto [ gnutls libgcrypt ];
   nativeBuildInputs = stdenv.lib.optional crypto pkgconfig;
 
   src = fetchurl {
-    url = "http://tuxera.com/opensource/ntfs-3g_ntfsprogs-${version}.tgz";
-    sha256 = "180y5y09h30ryf2vim8j30a2npwz1iv9ly5yjmh3wjdkwh2jrdyp";
+    url = "https://tuxera.com/opensource/ntfs-3g_ntfsprogs-${version}.tgz";
+    sha256 = "1mb228p80hv97pgk3myyvgp975r9mxq56c6bdn1n24kngcfh4niy";
   };
 
   patchPhase = ''
@@ -29,6 +30,7 @@ stdenv.mkDerivation rec {
     "--enable-posix-acls"
     "--enable-xattr-mappings"
     "--${if crypto then "enable" else "disable"}-crypto"
+    "--enable-extras"
   ];
 
   postInstall =
@@ -38,11 +40,10 @@ stdenv.mkDerivation rec {
     '';
 
   meta = with stdenv.lib; {
-    homepage = http://www.tuxera.com/community/open-source-ntfs-3g/;
+    homepage = "https://www.tuxera.com/community/open-source-ntfs-3g/";
     description = "FUSE-based NTFS driver with full write support";
-    maintainers = with maintainers; [ urkud dezgeg ];
+    maintainers = with maintainers; [ dezgeg ];
     platforms = platforms.linux;
     license = licenses.gpl2Plus; # and (lib)fuse-lite under LGPL2+
   };
 }
-

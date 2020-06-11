@@ -2,12 +2,12 @@
 
 let
 
-  common = { versionMajor, versionMinor, sha256 } @ args: stdenv.mkDerivation (rec {
-    name = "apache-tomcat-${version}";
+  common = { versionMajor, versionMinor, sha256 }: stdenv.mkDerivation (rec {
+    pname = "apache-tomcat";
     version = "${versionMajor}.${versionMinor}";
 
     src = fetchurl {
-      url = "mirror://apache/tomcat/tomcat-${versionMajor}/v${version}/bin/${name}.tar.gz";
+      url = "mirror://apache/tomcat/tomcat-${versionMajor}/v${version}/bin/${pname}-${version}.tar.gz";
       inherit sha256;
     };
 
@@ -21,7 +21,7 @@ let
       '';
 
     meta = {
-      homepage = https://tomcat.apache.org/;
+      homepage = "https://tomcat.apache.org/";
       description = "An implementation of the Java Servlet and JavaServer Pages technologies";
       platforms = with lib.platforms; all;
       maintainers = with lib.maintainers; [ danbst ];
@@ -30,35 +30,21 @@ let
   });
 
 in {
-
-  tomcat6 = common {
-    versionMajor = "6";
-    versionMinor = "0.45";
-    sha256 = "0ba8h86padpk23xmscp7sg70g0v8ji2jbwwriz59hxqy5zhd76wg";
-  };
-
   tomcat7 = common {
     versionMajor = "7";
-    versionMinor = "0.72";
-    sha256 = "1nx5pmz3bq3n20fdspqh8ljqy1nj67rwi1vsqjpkrvd996x7p73p";
+    versionMinor = "0.100";
+    sha256 = "0wjjnvxjz0xbnsfgyp0xc7nlij4z093v54hg59vww2nmkz5mg01v";
   };
 
   tomcat8 = common {
     versionMajor = "8";
-    versionMinor = "0.37";
-    sha256 = "0f9d4yxjzwdrayj5l3jyiclnmpb5lffvmsnp54qpf6m3gm7cj5i6";
+    versionMinor = "5.51";
+    sha256 = "1zmg0hi4nw4y5sknd0jgq9lb3bncjjscay5fdiiq3qh5cs0wsvl3";
   };
 
-  tomcat85 = common {
-    versionMajor = "8";
-    versionMinor = "5.5";
-    sha256 = "0idfxjrw5q45f531gyjnv6xjkbj9nhy2v1w4z7558z96230a0fqj";
-  };
-
-  tomcatUnstable = common {
+  tomcat9 = common {
     versionMajor = "9";
-    versionMinor = "0.0.M10";
-    sha256 = "0p3pqwz9zjvr9w73divsyaa53mbazf0icxfs06wvgxsvkbgj5gq9";
+    versionMinor = "0.31";
+    sha256 = "0hybcy280qhhp9if58xw0rmyyqz1m1bzby7qnwz3y2wc1y4is48v";
   };
-
 }

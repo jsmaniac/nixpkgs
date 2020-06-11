@@ -4,28 +4,35 @@ let
   libphutil = fetchFromGitHub {
     owner = "phacility";
     repo = "libphutil";
-    rev = "5fd1af8b4f2b9631e2ceb06bd88d21f2416123c2";
-    sha256 = "06zkfkgwni8prr3cnsbf1h4s30k4v00y8ll1bcl6282xynnh3gf6";
+    rev = "cc2a3dbf590389400da55563cb6993f321ec6d73";
+    sha256 = "1k7sr3racwz845i7r5kdwvgqrz8gldz07pxj3yw77s58rqbix3ad";
   };
   arcanist = fetchFromGitHub {
     owner = "phacility";
     repo = "arcanist";
-    rev = "9e82ef979e8148c43b9b8439025d505b1219e213";
-    sha256 = "0h7ny8wr3cjn105gyzhd4qmhhccd0ilalslsdjj10nxxw2cgn193";
+    rev = "21a1828ea06cf031e93082db8664d73efc88290a";
+    sha256 = "05rq9l9z7446ks270viay57r5ibx702b5bnlf4ck529zc4abympx";
   };
 in
-stdenv.mkDerivation rec {
-  name    = "arcanist-${version}";
-  version = "20160825";
+stdenv.mkDerivation {
+  pname = "arcanist";
+  version = "20200127";
 
   src = [ arcanist libphutil ];
   buildInputs = [ php makeWrapper flex ];
 
-  unpackPhase = "true";
-  buildPhase = ''
-    cp -R ${libphutil} libphutil
-    cp -R ${arcanist} arcanist
+  unpackPhase = ''
+    cp -aR ${libphutil} libphutil
+    cp -aR ${arcanist} arcanist
     chmod +w -R libphutil arcanist
+  '';
+
+  postPatch = stdenv.lib.optionalString stdenv.isAarch64 ''
+    substituteInPlace libphutil/support/xhpast/Makefile \
+      --replace "-minline-all-stringops" ""
+  '';
+
+  buildPhase = ''
     (
       cd libphutil/support/xhpast
       make clean all install
@@ -35,10 +42,12 @@ stdenv.mkDerivation rec {
     mkdir -p $out/bin $out/libexec
     cp -R libphutil $out/libexec/libphutil
     cp -R arcanist  $out/libexec/arcanist
-
-    ln -s $out/libexec/arcanist/bin/arc $out/bin
-    wrapProgram $out/bin/arc \
-      --prefix PATH : "${php}/bin"
+    ${if stdenv.isDarwin then ''
+        echo "#! $shell -e" > $out/bin/arc
+        echo "exec ${php}/bin/php $out/libexec/arcanist/scripts/arcanist.php "'"$@"' >> $out/bin/arc
+        chmod +x $out/bin/arc''
+      else ''
+        ln -s $out/libexec/arcanist/scripts/arcanist.php $out/bin/arc''}
   '';
 
   meta = {

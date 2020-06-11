@@ -8,7 +8,7 @@ with lib;
 
 let
 
-  versionFile = pkgs.writeText "nixos-version" config.system.nixosVersion;
+  versionFile = pkgs.writeText "nixos-label" config.system.nixos.label;
 
 in
 
@@ -41,7 +41,7 @@ in
 
     # In stage 1 of the boot, mount the CD/DVD as the root FS by label
     # so that we don't need to know its device.
-    fileSystems = [ ];
+    fileSystems = { };
 
     # boot.initrd.availableKernelModules = [ "mvsdio" "reiserfs" "ext3" "ext4" ];
 
@@ -58,8 +58,8 @@ in
     # Individual files to be included on the CD, outside of the Nix
     # store on the CD.
     tarball.contents =
-      [ { source = config.system.build.initialRamdisk + "/initrd";
-          target = "/boot/initrd";
+      [ { source = config.system.build.initialRamdisk + "/" + config.system.boot.loader.initrdFile;
+          target = "/boot/" + config.system.boot.loader.initrdFile;
         }
         { source = versionFile;
           target = "/nixos-version.txt";
@@ -68,7 +68,7 @@ in
 
     # Create the tarball
     system.build.tarball = import ../../../lib/make-system-tarball.nix {
-      inherit (pkgs) stdenv perl xz pathsFromGraph;
+      inherit (pkgs) stdenv closureInfo pixz;
 
       inherit (config.tarball) contents storeContents;
     };

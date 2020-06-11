@@ -1,43 +1,49 @@
-{ stdenv, fetchFromGitHub, pango, libinput
-, makeWrapper, cmake, pkgconfig, asciidoc, libxslt, docbook_xsl, cairo
-, wayland, wlc, libxkbcommon, pixman, fontconfig, pcre, json_c, dbus_libs
+{ stdenv, fetchFromGitHub, makeWrapper
+, meson, ninja
+, pkgconfig, scdoc
+, wayland, libxkbcommon, pcre, json_c, dbus, libevdev
+, pango, cairo, libinput, libcap, pam, gdk-pixbuf, librsvg
+, wlroots, wayland-protocols
 }:
 
-let
-  version = "0.9";
-in
-  stdenv.mkDerivation rec {
-    name = "sway-${version}";
+stdenv.mkDerivation rec {
+  pname = "sway-unwrapped";
+  version = "1.4";
 
-    src = fetchFromGitHub {
-      owner = "Sircmpwn";
-      repo = "sway";
-      rev = "${version}";
-      sha256 = "0qqqg23rknxnjcgvkfrx3pijqc3dvi74qmmavq07vy2qfs1xlwg0";
-    };
+  src = fetchFromGitHub {
+    owner = "swaywm";
+    repo = "sway";
+    rev = version;
+    sha256 = "11qf89y3q92g696a6f4d23qb44gqixg6qxq740vwv2jw59ms34ja";
+  };
 
-    nativeBuildInputs = [ makeWrapper cmake pkgconfig asciidoc libxslt docbook_xsl ];
+  patches = [
+    ./sway-config-no-nix-store-references.patch
+    ./load-configuration-from-etc.patch
+  ];
 
-    buildInputs = [ wayland wlc libxkbcommon pixman fontconfig pcre json_c dbus_libs pango cairo libinput ];
+  nativeBuildInputs = [
+    pkgconfig meson ninja scdoc
+  ];
 
-    patchPhase = ''
-      sed -i s@/etc/sway@$out/etc/sway@g CMakeLists.txt;
-    '';
+  buildInputs = [
+    wayland libxkbcommon pcre json_c dbus libevdev
+    pango cairo libinput libcap pam gdk-pixbuf librsvg
+    wlroots wayland-protocols
+  ];
 
-    makeFlags = "PREFIX=$(out)";
-    installPhase = "PREFIX=$out make install";
+  enableParallelBuilding = true;
 
-    LD_LIBRARY_PATH = stdenv.lib.makeLibraryPath [ wlc dbus_libs ];
-    preFixup = ''
-      wrapProgram $out/bin/sway \
-        --prefix LD_LIBRARY_PATH : "${LD_LIBRARY_PATH}";
-    '';
+  mesonFlags = [
+    "-Ddefault-wallpaper=false" "-Dxwayland=enabled" "-Dgdk-pixbuf=enabled"
+    "-Dtray=enabled" "-Dman-pages=enabled"
+  ];
 
-    meta = with stdenv.lib; {
-      description = "i3-compatible window manager for Wayland";
-      homepage    = "http://swaywm.org";
-      license     = licenses.mit;
-      platforms   = platforms.linux;
-      maintainers = with maintainers; [ ];
-    };
-  }
+  meta = with stdenv.lib; {
+    description = "i3-compatible tiling Wayland compositor";
+    homepage    = "https://swaywm.org";
+    license     = licenses.mit;
+    platforms   = platforms.linux;
+    maintainers = with maintainers; [ primeos synthetica ma27 ];
+  };
+}

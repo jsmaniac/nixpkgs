@@ -1,59 +1,135 @@
-{ stdenv, fetchurl, pkgconfig, spice_protocol, intltool, celt_0_5_1
-, openssl, libpulseaudio, pixman, gobjectIntrospection, libjpeg_turbo, zlib
-, cyrus_sasl, pythonPackages, autoreconfHook, usbredir, libsoup
-, gtk3, epoxy }:
+{ stdenv
+, fetchurl
+, acl
+, cyrus_sasl
+, docbook_xsl
+, epoxy
+, gettext
+, gobject-introspection
+, gst_all_1
+, gtk-doc
+, gtk3
+, json-glib
+, libcacard
+, libdrm
+, libjpeg_turbo
+, libopus
+, libsoup
+, libusb1
+, lz4
+, meson
+, ninja
+, openssl
+, perl
+, phodav
+, pixman
+, pkgconfig
+, polkit
+, python3
+, spice-protocol
+, usbredir
+, usbutils
+, vala
+, zlib
+, withPolkit ? true
+}:
 
-with stdenv.lib;
+# If this package is built with polkit support (withPolkit=true),
+# usb redirection reqires spice-client-glib-usb-acl-helper to run setuid root.
+# The helper confirms via polkit that the user has an active session,
+# then adds a device acl entry for that user.
+# Example NixOS config to create a setuid wrapper for the helper:
+# security.wrappers.spice-client-glib-usb-acl-helper.source =
+#   "${pkgs.spice-gtk}/bin/spice-client-glib-usb-acl-helper";
+# On non-NixOS installations, make a setuid copy of the helper
+# outside the store and adjust PATH to find the setuid version.
 
-let
-  inherit (pythonPackages) python pygtk;
-in stdenv.mkDerivation rec {
-  name = "spice-gtk-0.32";
+# If this package is built without polkit support (withPolkit=false),
+# usb redirection requires read-write access to usb devices.
+# This can be granted by adding users to a custom group like "usb"
+# and using a udev rule to put all usb devices in that group.
+# Example NixOS config:
+#  users.groups.usb = {};
+#  users.users.dummy.extraGroups = [ "usb" ];
+#  services.udev.extraRules = ''
+#    KERNEL=="*", SUBSYSTEMS=="usb", MODE="0664", GROUP="usb"
+#  '';
+
+stdenv.mkDerivation rec {
+  pname = "spice-gtk";
+  version = "0.37";
+
+  outputs = [ "out" "dev" "devdoc" "man" ];
 
   src = fetchurl {
-    url = "http://www.spice-space.org/download/gtk/${name}.tar.bz2";
-    sha256 = "00pf94xh2xf0h1g13lnavxrysd0d0x22l5jl108cvq1mjc4z8j2c";
+    url = "https://www.spice-space.org/download/gtk/${pname}-${version}.tar.bz2";
+    sha256 = "1drvj8y35gnxbnrxsipwi15yh0vs9ixzv4wslz6r3lra8w3bfa0z";
   };
 
+  postPatch = ''
+    # get rid of absolute path to helper in store so we can use a setuid wrapper
+    substituteInPlace src/usb-acl-helper.c \
+      --replace 'ACL_HELPER_PATH"/' '"'
+  '';
+
+  nativeBuildInputs = [
+    docbook_xsl
+    gettext
+    gobject-introspection
+    gtk-doc
+    libsoup
+    meson
+    ninja
+    perl
+    pkgconfig
+    python3
+    python3.pkgs.pyparsing
+    python3.pkgs.six
+    vala
+  ];
+
+  propagatedBuildInputs = [
+    gst_all_1.gst-plugins-base gst_all_1.gst-plugins-good
+  ];
+
   buildInputs = [
-    spice_protocol celt_0_5_1 openssl libpulseaudio pixman gobjectIntrospection
-    libjpeg_turbo zlib cyrus_sasl python pygtk usbredir gtk3 epoxy
+    cyrus_sasl
+    epoxy
+    gtk3
+    json-glib
+    libcacard
+    libdrm
+    libjpeg_turbo
+    libopus
+    libusb1
+    lz4
+    openssl
+    phodav
+    pixman
+    spice-protocol
+    usbredir
+    zlib
+  ] ++ stdenv.lib.optionals withPolkit [ polkit acl usbutils ] ;
+
+  PKG_CONFIG_POLKIT_GOBJECT_1_POLICYDIR = "${placeholder "out"}/share/polkit-1/actions";
+
+  mesonFlags = [
+    "-Dcelt051=disabled"
+    "-Dpulse=disabled" # is deprecated upstream
   ];
 
-  nativeBuildInputs = [ pkgconfig intltool libsoup autoreconfHook ];
-
-  NIX_CFLAGS_COMPILE = "-fno-stack-protector";
-
-  preAutoreconf = ''
-    substituteInPlace src/Makefile.am \
-          --replace '=codegendir pygtk-2.0' '=codegendir pygobject-2.0'
-  '';
-
-  preConfigure = ''
-    intltoolize -f
-  '';
-
-  configureFlags = [
-    "--disable-maintainer-mode"
-    "--with-gtk3"
-  ];
-
-  dontDisableStatic = true; # Needed by the coroutine test
-
-  enableParallelBuilding = true;
-
-  meta = {
-    description = "A GTK+3 SPICE widget";
+  meta = with stdenv.lib; {
+    description = "GTK 3 SPICE widget";
     longDescription = ''
-      spice-gtk is a GTK+3 SPICE widget. It features glib-based
+      spice-gtk is a GTK 3 SPICE widget. It features glib-based
       objects for SPICE protocol parsing and a gtk widget for embedding
       the SPICE display into other applications such as virt-manager.
       Python bindings are available too.
     '';
 
-    homepage = http://www.spice-space.org/;
+    homepage = "https://www.spice-space.org/";
     license = licenses.lgpl21;
-
+    maintainers = [ maintainers.xeji ];
     platforms = platforms.linux;
   };
 }

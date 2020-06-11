@@ -5,14 +5,14 @@
 }:
 
 stdenv.mkDerivation rec {
-  name = "mlt-${version}";
-  version = "6.2.0";
+  pname = "mlt";
+  version = "6.20.0";
 
   src = fetchFromGitHub {
     owner = "mltframework";
     repo = "mlt";
     rev = "v${version}";
-    sha256 = "17jwz1lf9ilaxvgvhg7z86dhcsk95m4wlszy4gn7wab2ns5zhdm7";
+    sha256 = "14kayzas2wisyw0z27qkcm4qnxbdb7bqa0hg7gaj5kbm3nvsnafk";
   };
 
   buildInputs = [
@@ -24,21 +24,25 @@ stdenv.mkDerivation rec {
   # Mostly taken from:
   # http://www.kdenlive.org/user-manual/downloading-and-installing-kdenlive/installing-source/installing-mlt-rendering-engine
   configureFlags = [
-    "--avformat-swscale" "--enable-gpl" "--enable-gpl" "--enable-gpl3"
-    "--enable-opengl"
+    "--avformat-swscale" "--enable-gpl" "--enable-gpl3" "--enable-opengl"
   ];
 
   enableParallelBuilding = true;
 
   postInstall = ''
     wrapProgram $out/bin/melt --prefix FREI0R_PATH : ${frei0r}/lib/frei0r-1
+
+    # Remove an unnecessary reference to movit.dev.
+    s=${movit.dev}/include
+    t=$(for ((i = 0; i < ''${#s}; i++)); do echo -n X; done)
+    sed -i $out/lib/mlt/libmltopengl.so -e "s|$s|$t|g"
   '';
 
   meta = with stdenv.lib; {
     description = "Open source multimedia framework, designed for television broadcasting";
-    homepage = http://www.mltframework.org/;
+    homepage = "https://www.mltframework.org";
     license = licenses.gpl3;
-    maintainers = [ maintainers.tohl ];
+    maintainers = with maintainers; [ tohl peti ];
     platforms = platforms.linux;
   };
 }

@@ -3,14 +3,15 @@
 , ...
 }:
 
-stdenv.mkDerivation rec {
-  name = "protobuf-${version}";
+stdenv.mkDerivation {
+  pname = "protobuf";
+  inherit version;
 
   inherit src;
 
   postPatch = ''
     rm -rf gtest
-    cp -r ${gtest.source} gtest
+    cp -r ${gtest.src}/googletest gtest
     chmod -R a+w gtest
   '' + stdenv.lib.optionalString stdenv.isDarwin ''
     substituteInPlace src/google/protobuf/testing/googletest.cc \
@@ -19,7 +20,28 @@ stdenv.mkDerivation rec {
 
   outputs = [ "out" "lib" ];
 
-  buildInputs = [ autoreconfHook zlib ];
+  nativeBuildInputs = [ autoreconfHook ];
+  buildInputs = [ zlib ];
+
+  # The generated C++ code uses static initializers which mutate a global data
+  # structure. This causes problems for an executable when:
+  #
+  # 1) it dynamically links to two libs, both of which contain generated C++ for
+  #    the same proto file, and
+  # 2) the two aforementioned libs both dynamically link to libprotobuf.
+  #
+  # One solution is to statically link libprotobuf, that way the global
+  # variables are not shared; in fact, this is necessary for the python Mesos
+  # binding to not crash, as the python lib contains two C extensions which
+  # both refer to the same proto schema.
+  #
+  # See: https://github.com/NixOS/nixpkgs/pull/19064#issuecomment-255082684
+  #      https://github.com/google/protobuf/issues/1489
+  dontDisableStatic = true;
+  configureFlags = [
+    "CFLAGS=-fPIC"
+    "CXXFLAGS=-fPIC"
+  ];
 
   doCheck = true;
 
@@ -31,7 +53,7 @@ stdenv.mkDerivation rec {
          almost all of its internal RPC protocols and file formats.
       '';
     license = "mBSD";
-    homepage = https://developers.google.com/protocol-buffers/;
+    homepage = "https://developers.google.com/protocol-buffers/";
     platforms = stdenv.lib.platforms.unix;
   };
 

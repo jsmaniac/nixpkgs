@@ -1,79 +1,164 @@
-{ stdenv, fetchurl, makeWrapper
-, intltool, isocodes, pkgconfig
-, python3, pygobject3
-, gtk2, gtk3, atk, dconf, glib, json_glib
-, dbus, libnotify, gobjectIntrospection, wayland
-, nodePackages
+{ stdenv
+, substituteAll
+, fetchurl
+, fetchFromGitHub
+, autoreconfHook
+, gettext
+, makeWrapper
+, pkgconfig
+, vala
+, wrapGAppsHook
+, dbus
+, dconf ? null
+, glib
+, gdk-pixbuf
+, gobject-introspection
+, gtk2
+, gtk3
+, gtk-doc
+, isocodes
+, cldr-emoji-annotation
+, unicode-character-database
+, unicode-emoji
+, python3
+, json-glib
+, libnotify ? null
+, enablePython2Library ? false
+, enableUI ? true
+, withWayland ? false
+, libxkbcommon ? null
+, wayland ? null
+, buildPackages
+, runtimeShell
+, nixosTests
 }:
 
-stdenv.mkDerivation rec {
-  name = "ibus-${version}";
-  version = "1.5.14";
+assert withWayland -> wayland != null && libxkbcommon != null;
 
-  src = fetchurl {
-    url = "https://github.com/ibus/ibus/releases/download/${version}/${name}.tar.gz";
-    sha256 = "0g4x02d7j5w1lfn4zvmzsq93h17lajgn9d7hlvr6pws28vz40ax4";
+with stdenv.lib;
+
+let
+  python3Runtime = python3.withPackages (ps: with ps; [ pygobject3 ]);
+  python3BuildEnv = python3.buildEnv.override {
+    # ImportError: No module named site
+    postBuild = ''
+      makeWrapper ${glib.dev}/bin/gdbus-codegen $out/bin/gdbus-codegen --unset PYTHONPATH
+      makeWrapper ${glib.dev}/bin/glib-genmarshal $out/bin/glib-genmarshal --unset PYTHONPATH
+      makeWrapper ${glib.dev}/bin/glib-mkenums $out/bin/glib-mkenums --unset PYTHONPATH
+    '';
+  };
+in
+
+stdenv.mkDerivation rec {
+  pname = "ibus";
+  version = "1.5.22";
+
+  src = fetchFromGitHub {
+    owner = "ibus";
+    repo = "ibus";
+    rev = version;
+    sha256 = "09ynn7gq84q18hhbg6wq2yrliwil42qbzxbwbpggry1s955jg5xb";
   };
 
+  patches = [
+    (substituteAll {
+      src = ./fix-paths.patch;
+      pythonInterpreter = python3Runtime.interpreter;
+      pythonSitePackages = python3.sitePackages;
+    })
+  ];
+
+  outputs = [ "out" "dev" "installedTests" ];
+
   postPatch = ''
-    # These paths will be set in the wrapper.
-    sed -e "/export IBUS_DATAROOTDIR/ s/^.*$//" \
-        -e "/export IBUS_LIBEXECDIR/ s/^.*$//" \
-        -e "/export IBUS_LOCALEDIR/ s/^.*$//" \
-        -e "/export IBUS_PREFIX/ s/^.*$//" \
-        -i "setup/ibus-setup.in"
+    echo \#!${runtimeShell} > data/dconf/make-dconf-override-db.sh
+    cp ${buildPackages.gtk-doc}/share/gtk-doc/data/gtk-doc.make .
   '';
 
+  preAutoreconf = "touch ChangeLog";
+
   configureFlags = [
-    "--disable-gconf"
-    "--enable-dconf"
     "--disable-memconf"
-    "--enable-ui"
-    "--enable-python-library"
-    "--with-emoji-json-file=${nodePackages.emojione}/lib/node_modules/emojione/emoji.json"
+    (enableFeature (dconf != null) "dconf")
+    (enableFeature (libnotify != null) "libnotify")
+    (enableFeature withWayland "wayland")
+    (enableFeature enablePython2Library "python-library")
+    (enableFeature enablePython2Library "python2") # XXX: python2 library does not work anyway
+    (enableFeature enableUI "ui")
+    "--enable-install-tests"
+    "--with-unicode-emoji-dir=${unicode-emoji}/share/unicode/emoji"
+    "--with-emoji-annotation-dir=${cldr-emoji-annotation}/share/unicode/cldr/common/annotations"
+    "--with-ucd-dir=${unicode-character-database}/share/unicode"
+  ];
+
+  makeFlags = [
+    "test_execsdir=${placeholder ''installedTests''}/libexec/installed-tests/ibus"
+    "test_sourcesdir=${placeholder ''installedTests''}/share/installed-tests/ibus"
+  ];
+
+  nativeBuildInputs = [
+    autoreconfHook
+    gtk-doc
+    gettext
+    makeWrapper
+    pkgconfig
+    python3BuildEnv
+    vala
+    wrapGAppsHook
+  ];
+
+  propagatedBuildInputs = [
+    glib
   ];
 
   buildInputs = [
-    python3 pygobject3
-    intltool isocodes pkgconfig
-    gtk2 gtk3 dconf
-    json_glib
-    dbus libnotify gobjectIntrospection wayland
+    dbus
+    dconf
+    gdk-pixbuf
+    gobject-introspection
+    python3.pkgs.pygobject3 # for pygobject overrides
+    gtk2
+    gtk3
+    isocodes
+    json-glib
+    libnotify
+  ] ++ optionals withWayland [
+    libxkbcommon
+    wayland
   ];
 
-  propagatedBuildInputs = [ glib ];
+  enableParallelBuilding = true;
 
-  nativeBuildInputs = [ makeWrapper ];
-
-  preConfigure = ''
-    # Fix hard-coded installation paths, so make does not try to overwrite our
-    # Python installation.
-    sed -e "/py2overridesdir=/ s|=.*$|=$out/lib/${python3.libPrefix}|" \
-        -e "/pyoverridesdir=/ s|=.*$|=$out/lib/${python3.libPrefix}|" \
-        -e "/PYTHON2_LIBDIR/ s|=.*|=$out/lib/${python3.libPrefix}|" \
-        -i configure
-
-    # Don't try to generate a system-wide dconf database; it wouldn't work.
-    substituteInPlace data/dconf/Makefile.in --replace "dconf update" "echo"
+  doCheck = false; # requires X11 daemon
+  doInstallCheck = true;
+  installCheckPhase = ''
+    $out/bin/ibus version
   '';
 
-  preFixup = ''
-    for f in "$out/bin"/*; do #*/
-      wrapProgram "$f" \
-        --prefix XDG_DATA_DIRS : "$out/share:$GSETTINGS_SCHEMAS_PATH" \
-        --prefix PYTHONPATH : "$PYTHONPATH" \
-        --prefix GI_TYPELIB_PATH : "$GI_TYPELIB_PATH:$out/lib/girepository-1.0" \
-        --prefix GIO_EXTRA_MODULES : "${dconf}/lib/gio/modules"
+  postInstall = ''
+    # It has some hardcoded FHS paths and also we do not use it
+    # since we set up the environment in NixOS tests anyway.
+    moveToOutput "bin/ibus-desktop-testing-runner" "$installedTests"
+  '';
+
+  postFixup = ''
+    # set necessary environment also for tests
+    for f in $installedTests/libexec/installed-tests/ibus/*; do
+        wrapGApp $f
     done
   '';
 
-  doInstallCheck = true;
-  installCheckPhase = "$out/bin/ibus version";
+  passthru = {
+    tests = {
+      installed-tests = nixosTests.installed-tests.ibus;
+    };
+  };
 
-  meta = with stdenv.lib; {
-    homepage = https://github.com/ibus/ibus;
-    description = "Intelligent Input Bus for Linux / Unix OS";
+  meta = {
+    homepage = "https://github.com/ibus/ibus";
+    description = "Intelligent Input Bus, input method framework";
+    license = licenses.lgpl21Plus;
     platforms = platforms.linux;
-    maintainers = [ maintainers.ttuegel ];
+    maintainers = with maintainers; [ ttuegel yegortimoshenko ];
   };
 }

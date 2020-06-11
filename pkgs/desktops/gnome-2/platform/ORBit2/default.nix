@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, pkgconfig, glib, libIDL, libintlOrEmpty }:
+{ stdenv, fetchurl, pkgconfig, glib, libIDL, libintl }:
 
 stdenv.mkDerivation rec {
   name = "ORBit2-${minVer}.19";
@@ -9,8 +9,8 @@ stdenv.mkDerivation rec {
     sha256 = "0l3mhpyym9m5iz09fz0rgiqxl2ym6kpkwpsp1xrr4aa80nlh1jam";
   };
 
-  nativeBuildInputs = [ pkgconfig ];
-  propagatedBuildInputs = [ glib libIDL ] ++ libintlOrEmpty;
+  nativeBuildInputs = [ pkgconfig libintl ];
+  propagatedBuildInputs = [ glib libIDL ];
 
   outputs = [ "out" "dev" ];
 
@@ -23,7 +23,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = with stdenv.lib; {
-    homepage    = https://projects.gnome.org/ORBit2/;
+    homepage    = "https://projects.gnome.org/ORBit2/";
     description = "A CORBA 2.4-compliant Object Request Broker";
     platforms   = platforms.unix;
     maintainers = with maintainers; [ lovek323 ];

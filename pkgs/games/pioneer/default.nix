@@ -1,39 +1,33 @@
-{ fetchFromGitHub, stdenv, automake, curl, libsigcxx, SDL2
-, SDL2_image, freetype, libvorbis, libpng, assimp, mesa
-, autoconf, pkgconfig }:
+{ fetchFromGitHub, stdenv, cmake, pkgconfig, curl, libsigcxx, SDL2
+, SDL2_image, freetype, libvorbis, libpng, assimp, libGLU, libGL
+, glew
+}:
 
-let
-  version = "20160116";
-  checksum = "07w5yin2xhb0fdlj1aipi64yx6vnr1siahsy0bxvzi06d73ffj6r";
-in
 stdenv.mkDerivation rec {
-  name = "pioneer-${version}";
+  pname = "pioneer";
+  version = "20200203";
 
   src = fetchFromGitHub{
     owner = "pioneerspacesim";
     repo = "pioneer";
     rev = version;
-    sha256 = checksum;
+    sha256 = "1011xsi94jhw98mhm8kryq8ajig0qfbrdx5xdasi92bd4nk7lcp8";
   };
 
+  nativeBuildInputs = [ cmake pkgconfig ];
+
   buildInputs = [
-    automake curl libsigcxx SDL2 SDL2_image freetype libvorbis
-    libpng assimp mesa autoconf pkgconfig
+    curl libsigcxx SDL2 SDL2_image freetype libvorbis libpng
+    assimp libGLU libGL glew
   ];
-
-  NIX_CFLAGS_COMPILE = [
-    "-I${SDL2}/include/SDL2"
-  ];
-
 
   preConfigure = ''
-     export PIONEER_DATA_DIR="$out/share/pioneer/data";
-    ./bootstrap
+    export PIONEER_DATA_DIR="$out/share/pioneer/data";
   '';
 
   meta = with stdenv.lib; {
-    description = "Pioneer is a space adventure game set in the Milky Way galaxy at the turn of the 31st century";
-    homepage = "http://pioneerspacesim.net";
+    description = "A space adventure game set in the Milky Way galaxy at the turn of the 31st century";
+    homepage = "https://pioneerspacesim.net";
     license = with licenses; [
         gpl3 cc-by-sa-30
     ];

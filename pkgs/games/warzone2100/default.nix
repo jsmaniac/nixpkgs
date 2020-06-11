@@ -1,7 +1,6 @@
-{ stdenv, fetchurl, bison, flex, gettext, pkgconfig, libpng
-, libtheora, openal, physfs, mesa, fribidi, fontconfig
-, freetype, qt4, glew, libogg, libvorbis, zlib, libX11
-, libXrandr, zip, unzip, which, perl
+{ stdenv, mkDerivation, fetchurl, autoconf, automake
+, perl, unzip, zip, which, pkgconfig, qtbase, qtscript
+, SDL2, libtheora, openal, glew, physfs, fribidi, libXrandr
 , withVideos ? false
 }:
 
@@ -13,29 +12,40 @@ let
   };
 in
 
-stdenv.mkDerivation rec {
-  version = "3.1.5";
-  name = "${pname}-${version}";
+mkDerivation rec {
+  inherit pname;
+  version  = "3.3.0";
+
   src = fetchurl {
-    url = "mirror://sourceforge/${pname}/releases/${version}/${name}.tar.xz";
-    sha256 = "0hm49i2knvvg3wlnryv7h4m84s3qa7jfyym5yy6365sx8wzcrai1";
+    url = "mirror://sourceforge/${pname}/releases/${version}/${pname}-${version}_src.tar.xz";
+    sha256 = "1s0n67rh32g0bgq72p4qzkcqjlw58gc70r4r6gl9k90pil9chj6c";
   };
-  buildInputs = [ bison flex gettext pkgconfig libpng libtheora openal
-                  physfs mesa fribidi fontconfig freetype qt4
-                  glew libogg libvorbis zlib libX11 libXrandr zip
-                  unzip perl
-                ];
-  patchPhase = ''
+
+  buildInputs = [
+    qtbase qtscript SDL2 libtheora openal
+    glew physfs fribidi libXrandr
+  ];
+  nativeBuildInputs = [
+    perl zip unzip pkgconfig autoconf automake
+  ];
+
+  preConfigure = "./autogen.sh";
+
+  postPatch = ''
     substituteInPlace lib/exceptionhandler/dumpinfo.cpp \
                       --replace "which %s" "${which}/bin/which %s"
     substituteInPlace lib/exceptionhandler/exceptionhandler.cpp \
                       --replace "which %s" "${which}/bin/which %s"
   '';
-  configureFlags = "--with-backend=qt --with-distributor=NixOS";
 
-  NIX_CFLAGS_COMPILE = "-fpermissive"; # GL header minor incompatibility
+  configureFlags = [ "--with-distributor=NixOS" ];
 
-  postInstall = stdenv.lib.optionalString withVideos "cp ${sequences_src} $out/share/warzone2100/sequences.wz";
+  hardeningDisable = [ "format" ];
+
+  enableParallelBuilding = true;
+
+  postInstall = stdenv.lib.optionalString withVideos
+    "cp ${sequences_src} $out/share/warzone2100/sequences.wz";
 
   meta = with stdenv.lib; {
     description = "A free RTS game, originally developed by Pumpkin Studios";
@@ -50,7 +60,7 @@ stdenv.mkDerivation rec {
       technologies, combined with the unit design system, allows for a wide
       variety of possible units and tactics.
     '';
-    homepage = http://wz2100.net;
+    homepage = "http://wz2100.net";
     license = licenses.gpl2Plus;
     maintainers = [ maintainers.astsmtl ];
     platforms = platforms.linux;

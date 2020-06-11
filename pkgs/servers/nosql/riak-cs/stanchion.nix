@@ -1,14 +1,16 @@
-{ stdenv, lib, fetchurl, unzip, erlang, git, wget, which, pam, coreutils, riak }:
+{ stdenv, lib, fetchurl, unzip, erlang, git, wget, which, pam 
+, Carbon ? null, Cocoa ? null }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   name = "stanchion-2.1.1";
 
   buildInputs = [
-    which unzip erlang pam git wget
-  ];
+    which unzip erlang git wget
+  ] ++ lib.optionals stdenv.isDarwin [ Carbon Cocoa ]
+    ++ lib.optional stdenv.isLinux [ pam ];
 
   src = fetchurl {
-    url = "http://s3.amazonaws.com/downloads.basho.com/stanchion/2.1/2.1.1/stanchion-2.1.1.tar.gz";
+    url = "https://s3.amazonaws.com/downloads.basho.com/stanchion/2.1/2.1.1/stanchion-2.1.1.tar.gz";
     sha256 = "1443arwgg7qvlx3msyg99qvvhck7qxphdjslcp494i60fhr2g8ja";
   };
 
@@ -57,7 +59,7 @@ stdenv.mkDerivation rec {
   meta = with lib; {
     maintainers = with maintainers; [ mdaiter ];
     description = "Manager for Riak CS";
-    platforms   = [ "x86_64-linux" ];
+    platforms   = [ "x86_64-linux" "x86_64-darwin" ];
     license = licenses.asl20;
   };
 }

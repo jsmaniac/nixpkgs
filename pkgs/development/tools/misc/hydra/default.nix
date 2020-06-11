@@ -1,148 +1,48 @@
-{ stdenv, nixUnstable, perlPackages, buildEnv, releaseTools, fetchFromGitHub
-, makeWrapper, autoconf, automake, libtool, unzip, pkgconfig, sqlite, libpqxx
-, gitAndTools, mercurial, darcs, subversion, bazaar, openssl, bzip2, libxslt
-, guile, perl, postgresql92, aws-sdk-cpp, nukeReferences, git, boehmgc
-, docbook_xsl, openssh, gnused, coreutils, findutils, gzip, lzma, gnutar
-, rpm, dpkg, cdrkit, fetchpatch }:
+{ fetchFromGitHub, nixStable, callPackage, nixFlakes, fetchpatch, nixosTests }:
 
-with stdenv;
+{
+  # Package for phase-1 of the db migration for Hydra.
+  # https://github.com/NixOS/hydra/pull/711
+  hydra-migration = callPackage ./common.nix {
+    version = "2020-02-10";
+    src = fetchFromGitHub {
+      owner = "NixOS";
+      repo = "hydra";
+      rev = "add4f610ce6f206fb44702b5a894d877b3a30e3a";
+      sha256 = "1d8hdgjx2ys0zmixi2ydmimdq7ml20h1ji4amwawcyw59kssh6l3";
+    };
+    nix = nixStable;
+    migration = true;
 
-let
-  perlDeps = buildEnv {
-    name = "hydra-perl-deps";
-    paths = with perlPackages;
-      [ ModulePluggable
-        CatalystActionREST
-        CatalystAuthenticationStoreDBIxClass
-        CatalystDevel
-        CatalystDispatchTypeRegex
-        CatalystPluginAccessLog
-        CatalystPluginAuthorizationRoles
-        CatalystPluginCaptcha
-        CatalystPluginSessionStateCookie
-        CatalystPluginSessionStoreFastMmap
-        CatalystPluginStackTrace
-        CatalystPluginUnicodeEncoding
-        CatalystTraitForRequestProxyBase
-        CatalystViewDownload
-        CatalystViewJSON
-        CatalystViewTT
-        CatalystXScriptServerStarman
-        CryptRandPasswd
-        DBDPg
-        DBDSQLite
-        DataDump
-        DateTime
-        DigestSHA1
-        EmailMIME
-        EmailSender
-        FileSlurp
-        IOCompress
-        IPCRun
-        JSONXS
-        LWP
-        LWPProtocolHttps
-        NetAmazonS3
-        NetStatsd
-        PadWalker
-        Readonly
-        SQLSplitStatement
-        SetScalar
-        Starman
-        SysHostnameLong
-        TestMore
-        TextDiff
-        TextTable
-        XMLSimple
-        nixUnstable
-        git
-        boehmgc
-      ];
-  };
-in releaseTools.nixBuild rec {
-  name = "hydra-${version}";
-  version = "2016-04-15";
-
-  src = fetchFromGitHub {
-    owner = "NixOS";
-    repo = "hydra";
-    rev = "177bf25d648092826a75369191503a3f2bb763a4";
-    sha256 = "0ngipzm2i2vz5ygfd70hh82d027snpl85r8ncn1rxlkak0g8fxsl";
+    tests = {
+      db-migration = nixosTests.hydra-db-migration.mig;
+      basic = nixosTests.hydra.hydra-migration;
+    };
   };
 
-  patches = [(fetchpatch {
-    name = "cmath.diff";
-    url = https://github.com/vcunat/hydra/commit/3c6fca1ba299.diff; # https://github.com/NixOS/hydra/pull/337
-    sha256 = "02m9q304ay45s7xfkm2y7lppakrkx3hrq39mm6348isnbqmbarc0";
-  })];
+  # Hydra from latest master branch. Contains breaking changes,
+  # so when having an older version, `pkgs.hydra-migration` should be deployed first.
 
-  buildInputs =
-    [ makeWrapper autoconf automake libtool unzip nukeReferences pkgconfig sqlite libpqxx
-      gitAndTools.topGit mercurial darcs subversion bazaar openssl bzip2 libxslt
-      guile # optional, for Guile + Guix support
-      perlDeps perl nixUnstable
-      postgresql92 # for running the tests
-      (lib.overrideDerivation (aws-sdk-cpp.override {
-        apis = ["s3"];
-        customMemoryManagement = false;
-      }) (attrs: {
-        src = fetchFromGitHub {
-          owner = "edolstra";
-          repo = "aws-sdk-cpp";
-          rev = "local";
-          sha256 = "1vhgsxkhpai9a7dk38q4r239l6dsz2jvl8hii24c194lsga3g84h";
-        };
-      }))
+  hydra-unstable = callPackage ./common.nix {
+    version = "2020-06-01";
+    src = fetchFromGitHub {
+      owner = "NixOS";
+      repo = "hydra";
+      rev = "750e2e618ac6d3df02c57a2cf8758bc66a27c40a";
+      sha256 = "1szfzf9kw5cj6yn57gfxrffbdkdf8v3xy9914924blpn5qll31g4";
+    };
+    nix = nixFlakes;
+
+    patches = [
+      (fetchpatch {
+        url = "https://github.com/NixOS/hydra/commit/d4822a5f4b57dff26bdbf436723a87dd62bbcf30.patch";
+        sha256 = "1n6hyjz1hzvka4wi78d4wg0sg2wanrdmizqy23vmp7pmv8s3gz8w";
+      })
     ];
 
-  hydraPath = lib.makeBinPath (
-    [ libxslt sqlite subversion openssh nixUnstable coreutils findutils
-      gzip bzip2 lzma gnutar unzip git gitAndTools.topGit mercurial darcs gnused bazaar
-    ] ++ lib.optionals stdenv.isLinux [ rpm dpkg cdrkit ] );
-
-  postUnpack = ''
-    # Clean up when building from a working tree.
-    (cd $sourceRoot && (git ls-files -o --directory | xargs -r rm -rfv)) || true
-  '';
-
-  configureFlags = [ "--with-docbook-xsl=${docbook_xsl}/xml/xsl/docbook" ];
-
-  preHook = ''
-    PATH=$(pwd)/src/script:$(pwd)/src/hydra-eval-jobs:$(pwd)/src/hydra-queue-runner:$PATH
-    PERL5LIB=$(pwd)/src/lib:$PERL5LIB;
-  '';
-
-  preConfigure = "autoreconf -vfi";
-
-  enableParallelBuilding = true;
-
-  preCheck = ''
-    patchShebangs .
-    export LOGNAME=''${LOGNAME:-foo}
-  '';
-
-  postInstall = ''
-    mkdir -p $out/nix-support
-    for i in $out/bin/*; do
-        read -n 4 chars < $i
-        if [[ $chars =~ ELF ]]; then continue; fi
-        wrapProgram $i \
-            --prefix PERL5LIB ':' $out/libexec/hydra/lib:$PERL5LIB \
-            --prefix PATH ':' $out/bin:$hydraPath \
-            --set HYDRA_RELEASE ${version} \
-            --set HYDRA_HOME $out/libexec/hydra \
-            --set NIX_RELEASE ${nixUnstable.name or "unknown"}
-    done
-  ''; # */
-
-  dontStrip = true;
-
-  passthru.perlDeps = perlDeps;
-
-  meta = with stdenv.lib; {
-    description = "Nix-based continuous build system";
-    license = licenses.gpl3;
-    platforms = platforms.linux;
-    maintainers = with maintainers; [ domenkozar ];
+    tests = {
+      db-migration = nixosTests.hydra-db-migration.mig;
+      basic = nixosTests.hydra.hydra-unstable;
+    };
   };
- }
+}

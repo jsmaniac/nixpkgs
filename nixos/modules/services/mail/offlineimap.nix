@@ -7,12 +7,11 @@ let
 in {
 
   options.services.offlineimap = {
-    enable = mkEnableOption "Offlineimap, a software to dispose your mailbox(es) as a local Maildir(s).";
+    enable = mkEnableOption "OfflineIMAP, a software to dispose your mailbox(es) as a local Maildir(s)";
 
     install = mkOption {
       type = types.bool;
       default = false;
-      example = true;
       description = ''
         Whether to install a user service for Offlineimap. Once
         the service is started, emails will be fetched automatically.

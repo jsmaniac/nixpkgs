@@ -1,24 +1,30 @@
-{ stdenv, fetchFromGitHub, qt4, sqlite, cmake }:
+{ mkDerivation, lib, fetchFromGitHub, cmake, antlr
+, qtbase, qttools, qscintilla, sqlite }:
 
-stdenv.mkDerivation rec {
-  version = "3.8.0";
-  name = "sqlitebrowser-${version}";
+mkDerivation rec {
+  pname = "sqlitebrowser";
+  version = "3.11.2";
 
   src = fetchFromGitHub {
-    repo   = "sqlitebrowser";
-    owner  = "sqlitebrowser";
+    owner  = pname;
+    repo   = pname;
     rev    = "v${version}";
-    sha256 = "009yaamf6f654dl796f1gmj3rb34d55w87snsfgk33gpy6x19ccp";
+    sha256 = "0ydd5fg76d5d23byac1f7f8mzx3brmd0cnnkd58qpmlzi7p9hcvx";
   };
 
-  buildInputs = [ qt4 sqlite cmake ];
+  buildInputs = [ antlr qtbase qscintilla sqlite ];
 
-  meta = with stdenv.lib; {
+  nativeBuildInputs = [ cmake qttools ];
+
+  NIX_LDFLAGS = "-lQt5PrintSupport";
+
+  enableParallelBuilding = true;
+
+  meta = with lib; {
     description = "DB Browser for SQLite";
-    homepage = "http://sqlitebrowser.org/";
+    homepage = "https://sqlitebrowser.org/";
     license = licenses.gpl3;
-    maintainers = [ maintainers.matthiasbeyer ];
-    platforms = platforms.linux; # can only test on linux
+    maintainers = with maintainers; [  ];
+    platforms = platforms.unix;
   };
 }
-

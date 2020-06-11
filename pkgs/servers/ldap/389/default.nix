@@ -1,33 +1,33 @@
-{ stdenv, fetchurl, fetchpatch, pkgconfig, perl, pam, nspr, nss, openldap
-, db, cyrus_sasl, svrcore, icu, net_snmp, kerberos, pcre, perlPackages
+{ stdenv, fetchurl, fetchpatch, autoreconfHook, pkgconfig, doxygen, perl, pam, nspr, nss, openldap
+, db, cyrus_sasl, svrcore, icu, net-snmp, kerberos, pcre, perlPackages, libevent, openssl, python
 }:
-let
-  version = "1.3.5.4";
-in
+
 stdenv.mkDerivation rec {
-  name = "389-ds-base-${version}";
+  pname = "389-ds-base";
+  version = "1.3.9.1";
 
   src = fetchurl {
-    url = "http://directory.fedoraproject.org/binaries/${name}.tar.bz2";
-    sha256 = "1f1r4wky8x39jdabnd277f6m0snnzh9f0wvsr8x4rnvkckjphbx8";
+    url = "https://releases.pagure.org/${pname}/${pname}-${version}.tar.bz2";
+    sha256 = "141iv1phgk1lw74sfjj3v7wy6qs0q56lvclwv2p0hqn1wg8ic4q6";
   };
 
+  nativeBuildInputs = [ autoreconfHook pkgconfig doxygen ];
   buildInputs = [
-    pkgconfig perl pam nspr nss openldap db cyrus_sasl svrcore icu
-    net_snmp kerberos pcre
+    perl pam nspr nss openldap db cyrus_sasl svrcore icu
+    net-snmp kerberos pcre libevent openssl python
   ] ++ (with perlPackages; [ MozillaLdap NetAddrIP DBFile ]);
 
-  # TODO: Fix bin/ds-logpipe.py, bin/logconv, bin/cl-dump
-
-  patches = [ ./perl-path.patch
-    # https://fedorahosted.org/389/ticket/48354
+  patches = [
     (fetchpatch {
-      name = "389-ds-base-CVE-2016-5416.patch";
-      url = "https://fedorahosted.org/389/changeset/3c2cd48b7d2cb0579f7de6d460bcd0c9bb1157bd/?format=diff&new=3c2cd48b7d2cb0579f7de6d460bcd0c9bb1157bd";
-      addPrefixes = true;
-      sha256 = "1kv3a3di1cihkaf8xdbb5mzvhm4c3frx8rc5mji8xgjyj9ni6xja";
+      name = "389-ds-nss.patch";
+      url = "https://aur.archlinux.org/cgit/aur.git/plain/nss.patch?h=389-ds-base&id=b80ed52cc65ff9b1d72f8ebc54dbd462b12f6be9";
+      sha256 = "07z7jl9z4gzhk3k6qyfn558xl76js8041llyr5n99h20ckkbwagk";
     })
   ];
+  postPatch = ''
+    substituteInPlace Makefile.am \
+      --replace 's,@perlpath\@,$(perldir),g' 's,@perlpath\@,$(perldir) $(PERLPATH),g'
+  '';
 
   preConfigure = ''
     # Create perl paths for library imports in perl scripts
@@ -42,28 +42,28 @@ stdenv.mkDerivation rec {
     "--sysconfdir=/etc"
     "--localstatedir=/var"
     "--with-openldap"
-    "--with-db=${db}"
+    "--with-db"
+    "--with-db-inc=${db.dev}/include"
+    "--with-db-lib=${db.out}/lib"
     "--with-sasl=${cyrus_sasl.dev}"
-    "--with-netsnmp=${net_snmp}"
+    "--with-netsnmp=yes"
+    "--with-netsnmp-inc=${stdenv.lib.getDev net-snmp}/include"
+    "--with-netsnmp-lib=${stdenv.lib.getLib net-snmp}/lib"
   ];
-  
-  preInstall = ''
-    # The makefile doesn't create this directory for whatever reason
-    mkdir -p $out/lib/dirsrv
-  '';
+
+  enableParallelBuilding = true;
 
   installFlags = [
-    "sysconfdir=\${out}/etc"
-    "localstatedir=\${TMPDIR}"
+    "sysconfdir=${placeholder "out"}/etc"
+    "localstatedir=${placeholder "TMPDIR"}"
   ];
 
   passthru.version = version;
 
   meta = with stdenv.lib; {
-    homepage = https://directory.fedoraproject.org/;
+    homepage = "https://www.port389.org/";
     description = "Enterprise-class Open Source LDAP server for Linux";
-    license = licenses.gpl2;
+    license = licenses.gpl3Plus;
     platforms = platforms.linux;
-    maintainers = with maintainers; [ wkennington ];
   };
 }

@@ -1,38 +1,50 @@
-{ stdenv, fetchFromGitHub, rustPlatform, makeWrapper }:
+{ stdenv, fetchFromGitHub, rustPlatform, makeWrapper, substituteAll, Security }:
 
-with rustPlatform;
+rustPlatform.buildRustPackage rec {
+  pname = "racer";
+  version = "2.1.30";
 
-buildRustPackage rec {
-  name = "racer-${version}";
-  version = "1.2.10";
   src = fetchFromGitHub {
-    owner = "phildawes";
+    owner = "racer-rust";
     repo = "racer";
-    rev = "e5ffe9efc1d10d4a7d66944b4c0939b7c575530e";
-    sha256 = "1cvgd6gcwb82p387h4wl8wz07z64is8jrihmf2z84vxmlrasmprm";
+    rev = "c2b0080243fefdad7f7b223e8a7fdef3e1f0fa77";
+    sha256 = "0svvdkfqpk2rw0wxyrhkxy553k55lg7jxc0ly4w1195iwv14ad3y";
   };
 
-  depsSha256 = "1d44q7hfxijn40q7y6xawgd3c91i90fmd1dyx7i2v9as29js5694";
+  cargoSha256 = "0zaqa89z3nf23s2q1jpmfz4lygh4zq9ymql71d748fgjy9psr449";
 
-  buildInputs = [ makeWrapper ];
+  buildInputs = [ makeWrapper ]
+                ++ stdenv.lib.optional stdenv.isDarwin Security;
 
-  preCheck = ''
-    export RUST_SRC_PATH="${rustPlatform.rust.rustc.src}/src"
+  # a nightly compiler is required unless we use this cheat code.
+  RUSTC_BOOTSTRAP=1;
+
+  RUST_SRC_PATH = rustPlatform.rustcSrc;
+  postInstall = ''
+    wrapProgram $out/bin/racer --set-default RUST_SRC_PATH ${rustPlatform.rustcSrc}
   '';
 
-  doCheck = true;
+  checkPhase = ''
+    cargo test -- \
+      --skip nameres::test_do_file_search_std \
+      --skip util::test_get_rust_src_path_rustup_ok \
+      --skip util::test_get_rust_src_path_not_rust_source_tree \
+      --skip extern --skip completes_pub_fn --skip find_crate_doc \
+      --skip follows_use_local_package --skip follows_use_for_reexport \
+      --skip follows_rand_crate --skip get_completion_in_example_dir \
+      --skip test_resolve_global_path_in_modules
+  '';
 
-  installPhase = ''
-    mkdir -p $out/bin
-    cp -p target/release/racer $out/bin/
-    wrapProgram $out/bin/racer --set RUST_SRC_PATH "${rustPlatform.rust.rustc.src}/src"
+  doInstallCheck = true;
+  installCheckPhase = ''
+    $out/bin/racer --version
   '';
 
   meta = with stdenv.lib; {
     description = "A utility intended to provide Rust code completion for editors and IDEs";
-    homepage = https://github.com/phildawes/racer;
-    license = stdenv.lib.licenses.mit;
-    maintainers = with maintainers; [ jagajaga globin ];
+    homepage = "https://github.com/racer-rust/racer";
+    license = licenses.mit;
+    maintainers = with maintainers; [ jagajaga ma27 ];
     platforms = platforms.all;
   };
 }

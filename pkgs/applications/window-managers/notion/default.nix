@@ -1,33 +1,39 @@
-{
-  enableXft ? true, libXft ? null,
-  patches ? [],
-  stdenv, fetchurl,
-  lua, gettext, groff,
-  pkgconfig, busybox,
-  xlibsWrapper, libXinerama, libXrandr, libX11
+{ stdenv, fetchFromGitHub, pkgconfig
+, lua, gettext, which, groff, xmessage, xterm
+, readline, fontconfig, libX11, libXext, libSM
+, libXinerama, libXrandr, libXft
+, xlibsWrapper, makeWrapper
 }:
 
-assert enableXft -> libXft != null;
+stdenv.mkDerivation rec {
+  pname = "notion";
+  version = "4.0.0";
 
-stdenv.mkDerivation {
-  name     = "notion";
-  version  = "3-2015061300";
+  src = fetchFromGitHub {
+    owner = "raboof";
+    repo = pname;
+    rev = version;
+    sha256 = "0rqfvwkj0j862hf6i4wsmb6185xibsskfj9kwy896qcpcg8w4kk7";
+  };
+
+  nativeBuildInputs = [ pkgconfig makeWrapper groff ];
+  buildInputs = [ lua gettext which readline fontconfig libX11 libXext libSM
+                  libXinerama libXrandr libXft xlibsWrapper ];
+
+  buildFlags = [ "LUA_DIR=${lua}" "X11_PREFIX=/no-such-path" ];
+
+  makeFlags = [ "NOTION_RELEASE=${version}" "PREFIX=\${out}" ];
+
+  postInstall = ''
+    wrapProgram $out/bin/notion \
+      --prefix PATH ":" "${xmessage}/bin:${xterm}/bin" \
+  '';
+
   meta = with stdenv.lib; {
-    description = "Tiling tabbed window manager, follow-on to the ion window manager";
-    homepage = http://notion.sourceforge.net;
+    description = "Tiling tabbed window manager";
+    homepage = "https://notionwm.net";
+    license   = licenses.lgpl21;
+    maintainers = with maintainers; [ jfb AndersonTorres raboof ];
     platforms = platforms.linux;
-    license   = licenses.notion_lgpl;
-    maintainers = [maintainers.jfb];
   };
-  src = fetchurl {
-    url = https://github.com/raboof/notion/archive/3-2015061300.tar.gz;
-    sha256 = "3c9d9f35a9fb0d17c263b76fe28f7a1a4a05b7d6140545524cc1effd98c5c305";
-  };
-
-  patches = patches ++ stdenv.lib.optional enableXft ./notion-xft_nixos.diff;
-  postPatch = "substituteInPlace system-autodetect.mk --replace '#PRELOAD_MODULES=1' 'PRELOAD_MODULES=1'";
-  buildInputs = [xlibsWrapper lua gettext groff pkgconfig busybox libXinerama libXrandr libX11] ++ stdenv.lib.optional enableXft libXft;
-
-  buildFlags = "LUA_DIR=${lua} X11_PREFIX=/no-such-path PREFIX=\${out}";
-  installFlags = "PREFIX=\${out}";
 }

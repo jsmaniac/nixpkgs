@@ -1,21 +1,26 @@
 { fetchurl,  stdenv, flex }:
 
 stdenv.mkDerivation rec {
-  version = "5.15";
-  name = "wcslib-${version}";
+  version = "7.2";
+  pname = "wcslib";
 
   buildInputs = [ flex ];
 
   src = fetchurl {
-    url = "ftp://ftp.atnf.csiro.au/pub/software/wcslib/${name}.tar.bz2";
-    sha256 ="1s2nig327g4bimd9xshlk11ww09a7mrjmsbpdcd8smsmn2kl1glb";
+    url = "ftp://ftp.atnf.csiro.au/pub/software/wcslib/${pname}-${version}.tar.bz2";
+    sha256 ="0fbf6ypq7ag9dmjn65ja5vbfxswb6511bja8rbna25wmhns9x5b3";
   };
+
+  prePatch = ''
+    substituteInPlace GNUmakefile --replace 2775 0775
+    substituteInPlace C/GNUmakefile --replace 2775 0775
+  '';
 
   enableParallelBuilding = true;
 
   meta = {
     description = "World Coordinate System Library for Astronomy";
-    homepage = http://www.atnf.csiro.au/people/mcalabre/WCS/;
+    homepage = "https://www.atnf.csiro.au/people/mcalabre/WCS/";
 
     longDescription = ''Library for world coordinate systems for
     spherical geometries and their conversion to image coordinate

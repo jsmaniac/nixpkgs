@@ -1,26 +1,31 @@
-{ stdenv, fetchurl, unzip, libusb, fetchgit }:
-let
-  version = "2.1";
-in
-stdenv.mkDerivation {
-  name = "teensy-loader-cli-${version}";
-  src = fetchgit {
-    url = "git://github.com/PaulStoffregen/teensy_loader_cli.git";
-    rev = "001da416bc362ff24485ff97e3a729bd921afe98";
-    sha256 = "36aed0a725055e36d71183ff57a023993099fdc380072177cffc7676da3c3966";
+{ stdenv, fetchFromGitHub, go-md2man, installShellFiles, libusb-compat-0_1 }:
+
+stdenv.mkDerivation rec {
+  pname = "teensy-loader-cli";
+  version = "2.1.20191110";
+
+  src = fetchFromGitHub {
+    owner = "PaulStoffregen";
+    repo = "teensy_loader_cli";
+    rev = "e98b5065cdb9f04aa4dde3f2e6e6e6f12dd97592";
+    sha256 = "1yx8vsh6b29pqr4zb6sx47429i9x51hj9psn8zksfz75j5ivfd5i";
   };
 
-  buildInputs = [ unzip libusb ];
+  buildInputs = [ libusb-compat-0_1 ];
+
+  nativeBuildInputs = [ go-md2man installShellFiles ];
 
   installPhase = ''
-    install -Dm755 teensy_loader_cli $out/bin/teensy-loader-cli
+    install -Dm555 teensy_loader_cli $out/bin/teensy-loader-cli
+    install -Dm444 -t $out/share/doc/${pname} *.md *.txt
+    go-md2man -in README.md -out ${pname}.1
+    installManPage *.1
   '';
 
   meta = with stdenv.lib; {
-    license = licenses.gpl3;
     description = "Firmware uploader for the Teensy microcontroller boards";
-    homepage = http://www.pjrc.com/teensy/;
-    maintainers = with maintainers; [ the-kenny ];
-    platforms = platforms.linux;
+    homepage = "https://www.pjrc.com/teensy/";
+    license = licenses.gpl3;
+    platforms = platforms.unix;
   };
 }

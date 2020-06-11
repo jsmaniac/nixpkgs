@@ -1,28 +1,46 @@
-{ stdenv, fetchFromGitHub, autoreconfHook }:
+{ stdenv, fetchFromGitHub, meson, ninja, gtk3, python3, gnome3, gnome-icon-theme, hicolor-icon-theme }:
 
 stdenv.mkDerivation rec {
-  name = "${package-name}-${version}";
-  package-name = "paper-icon-theme";
-  version = "2016-06-08";
+  pname = "paper-icon-theme";
+  version = "2018-06-24";
 
   src = fetchFromGitHub {
     owner = "snwh";
-    repo = package-name;
-    rev = "6aa0a2c8d802199d0a9f71579f136bd6476d5d8e";
-    sha256 = "07ak1lnvd0gwaclkcvccjbxikh701vfi07gmjp4zcqi6b5crl7f5";
+    repo = pname;
+    rev = "c7cd013fba06dd8fd5cdff9f885520e2923266b8";
+    sha256 = "0x45zkjnmbz904df63ph06npbm3phpgck4xwyymx8r8jgrfplk6v";
   };
 
-  nativeBuildInputs = [ autoreconfHook ];
+  nativeBuildInputs = [
+    meson
+    ninja
+    gtk3
+    python3
+  ];
+
+  propagatedBuildInputs = [
+    gnome3.adwaita-icon-theme
+    gnome-icon-theme
+    hicolor-icon-theme
+  ];
+
+  dontDropIconThemeCache = true;
 
   postPatch = ''
-    substituteInPlace Makefile.am --replace '$(DESTDIR)'/usr $out
+    patchShebangs meson/post_install.py
+  '';
+
+  postInstall = ''
+    # The cache for Paper-Mono-Dark is missing
+    gtk-update-icon-cache "$out"/share/icons/Paper-Mono-Dark;
   '';
 
   meta = with stdenv.lib; {
     description = "Modern icon theme designed around bold colours and simple geometric shapes";
-    homepage = http://snwh.org/paper;
+    homepage = "https://snwh.org/paper";
     license = with licenses; [ cc-by-sa-40 lgpl3 ];
-    platforms = platforms.all;
+    # darwin cannot deal with file names differing only in case
+    platforms = platforms.linux;
     maintainers = with maintainers; [ romildo ];
   };
 }

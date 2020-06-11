@@ -1,23 +1,32 @@
-{ lib, fetchurl, mkPythonDerivation, python, pkgconfig, dbus, dbus_glib, dbus_tools, isPyPy
+{ lib, fetchPypi, buildPythonPackage, python, pkgconfig, dbus, dbus-glib, isPyPy
 , ncurses, pygobject3 }:
 
-if isPyPy then throw "dbus-python not supported for interpreter ${python.executable}" else mkPythonDerivation rec {
-  name = "dbus-python-1.2.4";
+buildPythonPackage rec {
+  pname = "dbus-python";
+  version = "1.2.12";
+  format = "other";
 
-  src = fetchurl {
-    url = "http://dbus.freedesktop.org/releases/dbus-python/${name}.tar.gz";
-    sha256 = "1k7rnaqrk7mdkg0k6n2jn3d1mxsl7s3i07g5a8va5yvl3y3xdwg2";
+  outputs = [ "out" "dev" ];
+
+  src = fetchPypi {
+    inherit pname version;
+    sha256 = "0q7jmldv0bxxqnbj63cd7i81vs6y85xys4r0n63z4n2y9wndxm6d";
   };
 
-  postPatch = "patchShebangs .";
+  patches = [
+    ./fix-includedir.patch
+  ];
 
-  buildInputs = [ pkgconfig dbus dbus_glib ]
-    ++ lib.optionals doCheck [ dbus_tools pygobject3 ]
+  disabled = isPyPy;
+
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ dbus dbus-glib ]
     # My guess why it's sometimes trying to -lncurses.
     # It seems not to retain the dependency anyway.
     ++ lib.optional (! python ? modules) ncurses;
 
   doCheck = true;
+  checkInputs = [ dbus.out pygobject3 ];
 
   meta = {
     description = "Python DBus bindings";

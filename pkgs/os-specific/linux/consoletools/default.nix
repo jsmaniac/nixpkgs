@@ -1,22 +1,22 @@
 { stdenv, fetchurl, SDL }:
 
 stdenv.mkDerivation rec {
-  name = "linuxconsoletools-${version}";
-  version = "1.4.9";
+  pname = "linuxconsoletools";
+  version = "1.6.1";
 
   src = fetchurl {
-    url = "mirror://sourceforge/linuxconsole/${name}.tar.bz2";
-    sha256 = "0rwv2fxn12bblp096m9jy1lhngz26lv6g6zs4cgfg4frikwn977s";
+    url = "mirror://sourceforge/linuxconsole/${pname}-${version}.tar.bz2";
+    sha256 = "0d2r3j916fl2y7pk1y82b9fvbr10dgs1gw7rqwzfpispdidb1mp9";
   };
 
   buildInputs = [ SDL ];
 
   makeFlags = [ "DESTDIR=$(out)"];
 
-  installFlags = ''PREFIX=""'';
+  installFlags = [ "PREFIX=\"\"" ];
 
   meta = with stdenv.lib; {
-    homepage = https://sourceforge.net/projects/linuxconsole/;
+    homepage = "https://sourceforge.net/projects/linuxconsole/";
     description = "A set of tools for joysticks and serial peripherals";
     license = licenses.gpl2Plus;
     platforms = platforms.linux;

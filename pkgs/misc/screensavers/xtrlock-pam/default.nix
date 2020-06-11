@@ -9,7 +9,8 @@ stdenv.mkDerivation {
     sha256 = "1z2wlhi5d05b18pvwz146kp0lkcc6z2mnilk01mk19hzbziyqmsc";
   };
 
-  buildInputs = [ python pkgconfig xlibsWrapper pam ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ python xlibsWrapper pam ];
 
   configurePhase = ''
     substituteInPlace .config/options.py --replace /usr/include/security/pam_appl.h ${pam}/include/security/pam_appl.h
@@ -18,7 +19,7 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    homepage = https://github.com/aanatoly/xtrlock-pam;
+    homepage = "https://github.com/aanatoly/xtrlock-pam";
     description = "PAM based X11 screen locker";
     license = "unknown";
     maintainers = with stdenv.lib.maintainers; [ tstrobel ];

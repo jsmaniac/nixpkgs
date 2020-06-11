@@ -2,17 +2,18 @@
   gettext, glib, portaudio }:
 
 stdenv.mkDerivation rec {
-  name = "opencpn-${version}";
-  version = "4.2.0";
+  pname = "opencpn-unstable";
+  version = "2019-11-21";
 
   src = fetchFromGitHub {
     owner = "OpenCPN";
     repo = "OpenCPN";
-    rev = "v${version}";
-    sha256 = "1m6fp9lf9ki9444h0dq6bj0vr7d0pcxkbjv3j2v76p0ksk2l8kw3";
+    rev = "e73dc935545b2bbcf193cc61d987a0178c52d7a7";
+    sha256 = "0yiqahkzwcbzgabc5xgxmwlngapkfiaqyva3mwz29xj0c5lg2bdk";
   };
 
-  buildInputs = [ pkgconfig cmake gtk2 wxGTK30 libpulseaudio curl gettext
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ cmake gtk2 wxGTK30 libpulseaudio curl gettext
                   glib portaudio ];
 
   cmakeFlags = [
@@ -25,8 +26,8 @@ stdenv.mkDerivation rec {
   meta = {
     description = "A concise ChartPlotter/Navigator";
     maintainers = [ stdenv.lib.maintainers.kragniz ];
-    platforms = stdenv.lib.platforms.all;
+    platforms = [ "x86_64-linux" ];
     license = stdenv.lib.licenses.gpl2;
-    homepage = "http://opencpn.org/";
+    homepage = "https://opencpn.org/";
   };
 }

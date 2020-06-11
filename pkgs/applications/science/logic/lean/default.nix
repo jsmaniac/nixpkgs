@@ -1,34 +1,36 @@
-{ stdenv, fetchFromGitHub, cmake, gmp, mpfr, boost, python
-, gperftools, ninja, makeWrapper }:
+{ stdenv, fetchFromGitHub, cmake, gmp, coreutils }:
 
 stdenv.mkDerivation rec {
-  name = "lean-${version}";
-  version = "2016-07-05";
+  pname = "lean";
+  version = "3.15.0";
 
   src = fetchFromGitHub {
-    owner  = "leanprover";
+    owner  = "leanprover-community";
     repo   = "lean";
-    rev    = "cc70845332e63a1f1be21dc1f96d17269fc85909";
-    sha256 = "09qz2vjw7whiggvw0cdaa4i2f49wnch2sd4r43glq181ssln27d6";
+    rev    = "v${version}";
+    sha256 = "0fl8v8n53fr5qdnabici1mj3zpmjrkssx970y3q4m48s68q665v6";
   };
 
-  buildInputs = [ gmp mpfr boost cmake python gperftools ninja makeWrapper ];
+  nativeBuildInputs = [ cmake ];
+  buildInputs = [ gmp ];
   enableParallelBuilding = true;
 
   preConfigure = ''
-    patchShebangs bin/leantags
     cd src
   '';
 
-  postInstall = ''
-    wrapProgram $out/bin/linja --prefix PATH : $out/bin:${ninja}/bin
+  postInstall = stdenv.lib.optionalString stdenv.isDarwin ''
+    substituteInPlace $out/bin/leanpkg \
+      --replace "greadlink" "${coreutils}/bin/readlink"
   '';
 
   meta = with stdenv.lib; {
     description = "Automatic and interactive theorem prover";
-    homepage    = "http://leanprover.github.io";
+    homepage    = "https://leanprover.github.io/";
+    changelog   = "https://github.com/leanprover-community/lean/blob/v${version}/doc/changes.md";
     license     = licenses.asl20;
     platforms   = platforms.unix;
     maintainers = with maintainers; [ thoughtpolice gebner ];
   };
 }
+

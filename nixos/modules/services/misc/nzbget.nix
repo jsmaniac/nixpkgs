@@ -4,19 +4,40 @@ with lib;
 
 let
   cfg = config.services.nzbget;
-  nzbget = pkgs.nzbget;
+  pkg = pkgs.nzbget;
+  stateDir = "/var/lib/nzbget";
+  configFile = "${stateDir}/nzbget.conf";
+  configOpts = concatStringsSep " " (mapAttrsToList (name: value: "-o ${name}=${value}") nixosOpts);
+
+  nixosOpts = {
+    # allows nzbget to run as a "simple" service
+    OutputMode = "loggable";
+    # use journald for logging
+    WriteLog = "none";
+    ErrorTarget = "screen";
+    WarningTarget = "screen";
+    InfoTarget = "screen";
+    DetailTarget = "screen";
+    # required paths
+    ConfigTemplate = "${pkg}/share/nzbget/nzbget.conf";
+    WebDir = "${pkg}/share/nzbget/webui";
+    # nixos handles package updates
+    UpdateCheck = "none";
+  };
+
 in
 {
+  imports = [
+    (mkRemovedOptionModule [ "services" "misc" "nzbget" "configFile" ] "The configuration of nzbget is now managed by users through the web interface.")
+    (mkRemovedOptionModule [ "services" "misc" "nzbget" "dataDir" ] "The data directory for nzbget is now /var/lib/nzbget.")
+    (mkRemovedOptionModule [ "services" "misc" "nzbget" "openFirewall" ] "The port used by nzbget is managed through the web interface so you should adjust your firewall rules accordingly.")
+  ];
+
+  # interface
+
   options = {
     services.nzbget = {
       enable = mkEnableOption "NZBGet";
-
-      package = mkOption {
-        type = types.package;
-        default = pkgs.nzbget;
-        defaultText = "pkgs.nzbget";
-        description = "The NZBGet package to use";
-      };
 
       user = mkOption {
         type = types.str;
@@ -32,6 +53,8 @@ in
     };
   };
 
+  # implementation
+
   config = mkIf cfg.enable {
     systemd.services.nzbget = {
       description = "NZBGet Daemon";
@@ -42,41 +65,32 @@ in
         p7zip
       ];
       preStart = ''
-        test -d /var/lib/nzbget || {
-          echo "Creating nzbget state directoy in /var/lib/"
-          mkdir -p /var/lib/nzbget
-        }
-        test -f /var/lib/nzbget/nzbget.conf || {
-          echo "nzbget.conf not found. Copying default config to /var/lib/nzbget/nzbget.conf"
-          cp ${cfg.package}/share/nzbget/nzbget.conf /var/lib/nzbget/nzbget.conf
-          echo "Setting file mode of nzbget.conf to 0700 (needs to be written and contains plaintext credentials)"
-          chmod 0700 /var/lib/nzbget/nzbget.conf
-          echo "Setting temporary \$MAINDIR variable in default config required in order to allow nzbget to complete initial start"
-          echo "Remember to change this to a proper value once NZBGet startup has been completed"
-          sed -i -e 's/MainDir=.*/MainDir=\/tmp/g' /var/lib/nzbget/nzbget.conf
-        }
-        echo "Ensuring proper ownership of /var/lib/nzbget (${cfg.user}:${cfg.group})."
-        chown -R ${cfg.user}:${cfg.group} /var/lib/nzbget
+        if [ ! -f ${configFile} ]; then
+          ${pkgs.coreutils}/bin/install -m 0700 ${pkg}/share/nzbget/nzbget.conf ${configFile}
+        fi
       '';
 
       serviceConfig = {
-        Type = "forking";
+        StateDirectory = "nzbget";
+        StateDirectoryMode = "0750";
         User = cfg.user;
         Group = cfg.group;
-        PermissionsStartOnly = "true";
-        ExecStart = "${cfg.package}/bin/nzbget --daemon --configfile /var/lib/nzbget/nzbget.conf";
+        UMask = "0002";
         Restart = "on-failure";
+        ExecStart = "${pkg}/bin/nzbget --server --configfile ${stateDir}/nzbget.conf ${configOpts}";
+        ExecStop = "${pkg}/bin/nzbget --quit";
       };
     };
 
-    users.extraUsers = mkIf (cfg.user == "nzbget") {
+    users.users = mkIf (cfg.user == "nzbget") {
       nzbget = {
+        home = stateDir;
         group = cfg.group;
         uid = config.ids.uids.nzbget;
       };
     };
 
-    users.extraGroups = mkIf (cfg.group == "nzbget") {
+    users.groups = mkIf (cfg.group == "nzbget") {
       nzbget = {
         gid = config.ids.gids.nzbget;
       };

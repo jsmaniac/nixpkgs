@@ -1,8 +1,8 @@
-{ stdenv, lib, go, buildGoPackage, fetchFromGitHub }:
+{ stdenv, go, buildGoPackage, fetchFromGitHub, installShellFiles }:
 
 buildGoPackage rec {
-  name = "alertmanager-${version}";
-  version = "0.5.0";
+  pname = "alertmanager";
+  version = "0.20.0";
   rev = "v${version}";
 
   goPackagePath = "github.com/prometheus/alertmanager";
@@ -11,27 +11,31 @@ buildGoPackage rec {
     inherit rev;
     owner = "prometheus";
     repo = "alertmanager";
-    sha256 = "1k30v0z5awnd6ys2ybc2m580y98nlifpgl7hly977nfhc6s90kvh";
+    sha256 = "1bq6vbpy25k7apvs2ga3fbp1cbnv9j0y1g1khvz2qgz6a2zvhgg3";
   };
 
-  # Tests exist, but seem to clash with the firewall.
-  doCheck = false;
-
-  buildFlagsArray = let t = "${goPackagePath}/version"; in ''
+  buildFlagsArray = let t = "${goPackagePath}/vendor/github.com/prometheus/common/version"; in ''
     -ldflags=
        -X ${t}.Version=${version}
-       -X ${t}.Revision=unknown
+       -X ${t}.Revision=${src.rev}
        -X ${t}.Branch=unknown
        -X ${t}.BuildUser=nix@nixpkgs
        -X ${t}.BuildDate=unknown
        -X ${t}.GoVersion=${stdenv.lib.getVersion go}
   '';
 
+  nativeBuildInputs = [ installShellFiles ];
+
+  postInstall = ''
+    $out/bin/amtool --completion-script-bash > amtool.bash
+    installShellCompletion amtool.bash
+  '';
+
   meta = with stdenv.lib; {
     description = "Alert dispatcher for the Prometheus monitoring system";
-    homepage = https://github.com/prometheus/alertmanager;
+    homepage = "https://github.com/prometheus/alertmanager";
     license = licenses.asl20;
-    maintainers = with maintainers; [ benley ];
+    maintainers = with maintainers; [ benley fpletz globin ];
     platforms = platforms.unix;
   };
 }

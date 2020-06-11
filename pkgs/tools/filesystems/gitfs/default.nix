@@ -1,13 +1,14 @@
-{ stdenv, fetchFromGitHub, python2Packages }:
+{ stdenv, fetchFromGitHub, python3Packages }:
 
-python2Packages.buildPythonApplication rec {
-  name = "gitfs-0.2.5";
+python3Packages.buildPythonApplication rec {
+  pname = "gitfs";
+  version = "0.5.2";
 
   src = fetchFromGitHub {
     owner = "PressLabs";
     repo = "gitfs";
-    rev = "495c6c52ec3573294ba7b8426ed794eb466cbb82";
-    sha256 = "04yh6b5ivbviqy5k2768ag75cd5kr8k70ar0d801yvc8hnijvphk";
+    rev = version;
+    sha256 = "1jzwdwan8ndvp2lw6j7zbvg5k9rgf2d8dcxjrwc6bwyk59xdxn4p";
   };
 
   patchPhase = ''
@@ -15,12 +16,11 @@ python2Packages.buildPythonApplication rec {
     echo > requirements.txt
   '';
 
-  buildInputs = with python2Packages; [ pytest pytestcov mock ];
-  propagatedBuildInputs = with python2Packages; [ atomiclong fusepy pygit2 ];
+  checkInputs = with python3Packages; [ pytest pytestcov mock ];
+  propagatedBuildInputs = with python3Packages; [ atomiclong fusepy pygit2 six ];
 
-  checkPhase = ''
-    py.test
-  '';
+  checkPhase = "py.test";
+  doCheck = false;
 
   meta = {
     description = "A FUSE filesystem that fully integrates with git";
@@ -29,7 +29,7 @@ python2Packages.buildPythonApplication rec {
       and any subsequent changes made to the files will be
       automatically committed to the remote.
     '';
-    homepage = https://github.com/PressLabs/gitfs;
+    homepage = "https://github.com/PressLabs/gitfs";
     license = stdenv.lib.licenses.asl20;
     platforms = stdenv.lib.platforms.linux;
     maintainers = [ stdenv.lib.maintainers.robbinch ];

@@ -1,26 +1,42 @@
-{ stdenv, fetchurl, perl, cmake, flex, bison, libminc }:
+{ stdenv, fetchFromGitHub, cmake, makeWrapper, flex, bison, perl, TextFormat,
+  libminc, libjpeg, nifticlib, zlib }:
 
 stdenv.mkDerivation rec {
-  _name = "minc-tools";
-  name  = "${_name}-2.3.00";
+  pname   = "minc-tools";
+  version = "unstable-2019-12-04";
 
-  src = fetchurl {
-    url = "https://github.com/BIC-MNI/${_name}/archive/${_name}-2-3-00.tar.gz";
-    sha256 = "1d457vrwy2fl6ga2axnwn1cchkx2rmgixfzyb1zjxb06cxkfj1dm";
+  src = fetchFromGitHub {
+    owner  = "BIC-MNI";
+    repo   = pname;
+    rev    = "d4dddfdb4e4fa0cea389b8fdce51cfc076565d94";
+    sha256 = "1wwdss59qq4hz1jp35qylfswzzv0d37if23al0srnxkkgc5f8zng";
   };
 
-  nativeBuildInputs = [ cmake flex bison ] ++ (if doCheck then [ perl ] else [ ]);
-  buildInputs = [ libminc ];
+  patches = [ ./fix-netcdf-header.patch ];
 
-  cmakeFlags = [ "-DLIBMINC_DIR=${libminc}/lib/" ];
+  nativeBuildInputs = [ cmake flex bison makeWrapper ];
+  buildInputs = [ libminc libjpeg zlib ];
+  propagatedBuildInputs = [ perl TextFormat ];
 
-  checkPhase = "ctest";
-  doCheck = false;
+  cmakeFlags = [ "-DLIBMINC_DIR=${libminc}/lib/"
+                 "-DZNZ_INCLUDE_DIR=${nifticlib}/include/"
+                 "-DZNZ_LIBRARY=${nifticlib}/lib/libznz.a"
+                 "-DNIFTI_INCLUDE_DIR=${nifticlib}/include/nifti/"
+                 "-DNIFTI_LIBRARY=${nifticlib}/lib/libniftiio.a" ];
+
+  postFixup = ''
+    for prog in minccomplete minchistory mincpik; do
+      wrapProgram $out/bin/$prog --prefix PERL5LIB : $PERL5LIB
+    done
+  '';
+
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
-    homepage = https://github.com/BIC-MNI/minc-tools;
+    homepage = "https://github.com/BIC-MNI/minc-tools";
     description = "Command-line utilities for working with MINC files";
     maintainers = with maintainers; [ bcdarwin ];
     platforms = platforms.unix;
+    license   = licenses.free;
   };
 }

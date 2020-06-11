@@ -1,48 +1,55 @@
-{ stdenv, lib, fetchurl, pkgconfig, gtk, girara, ncurses, gettext, docutils
-, file, makeWrapper, sqlite, glib
-, synctexSupport ? true, texlive ? null }:
+{ stdenv, fetchurl, meson, ninja, wrapGAppsHook, pkgconfig
+, appstream-glib, desktop-file-utils, python3
+, gtk, girara, gettext, libxml2, check
+, sqlite, glib, texlive, libintl, libseccomp
+, file, librsvg
+, gtk-mac-integration
+}:
 
-assert synctexSupport -> texlive != null;
+with stdenv.lib;
 
 stdenv.mkDerivation rec {
-  version = "0.3.6";
-  name = "zathura-core-${version}";
+  pname = "zathura";
+  version = "0.4.5";
 
   src = fetchurl {
-    url = "http://pwmt.org/projects/zathura/download/zathura-${version}.tar.gz";
-    sha256 = "0fyb5hak0knqvg90rmdavwcmilhnrwgg1s5ykx9wd3skbpi8nsh8";
+    url = "https://pwmt.org/projects/${pname}/download/${pname}-${version}.tar.xz";
+    sha256 = "0b3nrcvykkpv2vm99kijnic2gpfzva520bsjlihaxandzfm9ff8c";
   };
 
-  icon = ./icon.xpm;
+  outputs = [ "bin" "man" "dev" "out" ];
 
-  buildInputs = [ pkgconfig file gtk girara gettext makeWrapper sqlite glib
-  ] ++ lib.optional synctexSupport texlive.bin.core;
+  # Flag list:
+  # https://github.com/pwmt/zathura/blob/master/meson_options.txt
+  mesonFlags = [
+    "-Dsqlite=enabled"
+    "-Dmagic=enabled"
+    # "-Dseccomp=enabled"
+    "-Dmanpages=enabled"
+    "-Dconvert-icon=enabled"
+    "-Dsynctex=enabled"
+    # Make sure tests are enabled for doCheck
+    "-Dtests=enabled"
+  ];
 
-  NIX_CFLAGS_COMPILE = "-I${glib.dev}/include/gio-unix-2.0";
+  nativeBuildInputs = [
+    meson ninja pkgconfig desktop-file-utils python3.pkgs.sphinx
+    gettext wrapGAppsHook libxml2 check
+  ] ++ optional stdenv.isLinux appstream-glib;
 
-  makeFlags = [
-    "PREFIX=$(out)"
-    "RSTTOMAN=${docutils}/bin/rst2man.py"
-    "VERBOSE=1"
-    "TPUT=${ncurses.out}/bin/tput"
-  ] ++ lib.optional synctexSupport "WITH_SYNCTEX=1";
+  buildInputs = [
+    gtk girara libintl sqlite glib file librsvg
+    texlive.bin.core
+  ] ++ optional stdenv.isLinux libseccomp
+    ++ optional stdenv.isDarwin gtk-mac-integration;
 
-  postInstall = ''
-    wrapProgram "$out/bin/zathura" \
-      --prefix PATH ":" "${lib.makeBinPath [ file ]}" \
-      --prefix XDG_CONFIG_DIRS ":" "$out/etc"
+  doCheck = true;
 
-    install -Dm644 $icon $out/share/pixmaps/pwmt.xpm
-    mkdir -pv $out/etc
-    echo "set window-icon $out/share/pixmaps/pwmt.xpm" > $out/etc/zathurarc
-    echo "Icon=pwmt" >> $out/share/applications/zathura.desktop
-  '';
-
-  meta = with stdenv.lib; {
-    homepage = http://pwmt.org/projects/zathura/;
+  meta = {
+    homepage = "https://git.pwmt.org/pwmt/zathura";
     description = "A core component for zathura PDF viewer";
     license = licenses.zlib;
-    platforms = platforms.linux;
-    maintainers = with maintainers; [ garbas ];
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ globin ];
   };
 }

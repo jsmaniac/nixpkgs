@@ -1,12 +1,12 @@
 { stdenv, fetchurl, autoreconfHook, gmp, flex, bison }:
 
-stdenv.mkDerivation rec {
-  name = "veriT-${version}";
-  version = "201506";
+stdenv.mkDerivation {
+  pname = "veriT";
+  version = "2016";
 
   src = fetchurl {
-    url = "http://www.verit-solver.org/distrib/${name}.tar.gz";
-    sha256 = "1cc9gcspw3namkdfypkians2j5dn224dsw6xx95qicad6033bsgk";
+    url = "http://www.verit-solver.org/distrib/veriT-stable2016.tar.gz";
+    sha256 = "0gvp4diz0qjg0y5ry0p1z7dkdkxw8l7jb8cdhvcnhl06jx977v4b";
   };
 
   nativeBuildInputs = [ autoreconfHook flex bison ];
@@ -23,7 +23,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "An open, trustable and efficient SMT-solver";
-    homepage = http://www.verit-solver.org/;
+    homepage = "http://www.verit-solver.org/";
     license = licenses.bsd3;
     platforms = platforms.unix;
     maintainers = [ maintainers.gebner ];

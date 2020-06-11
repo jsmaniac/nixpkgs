@@ -7,9 +7,10 @@ with lib;
 
 makeSetupHook {
       deps = makeWrapper;
-      substitutions.libPrefix = python.libPrefix;
+      substitutions.sitePackages = python.sitePackages;
       substitutions.executable = python.interpreter;
-      substitutions.python = python;
+      substitutions.python = python.pythonForBuild;
+      substitutions.pythonHost = python;
       substitutions.magicalSedExpression = let
         # Looks weird? Of course, it's between single quoted shell strings.
         # NOTE: Order DOES matter here, so single character quotes need to be
@@ -35,7 +36,7 @@ makeSetupHook {
           import sys
           import site
           import functools
-          sys.argv[0] = '"'$(basename "$f")'"'
+          sys.argv[0] = '"'$(readlink -f "$f")'"'
           functools.reduce(lambda k, p: site.addsitedir(p, k), ['"$([ -n "$program_PYTHONPATH" ] && (echo "'$program_PYTHONPATH'" | sed "s|:|','|g") || true)"'], site._init_pathinfo())
         '';
 

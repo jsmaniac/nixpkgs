@@ -1,26 +1,40 @@
-{ stdenv, fetchurl, python, buildPythonPackage
-, cython, bzip2, lzo, numpy, numexpr, hdf5 }:
+{ stdenv, lib, fetchPypi, python, buildPythonPackage, isPy38
+, cython, bzip2, lzo, numpy, numexpr, hdf5, six, c-blosc, mock }:
+
+with stdenv.lib;
 
 buildPythonPackage rec {
-  version = "3.2.2";
-  name = "tables-${version}";
+  version = "3.6.1";
+  pname = "tables";
 
-  src = fetchurl {
-    url = "mirror://pypi/t/tables/${name}.tar.gz";
-    sha256 = "3564b351a71ec1737b503b001eb7ceae1f65d5d6e3ffe1ea75aafba10f37fa84";
+  src = fetchPypi {
+    inherit pname version;
+    sha256 = "0j8vnxh2m5n0cyk9z3ndcj5n1zj5rdxgc1gb78bqlyn2lyw75aa9";
   };
 
-  buildInputs = [ hdf5 cython bzip2 lzo ];
-  propagatedBuildInputs = [ numpy numexpr ];
+  nativeBuildInputs = [ cython ];
+
+  buildInputs = [ hdf5 bzip2 lzo c-blosc ];
+  propagatedBuildInputs = [ numpy numexpr six mock ];
+
+  # When doing `make distclean`, ignore docs
+  postPatch = ''
+    substituteInPlace Makefile --replace "src doc" "src"
+  '';
+
+  # Regenerate C code with Cython
+  preBuild = ''
+    make distclean
+  '';
 
   # The setup script complains about missing run-paths, but they are
   # actually set.
-  setupPyBuildFlags =
-    [ "--hdf5=${hdf5}"
-      "--lzo=${lzo}"
-      "--bzip2=${bzip2.dev}"
-    ];
-
+  setupPyBuildFlags = [
+    "--hdf5=${getDev hdf5}"
+    "--lzo=${getDev lzo}"
+    "--bzip2=${getDev bzip2}"
+    "--blosc=${getDev c-blosc}"
+  ];
   # Run the test suite.
   # It requires the build path to be in the python search path.
   # These tests take quite some time.
@@ -29,7 +43,7 @@ buildPythonPackage rec {
   # github issue:
   #     https://github.com/PyTables/PyTables/issues/269
   checkPhase = ''
-    ${python}/bin/${python.executable} <<EOF
+    ${python.interpreter} <<EOF
     import sysconfig
     import sys
     import os

@@ -1,25 +1,31 @@
 { stdenv, fetchFromGitHub, lib
-, intltool, glib, pkgconfig, polkit, python, sqlite, systemd
-, gobjectIntrospection, vala_0_23, gtk_doc, autoreconfHook, autoconf-archive
-, nix, boost
+, intltool, glib, pkgconfig, polkit, python3, sqlite
+, gobject-introspection, vala, gtk-doc, autoreconfHook, autoconf-archive
+, nix, enableNixBackend ? false, boost
 , enableCommandNotFound ? false
-, enableBashCompletion ? false, bash-completion ? null }:
+, enableBashCompletion ? false, bash-completion ? null
+, enableSystemd ? stdenv.isLinux, systemd }:
 
 stdenv.mkDerivation rec {
-  name = "packagekit-${version}";
-  version = "1.1.3";
+  pname = "packagekit";
+  version = "1.1.13";
+
+  outputs = [ "out" "dev" ];
 
   src = fetchFromGitHub {
     owner = "hughsie";
     repo = "PackageKit";
     rev = "PACKAGEKIT_${lib.replaceStrings ["."] ["_"] version}";
-    sha256 = "150mpar7bhlvwfpwsr6zrjn3yggvklzr6nlhk0shaxnrfkfxvvb6";
+    sha256 = "0xmgac27p5z8wr56yw3cqhywnlvaf8kvyv1g0nzxnq167xj5vxam";
   };
 
-  buildInputs = [ glib polkit systemd python gobjectIntrospection vala_0_23 ]
+  buildInputs = [ glib polkit python3 gobject-introspection ]
+                  ++ lib.optional enableSystemd systemd
                   ++ lib.optional enableBashCompletion bash-completion;
-  propagatedBuildInputs = [ sqlite nix boost ];
-  nativeBuildInputs = [ intltool pkgconfig autoreconfHook autoconf-archive gtk_doc ];
+  propagatedBuildInputs =
+    [ sqlite boost ]
+    ++ lib.optional enableNixBackend nix;
+  nativeBuildInputs = [ vala intltool pkgconfig autoreconfHook autoconf-archive gtk-doc ];
 
   preAutoreconf = ''
     gtkdocize
@@ -27,24 +33,25 @@ stdenv.mkDerivation rec {
   '';
 
   configureFlags = [
-    "--enable-systemd"
-    "--enable-nix"
+    (if enableSystemd then "--enable-systemd" else "--disable-systemd")
     "--disable-dummy"
     "--disable-cron"
-    "--disable-introspection"
+    "--enable-introspection"
     "--disable-offline-update"
     "--localstatedir=/var"
     "--sysconfdir=/etc"
-    "--with-dbus-sys=$(out)/etc/dbus-1/system.d"
-    "--with-systemdsystemunitdir=$(out)/lib/systemd/system/"
+    "--with-dbus-sys=${placeholder "out"}/share/dbus-1/system.d"
+    "--with-systemdsystemunitdir=${placeholder "out"}/lib/systemd/system"
+    "--with-systemduserunitdir=${placeholder "out"}/lib/systemd/user"
   ]
+  ++ lib.optional enableNixBackend "--enable-nix"
   ++ lib.optional (!enableBashCompletion) "--disable-bash-completion"
   ++ lib.optional (!enableCommandNotFound) "--disable-command-not-found";
 
   enableParallelBuilding = true;
 
   installFlags = [
-    "sysconfdir=\${out}/etc"
+    "sysconfdir=${placeholder "out"}/etc"
     "localstatedir=\${TMPDIR}"
   ];
 
@@ -60,9 +67,9 @@ stdenv.mkDerivation rec {
       a common set of abstractions that can be used by standard GUI and text
       mode package managers.
     '';
-    homepage = http://www.packagekit.org/;
+    homepage = "http://www.packagekit.org/";
     license = licenses.gpl2Plus;
-    platforms = platforms.linux;
-    maintainers = with maintainers; [ nckx matthewbauer ];
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ matthewbauer ];
   };
 }

@@ -1,34 +1,33 @@
-{stdenv, fetchurl #, libX11, libXinerama, enableXft, libXft, zlib
-, swc, wld, wayland, libxkbcommon, pixman, fontconfig
+{ stdenv, fetchFromGitHub, meson, ninja, cairo, pango, pkg-config, wayland-protocols
+, glib, wayland, libxkbcommon, makeWrapper
 }:
 
-with stdenv.lib;
-
 stdenv.mkDerivation rec {
-  name = "dmenu-wayland-${version}";
-  version = "git-2014-11-02";
-  rev = "6e08b77428cc3c406ed2e90d4cae6c41df76341e";
+  pname = "dmenu-wayland-unstable";
+  version = "2020-04-03";
 
-  src = fetchurl {
-    url = "https://github.com/michaelforney/dmenu/archive/${rev}.tar.gz";
-    sha256 = "d0f73e442baf44a93a3b9d41a72e9cfa14f54af6049c90549f516722e3f88019";
+  src = fetchFromGitHub {
+    owner = "nyyManni";
+    repo = "dmenu-wayland";
+    rev = "550a7c39f3f925b803d51c616609c8cb6c0ea543";
+    sha256 = "0az3w1csn4x6mjyacg6lf70kykdfqamic3hbr57mj83i5jjv0jlv";
   };
 
-  buildInputs = [ swc wld wayland libxkbcommon pixman fontconfig ];
+  outputs = [ "out" "man" ];
 
-  postPatch = ''
-    sed -ri -e 's!\<(dmenu|dmenu_path)\>!'"$out/bin"'/&!g' dmenu_run
+  nativeBuildInputs = [ meson ninja pkg-config makeWrapper ];
+  buildInputs = [ cairo pango wayland-protocols glib wayland libxkbcommon ];
+
+  postInstall = ''
+    wrapProgram $out/bin/dmenu-wl_run \
+      --prefix PATH : $out/bin
   '';
 
-  preConfigure = [
-    ''sed -i "s@PREFIX = /usr/local@PREFIX = $out@g; s@/usr/share/swc@$(echo "$nativeBuildInputs" | grep -o '[^ ]*-swc-[^ ]*')/share/swc@g" config.mk''
-  ];
-
-  meta = {
-      description = "A generic, highly customizable, and efficient menu for the X Window System";
-      homepage = http://tools.suckless.org/dmenu;
-      license = stdenv.lib.licenses.mit;
-      maintainers = with stdenv.lib.maintainers; [ ];
-      platforms = with stdenv.lib.platforms; all;
+  meta = with stdenv.lib; {
+    license = licenses.mit;
+    platforms = platforms.linux;
+    description = "dmenu for wayland-compositors";
+    homepage = "https://github.com/nyyManni/dmenu-wayland";
+    maintainers = with maintainers; [ ma27 ];
   };
 }

@@ -1,28 +1,39 @@
-{ stdenv, fetchgit, rustPlatform, makeWrapper }:
+{ stdenv, fetchFromGitHub, fetchpatch, rustPlatform, makeWrapper, Security }:
 
-with rustPlatform;
+rustPlatform.buildRustPackage rec {
+  pname = "racerd";
+  version = "unstable-2019-09-02";
 
-buildRustPackage rec {
-  name = "racerd-${version}";
-  version = "2016-08-23";
-  src = fetchgit {
-    url = "git://github.com/jwilm/racerd.git";
-    rev = "5d685ed26ba812a1afe892a8c0d12eb6abbeeb3d";
-    sha256 = "1ww96nc00l8p28rnln31n92x0mp2p5jnaqh2nwc8xi3r559p1y5i";
+  src = fetchFromGitHub {
+    owner = "jwilm";
+    repo = "racerd";
+    rev = "e3d380b9a1d3f3b67286d60465746bc89fea9098";
+    sha256 = "13jqdvjk4savcl03mrn2vzgdsd7vxv2racqbyavrxp2cm9h6cjln";
   };
+
+  cargoPatches = [
+    (fetchpatch {
+      url = "https://github.com/jwilm/racerd/commit/856f3656e160cd2909c5166e962f422c901720ee.patch";
+      sha256 = "1qq2k4bnwjz5qgn7s8yxd090smwn2wvdm8dd1rrlgpln0a5vxkpb";
+    })
+  ];
+
+  cargoSha256 = "1z0dh2j9ik66i6nww3z7z2gw7nhc0b061zxbjzamk1jybpc845lq";
+
+  # a nightly compiler is required unless we use this cheat code.
+  RUSTC_BOOTSTRAP=1;
 
   doCheck = false;
 
-  depsSha256 = "13vkabr6bbl2nairxpn3lhqxcr3larasjk03r4hzrn7ff7sy40h2";
+  nativeBuildInputs = [ makeWrapper ];
+  buildInputs = stdenv.lib.optional stdenv.isDarwin Security;
 
-  buildInputs = [ makeWrapper ];
-
-  RUST_SRC_PATH = ''${rustPlatform.rust.rustc.src}/src'';
+  RUST_SRC_PATH = rustPlatform.rustcSrc;
 
   installPhase = ''
     mkdir -p $out/bin
-    cp -p target/release/racerd $out/bin/
-    wrapProgram $out/bin/racerd --set RUST_SRC_PATH "$RUST_SRC_PATH"
+    cp -p $releaseDir/racerd $out/bin/
+    wrapProgram $out/bin/racerd --set-default RUST_SRC_PATH "$RUST_SRC_PATH"
   '';
 
   meta = with stdenv.lib; {

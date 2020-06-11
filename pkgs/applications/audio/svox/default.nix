@@ -1,13 +1,13 @@
 { stdenv, fetchgit }:
 
-stdenv.mkDerivation rec {
-  name = "svox-${version}";
-  version = "2016-01-25";
+stdenv.mkDerivation {
+  pname = "svox";
+  version = "2017-07-18";
 
   src = fetchgit {
     url = "https://android.googlesource.com/platform/external/svox";
-    rev = "dfb9937746b1828d093faf3b1494f9dc403f392d";
-    sha256 = "1gkfj5avikzmr2vv8bhf83n15jcbz4phz5j13l0qnh3gjzh4f1bk";
+    rev = "7e68d0e9aac1b5d2ad15e92ddaa3bceb27973fcb";
+    sha256 = "1bqj12w23nn27x64ianm2flrqvkskpvgrnly7ah8gv6k8s8chh3r";
   };
 
   postPatch = ''
@@ -31,7 +31,7 @@ stdenv.mkDerivation rec {
     cp lang/*.bin $out/share/pico/lang
   '';
 
-  NIX_CFLAGS_COMPILE = [ "-include stdint.h" ];
+  NIX_CFLAGS_COMPILE = "-include stdint.h";
 
   meta = with stdenv.lib; {
     description = "Text-to-speech engine";

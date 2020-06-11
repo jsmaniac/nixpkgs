@@ -1,8 +1,8 @@
-{ stdenv, lib, fetchFromGitHub, buildGoPackage }:
+{ lib, fetchFromGitHub, buildGoPackage }:
 
 buildGoPackage rec {
-  name = "kapacitor-${version}";
-  version = "1.0.0";
+  pname = "kapacitor";
+  version = "1.5.4";
 
   goPackagePath = "github.com/influxdata/kapacitor";
 
@@ -10,14 +10,14 @@ buildGoPackage rec {
     owner = "influxdata";
     repo = "kapacitor";
     rev = "v${version}";
-    sha256 = "14l9bhj6qdif79s4dyqqbnjgj3m4iarvw0ckld1wdhpdgvl8w9qh";
+    sha256 = "1sd0gwqwa2bk81lshs8cy49mk1nh4azjkk0283rh0rkimy90l0zz";
   };
 
   meta = with lib; {
     description = "Open source framework for processing, monitoring, and alerting on time series data";
     license = licenses.mit;
-    homepage = https://influxdata.com/time-series-platform/kapacitor/;
-    maintainers = with maintainers; [offline];
+    homepage = "https://influxdata.com/time-series-platform/kapacitor/";
+    maintainers = with maintainers; [ offline ];
     platforms = with platforms; linux;
   };
 }

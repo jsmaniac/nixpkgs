@@ -1,33 +1,50 @@
-{ stdenv, fetchFromGitHub, cmake, makeWrapper, pkgconfig, vala, gtk3, libgee
-, poppler, libpthreadstubs, gstreamer, gst-plugins-base, librsvg }:
+{ stdenv, fetchFromGitHub, cmake, pkgconfig, vala, gtk3, libgee, fetchpatch
+, poppler, libpthreadstubs, gstreamer, gst-plugins-base, gst-plugins-good, gst-libav, librsvg, pcre, gobject-introspection, wrapGAppsHook }:
 
 stdenv.mkDerivation rec {
   name = "${product}-${version}";
   product = "pdfpc";
-  version = "4.0.3";
+  version = "4.3.4";
 
   src = fetchFromGitHub {
-    repo = "pdfpc";
-    owner = "pdfpc";
+    repo = product;
+    owner = product;
     rev = "v${version}";
-    sha256 = "1fcwxvik3nnn0g37xvb30vxaxwrd881fw07fyfb9c6ami9bnva3p";
+    sha256 = "07aafsm4jzdgpahz83p0ajv40hry7gviyadqi13ahr8xdhhwy2sd";
   };
 
-  nativeBuildInputs = [ cmake pkgconfig ];
-  buildInputs = [ gstreamer gst-plugins-base vala gtk3 libgee poppler
-    libpthreadstubs makeWrapper librsvg ];
+  nativeBuildInputs = [
+    cmake pkgconfig vala
+    # For setup hook
+    gobject-introspection
+    wrapGAppsHook
+  ];
 
-  postInstall = ''
-    wrapProgram $out/bin/pdfpc \
-      --set GDK_PIXBUF_MODULE_FILE "$GDK_PIXBUF_MODULE_FILE"
-  '';
+  buildInputs = [
+    gtk3 libgee poppler
+    libpthreadstubs librsvg pcre
+    gstreamer
+    gst-plugins-base
+    (gst-plugins-good.override { gtkSupport = true; })
+    gst-libav
+  ];
+
+  cmakeFlags = stdenv.lib.optional stdenv.isDarwin "-DMOVIES=OFF";
+
+  patches = [
+    # Fix build vala 0.46
+    (fetchpatch {
+      url = "https://github.com/pdfpc/pdfpc/commit/bbc16b97ecbdcdd22c2dc827a5c0e8b569073312.patch";
+      sha256 = "0wi1rqcvg65cxnxvmvavcvghqyksnpijq1p91m57jaby3hb0pdcy";
+    })
+  ];
 
   meta = with stdenv.lib; {
     description = "A presenter console with multi-monitor support for PDF files";
-    homepage = https://pdfpc.github.io/;
+    homepage = "https://pdfpc.github.io/";
     license = licenses.gpl2Plus;
     maintainers = with maintainers; [ pSub ];
-    platforms = platforms.linux;
+    platforms = platforms.unix;
   };
 
 }

@@ -1,23 +1,26 @@
 {stdenv, lib, fetchurl, pythonPackages
-, gnutar, unzip, lhasa, rpm, binutils, cpio, gzip, p7zip, cabextract, unrar, unshield
+, gnutar, unzip, lhasa, rpm, binutils, cpio, gzip, cabextract, unrar, unshield
 , bzip2, xz, lzip
-# unzip is handled by p7zip
-, unzipSupport ? false
+# unsafe:
+# ,p7zip
+# unzip is no longer handled by p7zip, since it's unsafe
+, unzipSupport ? true
 , unrarSupport ? false }:
 
 let
-  archivers = lib.makeBinPath ([ gnutar lhasa rpm binutils cpio gzip p7zip cabextract unshield ]
-  ++ lib.optional (unzipSupport) unzip
-  ++ lib.optional (unrarSupport) unrar
-  ++ [ bzip2 xz lzip ]);
+  # p7zip
+  archivers = lib.makeBinPath ([ gnutar lhasa rpm binutils cpio gzip cabextract unshield ]
+                               ++ lib.optional (unzipSupport) unzip
+                               ++ lib.optional (unrarSupport) unrar
+                               ++ [ bzip2 xz lzip ]);
 
 in pythonPackages.buildPythonApplication rec {
-  name = "dtrx-${version}";
+  pname = "dtrx";
   version = "7.1";
 
   src = fetchurl {
-    url = "http://brettcsmith.org/2007/dtrx/dtrx-${version}.tar.gz";
-    sha1 = "05cfe705a04a8b84571b0a5647cd2648720791a4";
+    url = "https://brettcsmith.org/2007/dtrx/dtrx-${version}.tar.gz";
+    sha256 = "15yf4n27zbhvv0byfv3i89wl5zn6jc2wbc69lk5a3m6rx54gx6hw";
   };
 
   postInstall = ''
@@ -26,7 +29,7 @@ in pythonPackages.buildPythonApplication rec {
 
   meta = with stdenv.lib; {
     description = "Do The Right Extraction: A tool for taking the hassle out of extracting archives";
-    homepage = "http://brettcsmith.org/2007/dtrx/";
+    homepage = "https://brettcsmith.org/2007/dtrx/";
     license = licenses.gpl3Plus;
     maintainers = [ maintainers.spwhitt ];
     platforms = platforms.all;

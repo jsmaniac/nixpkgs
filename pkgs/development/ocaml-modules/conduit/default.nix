@@ -1,26 +1,26 @@
-{ stdenv, buildOcaml, fetchurl, ocaml, sexplib_p4, stringext, uri, cstruct, ipaddr
-, asyncSupport ? stdenv.lib.versionAtLeast ocaml.version "4.02"
-, async_p4 ? null, async_ssl_p4 ? null, lwt ? null
+{ stdenv, fetchFromGitHub, buildDunePackage
+, ppx_sexp_conv, sexplib
+, astring, ipaddr, macaddr, uri,
 }:
 
-buildOcaml rec {
-  name = "conduit";
-  version = "0.8.3";
+buildDunePackage rec {
+  pname = "conduit";
+  version = "1.4.0";
 
-  src = fetchurl {
-    url = "https://github.com/mirage/ocaml-conduit/archive/v${version}.tar.gz";
-    sha256 = "5cf1a46aa0254345e5143feebe6b54bdef96314e9987f44e69f24618d620faa1";
+  src = fetchFromGitHub {
+    owner = "mirage";
+    repo = "ocaml-conduit";
+    rev = "v${version}";
+    sha256 = "1qzamqcmf9ywz04bkwrv17mz9j6zq2w9h1xmnjvp11pnwrs2xq8l";
   };
 
-  propagatedBuildInputs = [ sexplib_p4 stringext uri cstruct ipaddr ];
-  buildInputs = stdenv.lib.optional (lwt != null) lwt
-             ++ stdenv.lib.optional (asyncSupport && async_p4 != null) async_p4
-             ++ stdenv.lib.optional (asyncSupport && async_ssl_p4 != null) async_ssl_p4;
+  buildInputs = [ ppx_sexp_conv ];
+  propagatedBuildInputs = [ astring ipaddr macaddr sexplib uri ];
 
-  meta = with stdenv.lib; {
-    homepage = https://github.com/mirage/ocaml-conduit;
-    description = "Resolve URIs into communication channels for Async or Lwt ";
-    license = licenses.mit;
-    maintainers = [ maintainers.ericbmerritt ];
+  meta = {
+    description = "Network connection library for TCP and SSL";
+    license = stdenv.lib.licenses.isc;
+    maintainers = with stdenv.lib.maintainers; [ alexfmpe vbgl ];
+    inherit (src.meta) homepage;
   };
 }

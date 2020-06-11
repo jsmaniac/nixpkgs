@@ -1,16 +1,15 @@
 {stdenv, fetchFromGitHub, cmake}:
 
 stdenv.mkDerivation rec {
-  name = "wla-dx-git-2016-02-27";
+  pname = "wla-dx";
+  version = "9.8";
 
   src = fetchFromGitHub {
     owner = "vhelin";
     repo = "wla-dx";
-    rev = "8189fe8d5620584ea16563875ff3c5430527c86a";
-    sha256 = "02zgkcyfx7y8j6jvyi12lm29fydnd7m3rxv6g2psv23fyzmpkkir";
+    rev = "v${version}-fix";
+    sha256 = "1dsxhy19nif983lr20vxl099giwzgmzqyh7ass705hkphmwagcv6";
   };
-
-  hardeningDisable = [ "format" ];
 
   installPhase = ''
     mkdir -p $out/bin

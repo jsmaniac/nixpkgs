@@ -1,6 +1,6 @@
 { stdenv, fetchFromGitHub, faust2jaqt, faust2lv2 }:
 stdenv.mkDerivation rec {
-  name = "shelfMultiBand-${version}";
+  pname = "shelfMultiBand";
   version = "0.6.1";
 
   src = fetchFromGitHub {
@@ -15,7 +15,6 @@ stdenv.mkDerivation rec {
   buildPhase = ''
     faust2jaqt -vec -double -time -t 99999 shelfMultiBand.dsp
     faust2jaqt -vec -double -time -t 99999 shelfMultiBandMono.dsp
-    sed -i "s|\[ *scale *: *log *\]||g ; s|\btgroup\b|hgroup|g" "shelfMultiBand.lib"
     faust2lv2 -vec -double -time -gui -t 99999 shelfMultiBandMono.dsp
     faust2lv2 -vec -double -time -gui -t 99999 shelfMultiBand.dsp
   '';
@@ -31,7 +30,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "A multiband compressor made from shelving filters.";
-    homepage = https://github.com/magnetophon/shelfMultiBand;
+    homepage = "https://github.com/magnetophon/shelfMultiBand";
     license = stdenv.lib.licenses.gpl3;
     maintainers = [ stdenv.lib.maintainers.magnetophon ];
   };

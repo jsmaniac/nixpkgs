@@ -1,21 +1,30 @@
-{ stdenv, fetchurl, cmake, qt4, libXfixes, libXtst}:
+{ lib, mkDerivation, fetchFromGitHub, cmake
+, qtbase, qtscript, qtwebkit, libXfixes, libXtst, qtx11extras, git
+, webkitSupport ? true
+}:
 
-let version = "2.5.0";
-in
-stdenv.mkDerivation {
-  name = "CopyQ-${version}";
-  src  = fetchurl {
-    url    = "https://github.com/hluk/CopyQ/archive/v${version}.tar.gz";
-    sha256 = "7726745056e8d82625531defc75b2a740d3c42131ecce1f3181bc0a0bae51fb1";
+mkDerivation rec {
+  pname = "CopyQ";
+  version = "3.11.1";
+
+  src  = fetchFromGitHub {
+    owner = "hluk";
+    repo = "CopyQ";
+    rev = "v${version}";
+    sha256 = "1xxf8d220pa77195d9f3l3scvvyqsh1pvlrbw4cq6ydj9qbp5kf0";
   };
 
-  buildInputs = [ cmake qt4 libXfixes libXtst ];
+  nativeBuildInputs = [ cmake ];
 
-  meta = with stdenv.lib; {
+  buildInputs = [
+    git qtbase qtscript libXfixes libXtst qtx11extras
+  ] ++ lib.optional webkitSupport qtwebkit;
+
+  meta = with lib; {
     homepage    = "https://hluk.github.io/CopyQ";
     description = "Clipboard Manager with Advanced Features";
     license     = licenses.gpl3;
-    maintainers = with maintainers; [ willtim ];
+    maintainers = [ maintainers.willtim ];
     # NOTE: CopyQ supports windows and osx, but I cannot test these.
     # OSX build requires QT5.
     platforms   = platforms.linux;

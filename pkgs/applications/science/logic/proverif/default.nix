@@ -1,15 +1,15 @@
-{ stdenv, fetchurl, ocaml }:
+{ stdenv, fetchurl, ocamlPackages }:
 
 stdenv.mkDerivation rec {
-  name = "proverif-${version}";
-  version = "1.95";
+  pname = "proverif";
+  version = "2.01";
 
   src = fetchurl {
     url    = "http://prosecco.gforge.inria.fr/personal/bblanche/proverif/proverif${version}.tar.gz";
-    sha256 = "01viwi6sccdxk723ycy1shklz8g29j5i3wj2mcwb3j7advvqmws2";
+    sha256 = "01wp5431c77z0aaa99h8bnm5yhr6jslpqc8iyg0a7gxfqnb19gxi";
   };
 
-  buildInputs = [ ocaml ];
+  buildInputs = with ocamlPackages; [ ocaml findlib lablgtk ];
 
   buildPhase = "./build";
   installPhase = ''
@@ -20,7 +20,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Cryptographic protocol verifier in the Dolev-Yao model";
-    homepage    = "http://prosecco.gforge.inria.fr/personal/bblanche/proverif/";
+    homepage    = "https://prosecco.gforge.inria.fr/personal/bblanche/proverif/";
     license     = stdenv.lib.licenses.gpl2;
     platforms   = stdenv.lib.platforms.unix;
     maintainers = [ stdenv.lib.maintainers.thoughtpolice ];

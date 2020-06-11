@@ -1,41 +1,42 @@
 { stdenv
-, fetchurl
+, pythonOlder
+, fetchPypi
 , python
 , buildPythonPackage
 , isPy27
-, isPy33
 , isPy3k
 , numpy
 , llvmlite
-, argparse
 , funcsigs
 , singledispatch
 , libcxx
 }:
 
 buildPythonPackage rec {
-  version = "0.29.0";
-  name = "numba-${version}";
+  version = "0.49.1";
+  pname = "numba";
+  # uses f-strings
+  disabled = pythonOlder "3.6";
 
-  src = fetchurl {
-    url = "mirror://pypi/n/numba/${name}.tar.gz";
-    sha256 = "00ae294f3fb3a99e8f0a9f568213cebed26675bacc9c6f8d2e025b6d564e460d";
+  src = fetchPypi {
+    inherit pname version;
+    sha256 = "89e1ad8215918036b0ffc53501888d44ed44c1f2cb09a9e047d06af5cd7e7a5a";
   };
 
   NIX_CFLAGS_COMPILE = stdenv.lib.optionalString stdenv.isDarwin "-I${libcxx}/include/c++/v1";
 
-  propagatedBuildInputs = [numpy llvmlite argparse] ++ stdenv.lib.optional (!isPy3k) funcsigs ++ stdenv.lib.optional (isPy27 || isPy33) singledispatch;
+  propagatedBuildInputs = [numpy llvmlite]
+    ++ stdenv.lib.optionals isPy27 [ funcsigs singledispatch];
 
   # Copy test script into $out and run the test suite.
   checkPhase = ''
-    cp runtests.py $out/${python.sitePackages}/numba/runtests.py
-    ${python.interpreter} $out/${python.sitePackages}/numba/runtests.py
+    ${python.interpreter} -m numba.runtests
   '';
   # ImportError: cannot import name '_typeconv'
   doCheck = false;
 
   meta =  {
-    homepage = http://numba.pydata.org/;
+    homepage = "http://numba.pydata.org/";
     license = stdenv.lib.licenses.bsd2;
     description = "Compiling Python code using LLVM";
     maintainers = with stdenv.lib.maintainers; [ fridh ];

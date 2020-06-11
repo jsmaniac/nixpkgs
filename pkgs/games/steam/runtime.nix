@@ -1,37 +1,30 @@
-{ stdenv, fetchurl, writeText, python2, dpkg, binutils }:
+{ stdenv, steamArch, fetchurl, }:
 
-let arch = if stdenv.system == "x86_64-linux" then "amd64"
-           else if stdenv.system == "i686-linux" then "i386"
-           else abort "Unsupported platform";
+stdenv.mkDerivation rec {
 
-    input = builtins.getAttr arch (import ./runtime-generated.nix { inherit fetchurl; });
+  name = "steam-runtime";
+  # from https://repo.steampowered.com/steamrt-images-scout/snapshots/
+  version = "0.20200417.0";
 
-    inputFile = writeText "steam-runtime.json" (builtins.toJSON input);
-
-in stdenv.mkDerivation {
-  name = "steam-runtime-2016-08-13";
-
-  nativeBuildInputs = [ python2 dpkg binutils ];
+  src =
+    if steamArch == "amd64" then fetchurl {
+      url = "https://repo.steampowered.com/steamrt-images-scout/snapshots/${version}/com.valvesoftware.SteamRuntime.Platform-amd64,i386-scout-runtime.tar.gz";
+      sha256 = "0kps8i5v23sycqm69xz389n8k831jd7ncsmlrkky7nib2q91rbvj";
+      name = "scout-runtime-${version}.tar.gz";
+    } else fetchurl {
+      url = "https://repo.steampowered.com/steamrt-images-scout/snapshots/${version}/com.valvesoftware.SteamRuntime.Platform-i386-scout-runtime.tar.gz";
+      sha256 = "03fhac1r25xf7ia2pd35wjw360v5pa9h4870yrhhygp9h7v4klzf";
+      name = "scout-runtime-i386-${version}.tar.gz";
+    };
 
   buildCommand = ''
     mkdir -p $out
-    python2 ${./build-runtime.py} -i ${inputFile} -r $out
+    tar -C $out -x --strip=1 -f $src files/
   '';
-
-  passthru = rec {
-    inherit arch;
-
-    gnuArch = if arch == "amd64" then "x86_64-linux-gnu"
-              else if arch == "i386" then "i386-linux-gnu"
-              else abort "Unsupported architecture";
-
-    libs = [ "lib/${gnuArch}" "lib" "usr/lib/${gnuArch}" "usr/lib" ];
-    bins = [ "bin" "usr/bin" ];
-  };
 
   meta = with stdenv.lib; {
     description = "The official runtime used by Steam";
-    homepage = https://github.com/ValveSoftware/steam-runtime;
+    homepage = "https://github.com/ValveSoftware/steam-runtime";
     license = licenses.unfreeRedistributable; # Includes NVIDIA CG toolkit
     maintainers = with maintainers; [ hrdinka abbradar ];
   };

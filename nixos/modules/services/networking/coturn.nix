@@ -294,20 +294,19 @@ in {
   };
 
   config = mkIf cfg.enable {
-    users.extraUsers = [
-      { name = "turnserver";
-        uid = config.ids.uids.turnserver;
+    users.users.turnserver =
+      { uid = config.ids.uids.turnserver;
         description = "coturn TURN server user";
-      } ];
-    users.extraGroups = [
-      { name = "turnserver";
-        gid = config.ids.gids.turnserver;
+      };
+    users.groups.turnserver =
+      { gid = config.ids.gids.turnserver;
         members = [ "turnserver" ];
-      } ];
+      };
 
     systemd.services.coturn = {
       description = "coturn TURN server";
-      after = [ "network.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
 
       unitConfig = {
@@ -320,6 +319,14 @@ in {
         RuntimeDirectory = "turnserver";
         User = "turnserver";
         Group = "turnserver";
+        AmbientCapabilities =
+          mkIf (
+            cfg.listening-port < 1024 ||
+            cfg.alt-listening-port < 1024 ||
+            cfg.tls-listening-port < 1024 ||
+            cfg.alt-tls-listening-port < 1024 ||
+            cfg.min-port < 1024
+          ) "cap_net_bind_service";
         Restart = "on-abort";
       };
     };

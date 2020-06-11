@@ -1,11 +1,11 @@
 { stdenv, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "ustr-${version}";
+  pname = "ustr";
   version = "1.0.4";
 
   src = fetchurl {
-    url = "http://www.and.org/ustr/${version}/${name}.tar.bz2";
+    url = "http://www.and.org/ustr/${version}/${pname}-${version}.tar.bz2";
     sha256 = "1i623ygdj7rkizj7985q9d6vj5amwg686aqb5j3ixpkqkyp6xbrx";
   };
 
@@ -21,8 +21,6 @@ stdenv.mkDerivation rec {
     sed -i 's,\(USTR_CONF_HAVE_STDINT_H\) 0,\1 1,g' ustr-import.in
   '';
 
-  buildTargets = [ "all-shared" ];
-
   preBuild = ''
     makeFlagsArray+=("prefix=$out")
     makeFlagsArray+=("LDCONFIG=echo")
@@ -35,7 +33,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = with stdenv.lib; {
-    homepage = http://www.and.org/ustr/;
+    homepage = "http://www.and.org/ustr/";
     description = "Micro String API for C language";
     license = licenses.bsd2;
     maintainers = [ maintainers.phreedom ];

@@ -1,69 +1,51 @@
-{ stdenv, fetchurl
-# optional:
-, pkgconfig ? null  # most of the extra deps need pkgconfig to be found
-, curl ? null
-, iptables ? null
-, jdk ? null
-, libatasmart ? null
-, libcredis ? null
-, libdbi ? null
-, libgcrypt ? null
-, libmemcached ? null, cyrus_sasl ? null
-, libmodbus ? null
-, libnotify ? null, gdk_pixbuf ? null
-, liboping ? null
-, libpcap ? null
-, libsigrok ? null
-, libvirt ? null
-, libxml2 ? null
-, libtool ? null
-, lm_sensors ? null
-, lvm2 ? null
-, libmysql ? null
-, postgresql ? null
-, protobufc ? null
-, python ? null
-, rabbitmq-c ? null
-, riemann ? null
-, rrdtool ? null
-, udev ? null
-, varnish ? null
-, yajl ? null
-, net_snmp ? null
-, hiredis ? null
-, libmnl ? null
-}:
+{ stdenv, fetchurl, fetchpatch, darwin, callPackage
+, autoreconfHook
+, pkgconfig
+, libtool
+, ...
+}@args:
+let
+  plugins = callPackage ./plugins.nix args;
+in
 stdenv.mkDerivation rec {
-  version = "5.6.0";
-  name = "collectd-${version}";
+  version = "5.11.0";
+  pname = "collectd";
 
   src = fetchurl {
-    url = "http://collectd.org/files/${name}.tar.bz2";
-    sha256 = "08w6fjzczi2psk7va0xkjh9pigpar6sbjx2a6ayq4dmc3zcvpzzh";
+    url = "https://collectd.org/files/${pname}-${version}.tar.bz2";
+    sha256 = "1cjxksxdqcqdccz1nbnc2fp6yy84qq361ynaq5q8bailds00mc9p";
   };
 
+  nativeBuildInputs = [ pkgconfig autoreconfHook ];
   buildInputs = [
-    pkgconfig curl iptables libatasmart libcredis libdbi libgcrypt libmemcached
-    cyrus_sasl libmodbus libnotify gdk_pixbuf liboping libpcap libsigrok libvirt
-    lm_sensors libxml2 lvm2 libmysql postgresql protobufc rabbitmq-c rrdtool
-    varnish yajl jdk libtool python udev net_snmp hiredis libmnl
-  ];
+    libtool
+  ] ++ stdenv.lib.optionals stdenv.isDarwin [
+    darwin.apple_sdk.frameworks.ApplicationServices
+  ] ++ plugins.buildInputs;
 
-  patches = [
-    # Replace deprecated readdir_r() with readdir() to avoid a fatal warning.
-    ./readdir-fix.patch
-  ];
+  configureFlags = [
+    "--localstatedir=/var"
+    "--disable-werror"
+  ] ++ plugins.configureFlags;
 
-  # for some reason libsigrok isn't auto-detected
-  configureFlags =
-    stdenv.lib.optional (libsigrok != null) "--with-libsigrok" ++
-    stdenv.lib.optional (python != null) "--with-python=${python}/bin/python";
+  # do not create directories in /var during installPhase
+  postConfigure = ''
+     substituteInPlace Makefile --replace '$(mkinstalldirs) $(DESTDIR)$(localstatedir)/' '#'
+  '';
+
+  postInstall = ''
+    if [ -d $out/share/collectd/java ]; then
+      mv $out/share/collectd/java $out/share/
+    fi
+  '';
+
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
     description = "Daemon which collects system performance statistics periodically";
-    homepage = http://collectd.org;
+    homepage = "https://collectd.org";
     license = licenses.gpl2;
-    platforms = platforms.linux;
+    platforms = platforms.unix;
     maintainers = with maintainers; [ bjornfor fpletz ];
   };
 }

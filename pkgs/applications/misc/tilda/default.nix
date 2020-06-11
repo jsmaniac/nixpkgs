@@ -1,19 +1,23 @@
-{ stdenv, fetchurl, pkgconfig
-, autoreconfHook, gettext, expat
-, confuse, vte, gtk
+{ stdenv, fetchFromGitHub, pkgconfig
+, autoreconfHook, gettext, expat, pcre2
+, libconfuse, vte, gtk
 , makeWrapper }:
 
+with stdenv.lib;
 stdenv.mkDerivation rec {
 
-  name = "tilda-${version}";
-  version = "1.3.3";
+  pname = "tilda";
+  version = "1.5.1";
 
-  src = fetchurl {
-    url = "https://github.com/lanoxx/tilda/archive/${name}.tar.gz";
-    sha256 = "1cc4qbg1m3i04lj5p6i6xbd0zvy1320pxdgmjhz5p3j95ibsbfki";
+  src = fetchFromGitHub {
+    owner = "lanoxx";
+    repo = "tilda";
+    rev = "${pname}-${version}";
+    sha256 = "1kk69sg7ph906yr5jagkjx0qfkhr5w2nyx407wl2dsjimbps44rd";
   };
 
-  buildInputs = [ pkgconfig autoreconfHook gettext confuse vte gtk makeWrapper ];
+  nativeBuildInputs = [ autoreconfHook makeWrapper pkgconfig ];
+  buildInputs = [ gettext pcre2 libconfuse vte gtk ];
 
   LD_LIBRARY_PATH = "${expat.out}/lib"; # ugly hack for xgettext to work during build
 
@@ -26,9 +30,9 @@ stdenv.mkDerivation rec {
         --prefix XDG_DATA_DIRS : "$GSETTINGS_SCHEMAS_PATH"
   '';
 
-  meta = with stdenv.lib; {
+  meta = {
     description = "A Gtk based drop down terminal for Linux and Unix";
-    homepage = https://github.com/lanoxx/tilda/;
+    homepage = "https://github.com/lanoxx/tilda/";
     license = licenses.gpl3;
     maintainers = [ maintainers.AndersonTorres ];
     platforms = platforms.linux;

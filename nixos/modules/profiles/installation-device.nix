@@ -22,31 +22,50 @@ with lib;
   config = {
 
     # Enable in installer, even if the minimal profile disables it.
-    services.nixosManual.enable = mkForce true;
+    documentation.enable = mkForce true;
 
     # Show the manual.
-    services.nixosManual.showManual = true;
+    documentation.nixos.enable = mkForce true;
 
-    # Let the user play Rogue on TTY 8 during the installation.
-    services.rogue.enable = true;
+    # Use less privileged nixos user
+    users.users.nixos = {
+      isNormalUser = true;
+      extraGroups = [ "wheel" "networkmanager" "video" ];
+      # Allow the graphical user to login without password
+      initialHashedPassword = "";
+    };
 
-    # Disable some other stuff we don't need.
-    security.sudo.enable = false;
+    # Allow the user to log in as root without a password.
+    users.users.root.initialHashedPassword = "";
+
+    # Allow passwordless sudo from nixos user
+    security.sudo = {
+      enable = mkDefault true;
+      wheelNeedsPassword = mkForce false;
+    };
 
     # Automatically log in at the virtual consoles.
-    services.mingetty.autologinUser = "root";
+    services.mingetty.autologinUser = "nixos";
 
     # Some more help text.
-    services.mingetty.helpLine =
-      ''
+    services.mingetty.helpLine = ''
+      The "nixos" and "root" accounts have empty passwords.
 
-        The "root" account has an empty password.  ${
-          optionalString config.services.xserver.enable
-            "Type `systemctl start display-manager' to\nstart the graphical user interface."}
-      '';
+      Type `sudo systemctl start sshd` to start the SSH daemon.
+      You then must set a password for either "root" or "nixos"
+      with `passwd` to be able to login.
+    '' + optionalString config.services.xserver.enable ''
+      Type `sudo systemctl start display-manager' to
+      start the graphical user interface.
+    '';
 
-    # Allow sshd to be started manually through "start sshd".
-    services.openssh.enable = true;
+    # Allow sshd to be started manually through "systemctl start sshd".
+    services.openssh = {
+      enable = true;
+      # Allow password login to the installation, if the user sets a password via "passwd"
+      # It is safe as root doesn't have a password by default and SSH is disabled by default
+      permitRootLogin = "yes";
+    };
     systemd.services.sshd.wantedBy = mkOverride 50 [];
 
     # Enable wpa_supplicant, but don't start it by default.
@@ -56,7 +75,7 @@ with lib;
     # Tell the Nix evaluator to garbage collect more aggressively.
     # This is desirable in memory-constrained environments that don't
     # (yet) have swap set up.
-    environment.variables.GC_INITIAL_HEAP_SIZE = "100000";
+    environment.variables.GC_INITIAL_HEAP_SIZE = "1M";
 
     # Make the installer more likely to succeed in low memory
     # environments.  The kernel's overcommit heustistics bite us
@@ -66,9 +85,18 @@ with lib;
     boot.kernel.sysctl."vm.overcommit_memory" = "1";
 
     # To speed up installation a little bit, include the complete
-    # stdenv in the Nix store on the CD.  Archive::Cpio is needed for
-    # the initrd builder.
-    system.extraDependencies = [ pkgs.stdenv pkgs.busybox pkgs.perlPackages.ArchiveCpio ];
+    # stdenv in the Nix store on the CD.
+    system.extraDependencies = with pkgs;
+      [
+        stdenv
+        stdenvNoCC # for runCommand
+        busybox
+        jq # for closureInfo
+      ];
 
+    # Show all debug messages from the kernel but don't log refused packets
+    # because we have the firewall enabled. This makes installs from the
+    # console less cumbersome if the machine has a public IP.
+    networking.firewall.logRefusedConnections = mkDefault false;
   };
 }

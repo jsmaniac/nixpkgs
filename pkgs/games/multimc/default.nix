@@ -1,52 +1,34 @@
-{ stdenv, fetchFromGitHub, cmake, qt5Full, jdk7, zlib, file, makeWrapper, xorg, libpulseaudio, qt5 }:
+{ stdenv, mkDerivation, fetchFromGitHub, cmake, jdk, zlib, file, makeWrapper, xorg, libpulseaudio, qtbase }:
 
 let
-  libnbt = fetchFromGitHub {
-    owner = "MultiMC";
-    repo = "libnbtplusplus";
-    rev = "5d0ffb50a526173ce58ae57136bf5d79a7e1920d";
-    sha256 = "05hnwfb77rmm9ba7n96g4g1sgwqqcmplvbcafsl76yxr6ysgw5jg";
-  };
-in
-stdenv.mkDerivation {
-  name = "multimc-5";
+  libpath = with xorg; stdenv.lib.makeLibraryPath [ libX11 libXext libXcursor libXrandr libXxf86vm libpulseaudio ];
+in mkDerivation rec {
+  pname = "multimc";
+  version = "0.6.11";
   src = fetchFromGitHub {
     owner = "MultiMC";
     repo = "MultiMC5";
-    rev = "895d8ab4699f1b50bf03532c967a91f5ecb62a50";
-    sha256 = "179vc1iv57fx4g4h1wy8yvyvdm671jnvp6zi8pcr1n6azqhwklds";
+    rev = version;
+    sha256 = "1jkbmb4sgfk8d93f5l1vd9pkpvhq9sxacc61w0rvf5xmz0wnszmz";
+    fetchSubmodules = true;
   };
-  buildInputs = [ cmake qt5Full jdk7 zlib file makeWrapper ];
-
-  libpath = with xorg; [ libX11 libXext libXcursor libXrandr libXxf86vm libpulseaudio ];
-  postUnpack = ''
-    rmdir $sourceRoot/depends/libnbtplusplus
-    cp -r ${libnbt} $sourceRoot/depends/libnbtplusplus
-    chmod 755 -R $sourceRoot/depends/libnbtplusplus
-    mkdir -pv $sourceRoot/build/
-    cp -v ${qt5.quazip.src} $sourceRoot/build/quazip-0.7.1.tar.gz
-  '';
-
-  patches = [ ./multimc.patch ];
+  nativeBuildInputs = [ cmake file makeWrapper ];
+  buildInputs = [ qtbase jdk zlib ];
 
   enableParallelBuilding = true;
 
-  # the install rule tries to bundle ALL deps into the output for portability
-  installPhase = ''
-    RESULT=/run/opengl-driver/lib/
-    for x in $libpath; do
-      RESULT=$x/lib/:$RESULT
-    done
+  cmakeFlags = [ "-DMultiMC_LAYOUT=lin-system" ];
 
-    mkdir -pv $out/bin/jars $out/lib
-    cp -v MultiMC $out/bin/
-    cp -v jars/*.jar $out/bin/jars/ #*/
-    cp -v librainbow.so libnbt++.so libMultiMC_logic.so $out/lib
-    wrapProgram $out/bin/MultiMC --add-flags "-d \$HOME/.multimc/" --set GAME_LIBRARY_PATH $RESULT --prefix PATH : ${jdk7}/bin/
+  postInstall = ''
+    install -Dm644 ../application/resources/multimc/scalable/multimc.svg $out/share/pixmaps/multimc.svg
+    install -Dm755 ../application/package/linux/multimc.desktop $out/share/applications/multimc.desktop
+
+    # xorg.xrandr needed for LWJGL [2.9.2, 3) https://github.com/LWJGL/lwjgl/issues/128
+    wrapProgram $out/bin/multimc --add-flags "-d \$HOME/.multimc/" --set GAME_LIBRARY_PATH /run/opengl-driver/lib:${libpath} --prefix PATH : ${jdk}/bin/:${xorg.xrandr}/bin/
   '';
 
   meta = with stdenv.lib; {
-    homepage = https://multimc.org/;
+    homepage = "https://multimc.org/";
     description = "A free, open source launcher for Minecraft";
     longDescription = ''
       Allows you to have multiple, separate instances of Minecraft (each with their own mods, texture packs, saves, etc) and helps you manage them and their associated options with a simple interface.

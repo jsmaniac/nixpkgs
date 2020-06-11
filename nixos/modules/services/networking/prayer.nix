@@ -18,14 +18,14 @@ let
     var_prefix = "${stateDir}"
     prayer_user = "${prayerUser}"
     prayer_group = "${prayerGroup}"
-    sendmail_path = "/var/setuid-wrappers/sendmail"
+    sendmail_path = "/run/wrappers/bin/sendmail"
 
     use_http_port ${cfg.port}
 
     ${cfg.extraConfig}
   '';
 
-  prayerCfg = pkgs.runCommand "prayer.cf" { } ''
+  prayerCfg = pkgs.runCommand "prayer.cf" { preferLocalBuild = true; } ''
     # We have to remove the http_port 80, or it will start a server there
     cat ${prayer}/etc/prayer.cf | grep -v http_port > $out
     cat ${prayerExtraCfg} >> $out
@@ -41,12 +41,7 @@ in
 
     services.prayer = {
 
-      enable = mkOption {
-        default = false;
-        description = ''
-          Whether to run the prayer webmail http server.
-        '';
-      };
+      enable = mkEnableOption "the prayer webmail http server";
 
       port = mkOption {
         default = "2080";
@@ -72,17 +67,14 @@ in
   config = mkIf config.services.prayer.enable {
     environment.systemPackages = [ prayer ];
 
-    users.extraUsers = singleton
-      { name = prayerUser;
-        uid = config.ids.uids.prayer;
+    users.users.${prayerUser} =
+      { uid = config.ids.uids.prayer;
         description = "Prayer daemon user";
         home = stateDir;
       };
 
-    users.extraGroups = singleton
-      { name = prayerGroup;
-        gid = config.ids.gids.prayer;
-      };
+    users.groups.${prayerGroup} =
+      { gid = config.ids.gids.prayer; };
 
     systemd.services.prayer = {
       wantedBy = [ "multi-user.target" ];

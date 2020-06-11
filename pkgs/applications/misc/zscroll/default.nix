@@ -1,4 +1,4 @@
-{ stdenv, lib, python3, python3Packages, fetchFromGitHub }:
+{ stdenv, python3, python3Packages, fetchFromGitHub }:
 
 let version = "1.0"; in
 
@@ -20,7 +20,7 @@ python3Packages.buildPythonApplication {
 
   meta = with stdenv.lib; {
     description = "A text scroller for use with panels and shells";
-    homepage = https://github.com/noctuid/zscroll;
+    homepage = "https://github.com/noctuid/zscroll";
     license = licenses.bsd2;
     platforms = platforms.all;
   };

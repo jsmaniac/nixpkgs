@@ -1,80 +1,87 @@
-{ stdenv, fetchurl, gfortran, openblas }:
+{ stdenv
+, fetchFromGitHub
+, gfortran
+, blas, lapack
+, metis
+, fixDarwinDylibNames
+, gnum4
+, enableCuda ? false
+, cudatoolkit
+}:
 
-let
-  version = "4.4.4";
-  name = "suitesparse-${version}";
+stdenv.mkDerivation rec {
+  pname = "suitesparse";
+  version = "5.7.2";
 
-  int_t = if openblas.blas64 then "int64_t" else "int32_t";
-  SHLIB_EXT = if stdenv.isDarwin then "dylib" else "so";
-in
-stdenv.mkDerivation {
-  inherit name;
+  outputs = [ "out" "dev" "doc" ];
 
-  src = fetchurl {
-    url = "http://faculty.cse.tamu.edu/davis/SuiteSparse/SuiteSparse-${version}.tar.gz";
-    sha256 = "1zdn1y0ij6amj7smmcslkqgbqv9yy5cwmbyzqc9v6drzdzllgbpj";
+  src = fetchFromGitHub {
+    owner = "DrTimothyAldenDavis";
+    repo = "SuiteSparse";
+    rev = "v${version}";
+    sha256 = "1imndff7yygjrbbrcscsmirdi8w0lkwj5dbhydxmf7lklwn4j3q6";
   };
 
-  preConfigure = ''
-    mkdir -p $out/lib
-    mkdir -p $out/include
+  nativeBuildInputs = [
+    gnum4
+  ] ++ stdenv.lib.optional stdenv.isDarwin fixDarwinDylibNames;
 
-    sed -i "SuiteSparse_config/SuiteSparse_config.mk" \
-        -e 's/METIS .*$/METIS =/' \
-        -e 's/METIS_PATH .*$/METIS_PATH =/' \
-        -e '/CHOLMOD_CONFIG/ s/$/-DNPARTITION -DLONGBLAS=${int_t}/' \
-        -e '/UMFPACK_CONFIG/ s/$/-DLONGBLAS=${int_t}/'
-  ''
-  + stdenv.lib.optionalString stdenv.isDarwin ''
-    sed -i "SuiteSparse_config/SuiteSparse_config.mk" \
-        -e 's/^[[:space:]]*\(LIB = -lm\) -lrt/\1/'
+  buildInputs = [
+    blas lapack
+    metis
+    gfortran.cc.lib
+  ] ++ stdenv.lib.optional enableCuda cudatoolkit;
+
+  preConfigure = ''
+    # Mongoose and GraphBLAS are packaged separately
+    sed -i "Makefile" -e '/GraphBLAS\|Mongoose/d'
   '';
 
   makeFlags = [
-    "PREFIX=\"$(out)\""
-    "INSTALL_LIB=$(out)/lib"
-    "INSTALL_INCLUDE=$(out)/include"
-    "BLAS=-lopenblas"
-    "LAPACK="
+    "INSTALL=${placeholder "out"}"
+    "INSTALL_INCLUDE=${placeholder "dev"}/include"
+    "JOBS=$(NIX_BUILD_CORES)"
+    "BLAS=-lblas"
+    "LAPACK=-llapack"
+    "MY_METIS_LIB=-lmetis"
+  ] ++ stdenv.lib.optionals blas.isILP64 [
+    "CFLAGS=-DBLAS64"
+  ] ++ stdenv.lib.optionals enableCuda [
+    "CUDA_PATH=${cudatoolkit}"
+    "CUDART_LIB=${cudatoolkit.lib}/lib/libcudart.so"
+    "CUBLAS_LIB=${cudatoolkit}/lib/libcublas.so"
   ];
 
-  NIX_CFLAGS = stdenv.lib.optionalString stdenv.isDarwin " -DNTIMER";
+  buildFlags = [
+    # Build individual shared libraries, not demos
+    "library"
+  ];
 
-  postInstall = ''
-    # Build and install shared library
-    (
-        cd "$(mktemp -d)"
-        for i in "$out"/lib/lib*.a; do
-          ar -x $i
+  # Likely fixed after 5.7.2
+  # https://github.com/DrTimothyAldenDavis/SuiteSparse/commit/f6daae26ee391e475e2295e77c839aa7c1a8b784
+  postInstall = stdenv.lib.optionalString stdenv.isDarwin ''
+    # The fixDarwinDylibNames in nixpkgs can't seem to fix all the libraries.
+    # We manually fix them up here.
+    fixDarwinDylibNames() {
+        local flags=()
+        local old_id
+
+        for fn in "$@"; do
+            flags+=(-change "$PWD/lib/$(basename "$fn")" "$fn")
         done
-        ''${CC} *.o ${if stdenv.isDarwin then "-dynamiclib" else "--shared"} -o "$out/lib/libsuitesparse.${SHLIB_EXT}" -lopenblas
-    )
-    for i in umfpack cholmod amd camd colamd spqr; do
-      ln -s libsuitesparse.${SHLIB_EXT} "$out"/lib/lib$i.${SHLIB_EXT}
-    done
 
-    # Install documentation
-    outdoc=$out/share/doc/${name}
-    mkdir -p $outdoc
-    cp -r AMD/Doc $outdoc/amd
-    cp -r BTF/Doc $outdoc/bft
-    cp -r CAMD/Doc $outdoc/camd
-    cp -r CCOLAMD/Doc $outdoc/ccolamd
-    cp -r CHOLMOD/Doc $outdoc/cholmod
-    cp -r COLAMD/Doc $outdoc/colamd
-    cp -r CXSparse/Doc $outdoc/cxsparse
-    cp -r KLU/Doc $outdoc/klu
-    cp -r LDL/Doc $outdoc/ldl
-    cp -r RBio/Doc $outdoc/rbio
-    cp -r SPQR/Doc $outdoc/spqr
-    cp -r UMFPACK/Doc $outdoc/umfpack
+        for fn in "$@"; do
+            if [ -L "$fn" ]; then continue; fi
+            echo "$fn: fixing dylib"
+            install_name_tool -id "$fn" "''${flags[@]}" "$fn"
+        done
+    }
+
+    fixDarwinDylibNames $(find "$out" -name "*.dylib")
   '';
 
-  nativeBuildInputs = [ gfortran ];
-  buildInputs = [ openblas ];
-
   meta = with stdenv.lib; {
-    homepage = http://faculty.cse.tamu.edu/davis/suitesparse.html;
+    homepage = "http://faculty.cse.tamu.edu/davis/suitesparse.html";
     description = "A suite of sparse matrix algorithms";
     license = with licenses; [ bsd2 gpl2Plus lgpl21Plus ];
     maintainers = with maintainers; [ ttuegel ];

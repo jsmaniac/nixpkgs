@@ -1,4 +1,4 @@
-{ stdenv, lib, fetchurl, pythonPackages }:
+{ stdenv, fetchurl, python3Packages, gtk3, gobject-introspection, wrapGAppsHook, gnome3 }:
 
 #
 # TODO: Declare configuration options for the following optional dependencies:
@@ -7,40 +7,36 @@
 #  -  pyxdg: Need to make it work first (see setupPyInstallFlags).
 #
 
-pythonPackages.buildPythonApplication rec {
+python3Packages.buildPythonApplication rec {
   name = "zim-${version}";
-  version = "0.65";
-  namePrefix = "";
+  version = "0.72.1";
 
   src = fetchurl {
-    url = "http://zim-wiki.org/downloads/${name}.tar.gz";
-    sha256 = "15pdq4fxag85qjsrdmmssiq85qsk5vnbp8mrqnpvx8lm8crz6hjl";
+    url = "https://zim-wiki.org/downloads/${name}.tar.gz";
+    sha256 = "0a9h97rmp7if74p3i028cllzf9p9468psbqwcvm9009ga253dr1l";
   };
 
-  propagatedBuildInputs = with pythonPackages; [ pyGtkGlade pyxdg pygobject2 ];
-
-  preBuild = ''
-    export HOME=$TMP
-
-    sed -i '/zim_install_class,/d' setup.py
-  '';
+  buildInputs = [ gtk3 gobject-introspection wrapGAppsHook gnome3.adwaita-icon-theme ];
+  propagatedBuildInputs = with python3Packages; [ pyxdg pygobject3 ];
 
 
   preFixup = ''
     export makeWrapperArgs="--prefix XDG_DATA_DIRS : $out/share --argv0 $out/bin/.zim-wrapped"
   '';
 
-  postFixup = ''
-    wrapPythonPrograms
-    substituteInPlace $out/bin/.zim-wrapped \
-    --replace "sys.argv[0] = 'zim'" "sys.argv[0] = '$out/bin/zim'"
+  # RuntimeError: could not create GtkClipboard object
+  doCheck = false;
+
+  checkPhase = ''
+    python test.py
   '';
 
-  doCheck = true;
 
-  meta = {
-      description = "A desktop wiki";
-      homepage = http://zim-wiki.org;
-      license = stdenv.lib.licenses.gpl2Plus;
+  meta = with stdenv.lib; {
+    description = "A desktop wiki";
+    homepage = "http://zim-wiki.org";
+    license = licenses.gpl2Plus;
+    maintainers = with maintainers; [ pSub ];
+    broken = stdenv.isDarwin; # https://github.com/NixOS/nixpkgs/pull/52658#issuecomment-449565790
   };
 }

@@ -1,12 +1,12 @@
 { stdenv, fetchurl, pkgs }:
 
 stdenv.mkDerivation rec {
-  name = "pipes-${version}";
-  version = "1.1.0";
+  pname = "pipes";
+  version = "1.3.0";
 
   src = fetchurl {
     url = "https://github.com/pipeseroni/pipes.sh/archive/v${version}.tar.gz";
-    sha256 = "1225llbm0zfnkqykfi7qz7z5p102pwldmj22761m653jy0ahi7w2";
+    sha256 = "09m4alb3clp3rhnqga5v6070p7n1gmnwp2ssqhq87nf2ipfpcaak";
   };
 
   buildInputs = with pkgs; [ bash ];

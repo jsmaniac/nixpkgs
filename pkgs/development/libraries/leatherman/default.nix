@@ -1,20 +1,30 @@
-{ stdenv, fetchFromGitHub, boost, cmake, curl }:
+{ stdenv, fetchFromGitHub, boost, cmake, curl, ruby }:
 
 stdenv.mkDerivation rec {
-  name = "leatherman-${version}";
-  version = "0.9.0";
+  pname = "leatherman";
+  version = "1.12.0";
 
   src = fetchFromGitHub {
-    sha256 = "18nidasykbwdd9qzwc8pnzhczy6acr3rsxwvv2v3j5gq3nbsk2mc";
+    sha256 = "00qigglp67a14ki4dhjxd3j540a80rkmzhysx7hra8v2rgbsqgj8";
     rev = version;
     repo = "leatherman";
     owner = "puppetlabs";
   };
 
-  buildInputs = [ boost cmake curl ];
+  NIX_CFLAGS_COMPILE = builtins.toString [
+    "-Wno-error=ignored-qualifiers"
+    "-Wno-error=class-memaccess"
+    "-Wno-error=catch-value"
+    "-Wno-error=deprecated-copy"
+  ];
+
+  nativeBuildInputs = [ cmake ];
+  buildInputs = [ boost curl ruby ];
+
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
-    homepage = https://github.com/puppetlabs/leatherman/;  
+    homepage = "https://github.com/puppetlabs/leatherman/";
     description = "A collection of C++ and CMake utility libraries";
     license = licenses.asl20;
     maintainers = [ maintainers.womfoo ];

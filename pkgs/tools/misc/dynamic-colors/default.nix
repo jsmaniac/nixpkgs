@@ -1,40 +1,28 @@
 { stdenv, fetchFromGitHub }:
 
 stdenv.mkDerivation rec {
-  name = "dynamic-colors-${version}";
-  version = "0.2.1";
+  pname = "dynamic-colors";
+  version = "0.2.2.2";
 
   src = fetchFromGitHub {
-    owner = "peterhoeg";
-    repo = "dynamic-colors";
-    rev = "v${version}";
-    sha256 = "061lh4qjk4671hwzmj55n3gy5hsi4p3hb30hj5bg3s6glcsbjpr5";
+    owner  = "peterhoeg";
+    repo   = "dynamic-colors";
+    rev    = "v${version}";
+    sha256 = "0i63570z9aqbxa8ixh4ayb3akgjdnlqyl2sbf9d7x8f1pxhk5kd5";
   };
 
-  dontBuild = true;
-  dontStrip = true;
+  PREFIX = placeholder "out";
 
-  installPhase = ''
-    mkdir -p \
-      $out/bin \
-      $out/share/colorschemes \
-      $out/share/bash-completion/completions \
-      $out/share/zsh/site-packages
-
-    install -m755 bin/dynamic-colors              $out/bin/
-    install -m644 completions/dynamic-colors.bash $out/share/bash-completion/completions/dynamic-colors
-    install -m644 completions/dynamic-colors.zsh  $out/share/zsh/site-packages/_dynamic-colors
-    install -m644 colorschemes/*               -t $out/share/colorschemes
-
-    sed -e "s|/usr/share/dynamic-colors|$out/share|g" \
-        -i $out/bin/dynamic-colors
+  postPatch = ''
+    substituteInPlace bin/dynamic-colors \
+      --replace /usr/share/dynamic-colors $out/share/dynamic-colors
   '';
 
-  meta = {
-    homepage = https://github.com/peterhoeg/dynamic-colors;
-    license = stdenv.lib.licenses.mit;
+  meta = with stdenv.lib; {
     description = "Change terminal colors on the fly";
-    platforms = stdenv.lib.platforms.unix;
-    maintainers = [ stdenv.lib.maintainers.peterhoeg ];
+    homepage    = "https://github.com/peterhoeg/dynamic-colors";
+    license     = licenses.mit;
+    maintainers = with maintainers; [ peterhoeg ];
+    platforms   = platforms.unix;
   };
 }

@@ -1,15 +1,22 @@
 { stdenv, fetchurl, pkgconfig, ncurses, ocaml, findlib, ocaml_pcre, camlzip
-, gnutls, nettle }:
+, gnutls, nettle
+}:
 
-stdenv.mkDerivation {
-  name = "ocamlnet-4.1.2";
+if stdenv.lib.versionOlder ocaml.version "4.02"
+then throw "ocamlnet is not available for OCaml ${ocaml.version}"
+else
+
+stdenv.mkDerivation rec {
+  name = "ocaml${ocaml.version}-ocamlnet-${version}";
+  version = "4.1.7";
 
   src = fetchurl {
-    url = http://download.camlcity.org/download/ocamlnet-4.1.2.tar.gz;
-    sha256 = "1n0l9zlq7dc5yr43bpa4a0b6bxj3iyjkadbb41g59zlwa8hkk34i";
+    url = "http://download.camlcity.org/download/ocamlnet-${version}.tar.gz";
+    sha256 = "0r9gl0lsgxk2achixxqzm8bm5l9jwc4vwihf0rvxxa9v9q9vfdhi";
   };
 
-  buildInputs = [ ncurses ocaml findlib ocaml_pcre camlzip gnutls pkgconfig nettle ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ ncurses ocaml findlib ocaml_pcre camlzip gnutls nettle ];
 
   createFindlibDestdir = true;
 
@@ -33,12 +40,12 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    homepage = http://projects.camlcity.org/projects/ocamlnet.html;
+    homepage = "http://projects.camlcity.org/projects/ocamlnet.html";
     description = "A library implementing Internet protocols (http, cgi, email, etc.) for OCaml";
     license = "Most Ocamlnet modules are released under the zlib/png license. The HTTP server module Nethttpd is, however, under the GPL.";
     platforms = ocaml.meta.platforms or [];
     maintainers = [
-      stdenv.lib.maintainers.z77z
+      stdenv.lib.maintainers.maggesi
     ];
   };
 }

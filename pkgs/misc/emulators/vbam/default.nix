@@ -1,44 +1,38 @@
 { stdenv
 , cairo
 , cmake
-, fetchsvn
+, fetchFromGitHub
 , ffmpeg
 , gettext
-, libpng
-, libpthreadstubs
-, libXdmcp
-, libxshmfence
-, mesa
+, libGLU, libGL
 , openal
 , pkgconfig
-, SDL
-, wxGTK
+, SDL2
+, sfml
 , zip
 , zlib
 }:
 
-stdenv.mkDerivation {
-  name = "VBAM-1507";
-  src = fetchsvn {
-    url = "svn://svn.code.sf.net/p/vbam/code/trunk";
-    rev = 1507;
-    sha256 = "0fqvgi5s0sacqr9yi7kv1klqlvfzr13sjq5ikipirz0jv50kjxa7";
+stdenv.mkDerivation rec {
+  pname = "visualboyadvance-m";
+  version = "2.1.4";
+  src = fetchFromGitHub {
+    owner = "visualboyadvance-m";
+    repo = "visualboyadvance-m";
+    rev = "v${version}";
+    sha256 = "1kgpbvng3c12ws0dy92zc0azd94h0i3j4vm7b67zc8mi3pqsppdg";
   };
+
+  nativeBuildInputs = [ cmake pkgconfig ];
 
   buildInputs = [
     cairo
-    cmake
     ffmpeg
     gettext
-    libpng
-    libpthreadstubs
-    libXdmcp
-    libxshmfence
-    mesa
+    libGLU libGL
     openal
-    pkgconfig
-    SDL
-    wxGTK
+    SDL2
+    sfml
     zip
     zlib
   ];
@@ -46,15 +40,18 @@ stdenv.mkDerivation {
   cmakeFlags = [
     "-DCMAKE_BUILD_TYPE='Release'"
     "-DENABLE_FFMPEG='true'"
-    #"-DENABLE_LINK='true'" currently broken :/
-    "-DSYSCONFDIR='$out/etc'"
+    "-DENABLE_LINK='true'"
+    "-DSYSCONFDIR=etc"
+    "-DENABLE_WX='false'"
+    "-DENABLE_SDL='true'"
   ];
 
-  meta = {
+  meta =  with stdenv.lib; {
     description = "A merge of the original Visual Boy Advance forks";
-    license = stdenv.lib.licenses.gpl2;
-    maintainers = [ stdenv.lib.maintainers.lassulus ];
-    homepage = http://vba-m.com/;
+    license = licenses.gpl2;
+    maintainers = with maintainers; [ lassulus ];
+    homepage = "https://vba-m.com/";
     platforms = stdenv.lib.platforms.linux;
+    badPlatforms = [ "aarch64-linux" ];
   };
 }

@@ -2,11 +2,11 @@
 
 python3Packages.buildPythonApplication rec {
   name = "nextcloud-news-updater-${version}";
-  version = "9.0.2";
+  version = "10.0.1";
 
   src = fetchurl {
     url = "mirror://pypi/n/nextcloud_news_updater/nextcloud_news_updater-${version}.tar.gz";
-    sha256 = "1m6g4591zyvjl2fji4iwl9api02racgc9rqa0gf0mfsqwdr77alw";
+    sha256 = "14jj3w417wfsm1ki34d980b0s6vfn8i29g4c66qb2fizdq1d0z6q";
   };
 
   doCheck = false;

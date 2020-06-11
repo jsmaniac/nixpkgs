@@ -2,25 +2,24 @@
 
 with stdenv.lib;
 
-assert stdenv.isLinux;
-
 let
   arch =
-    if stdenv.system == "x86_64-linux" then "x64"
-    else if stdenv.system == "i686-linux" then "x86"
-    else abort "Unsupported architecture";
+    if stdenv.hostPlatform.system == "x86_64-linux" then "x64"
+    else if stdenv.hostPlatform.system == "i686-linux" then "x86"
+    else throwSystem;
+  throwSystem = throw "Unsupported system: ${stdenv.hostPlatform.system}";
   sha256 =
-    if stdenv.system == "x86_64-linux" then "0l8y8z8fqvxrypx3dp83mm3qr9shgpcn5h7x2k2z13gp4aq0yw6g"
-    else if stdenv.system == "i686-linux" then "00nl442k4pij9fm8inlk4qrcvbnz55fbwf3sm3dgbzvd5jcgsa0f"
-    else abort "Unsupported architecture";
+    if stdenv.hostPlatform.system == "x86_64-linux" then "0zy0jzvdqccfsg42m2lq1rj8r2c4iypd1h9vxl9824cbl92yim37"
+    else if stdenv.hostPlatform.system == "i686-linux" then "03ml9xv19km99f0z7fpr21b1zkxvw7q39kjzd8wpb2pds51wnc62"
+    else throwSystem;
   libraries = stdenv.lib.makeLibraryPath [ stdenv.cc.cc ];
 
 in stdenv.mkDerivation rec {
-  name = "logmein-hamachi-${version}";
-  version = "2.1.0.165";
+  pname = "logmein-hamachi";
+  version = "2.1.0.203";
 
   src = fetchurl {
-    url = "https://www.vpn.net/installers/${name}-${arch}.tgz";
+    url = "https://www.vpn.net/installers/${pname}-${version}-${arch}.tgz";
     inherit sha256;
   };
 

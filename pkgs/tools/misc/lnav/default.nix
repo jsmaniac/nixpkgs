@@ -1,5 +1,5 @@
-{ stdenv, fetchFromGitHub, pcre, sqlite, ncurses,
-  readline, zlib, bzip2, autoconf, automake }:
+{ stdenv, fetchFromGitHub, pcre-cpp, sqlite, ncurses
+, readline, zlib, bzip2, autoconf, automake, curl }:
 
 stdenv.mkDerivation rec {
 
@@ -9,7 +9,7 @@ stdenv.mkDerivation rec {
     owner = "tstack";
     repo = "lnav";
     rev = "v${meta.version}";
-    sha256 = "06h0hy8k0w692df2490dshxf2x8qcnw5myyp0k5jkc63ai2ra6aq";
+    sha256 = "0z8bsr0falxlkmd1b5gy871vyafyih0sw7lgg858lqnbsy0q2m4i";
     inherit name;
   };
 
@@ -19,9 +19,10 @@ stdenv.mkDerivation rec {
     zlib
     bzip2
     ncurses
-    pcre
+    pcre-cpp
     readline
     sqlite
+    curl
   ];
 
   preConfigure = ''
@@ -42,8 +43,9 @@ stdenv.mkDerivation rec {
     '';
     downloadPage = "https://github.com/tstack/lnav/releases";
     license = licenses.bsd2;
-    version = "0.8.0";
-    maintainers = [ maintainers.dochang ];
+    version = "0.8.5";
+    maintainers = with maintainers; [ dochang ma27 ];
+    platforms = platforms.unix;
   };
 
 }

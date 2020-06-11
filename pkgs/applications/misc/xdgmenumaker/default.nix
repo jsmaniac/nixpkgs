@@ -1,38 +1,49 @@
-{ stdenv, fetchFromGitHub, txt2tags, python2Packages }:
+{ stdenv, fetchFromGitHub, txt2tags, python3Packages, glib, gobject-introspection, wrapGAppsHook }:
 
-stdenv.mkDerivation rec {
-  name = "xdgmenumaker-${version}";
-  version = "0.9";
+python3Packages.buildPythonApplication rec {
+  pname = "xdgmenumaker";
+  version = "1.5";
 
   src = fetchFromGitHub {
-    rev = version;
     owner = "gapan";
-    repo = "xdgmenumaker";
-    sha256 = "1n29syadsgj0vpnkc8nji4k1c8gminr1xdriz5ck2bcygsgxkdrd";
+    repo = pname;
+    rev = version;
+    sha256 = "1vrsp5c1ah7p4dpwd6aqvinpwzd8crdimvyyr3lbm3c6cwpyjmif";
   };
 
+  format = "other";
+
+  strictDeps = false;
+
   nativeBuildInputs = [
+    gobject-introspection
     txt2tags
-    python2Packages.wrapPython
+    wrapGAppsHook
   ];
 
-  pythonPath = [
-    python2Packages.pyxdg
-    python2Packages.pygtk
+  buildInputs = [
+    glib
   ];
 
-  installPhase = ''
-    make install PREFIX=$out DESTDIR=
-    wrapProgram "$out/bin/xdgmenumaker" \
-      --prefix XDG_DATA_DIRS : "$out/share"
-    wrapPythonPrograms
-  '';
-  
+  pythonPath = with python3Packages; [
+    pyxdg
+    pygobject3
+  ];
+
+  makeFlags = [
+    "PREFIX=${placeholder "out"}"
+  ];
+
+  installFlags = [
+    "DESTDIR="
+  ];
+
   meta = with stdenv.lib; {
     description = "Command line tool that generates XDG menus for several window managers";
-    homepage = https://github.com/gapan/xdgmenumaker;
+    homepage = "https://github.com/gapan/xdgmenumaker";
     license = licenses.gpl2Plus;
-    platforms = platforms.unix;
+    # NOTE: exclude darwin from platforms because Travis reports hash mismatch
+    platforms = with platforms; filter (x: !(elem x darwin)) unix;
     maintainers = [ maintainers.romildo ];
   };
 }

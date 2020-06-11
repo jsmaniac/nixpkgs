@@ -1,25 +1,34 @@
-{ stdenv, fetchFromGitHub, qt4, qmake4Hook, boost, proj, gdal, sqlite, pkgconfig }:
+{ stdenv, fetchFromGitHub, makeWrapper, qmake, pkgconfig, boost, gdal, proj
+, qtbase, qtsvg, qtwebview, qtwebkit }:
 
 stdenv.mkDerivation rec {
-  name = "merkaartor-${version}";
-  version = "0.18.2";
+  pname = "merkaartor";
+  version = "unstable-2019-11-12";
 
   src = fetchFromGitHub {
     owner = "openstreetmap";
     repo = "merkaartor";
-    rev = version;
-    sha256 = "1a8kzrc9w0b2a2zgw9dbbi15jy9ynv6nf2sg3k4dbh7f1s2ajx9l";
+    rev = "29b3388680a03f1daac0037a2b504ea710da879a";
+    sha256 = "0h3d3srzl06p2ajq911j05zr4vkl88qij18plydx45yqmvyvh0xz";
   };
 
-  buildInputs = [ qt4 boost proj gdal sqlite ];
+  nativeBuildInputs = [ makeWrapper qmake pkgconfig ];
 
-  nativeBuildInputs = [ qmake4Hook pkgconfig ];
+  buildInputs = [ boost gdal proj qtbase qtsvg qtwebview qtwebkit ];
 
-  meta = {
-    description = "An openstreetmap editor";
-    homepage = http://merkaartor.org/;
-    license = stdenv.lib.licenses.gpl2Plus;
-    maintainers = with stdenv.lib.maintainers; [viric urkud];
-    inherit (qt4.meta) platforms;
+  enableParallelBuilding = true;
+
+  NIX_CFLAGS_COMPILE = "-DACCEPT_USE_OF_DEPRECATED_PROJ_API_H";
+
+  postInstall = ''
+    wrapProgram $out/bin/merkaartor \
+      --set QT_QPA_PLATFORM_PLUGIN_PATH ${qtbase.bin}/lib/qt-*/plugins/platforms
+  '';
+
+  meta = with stdenv.lib; {
+    description = "OpenStreetMap editor";
+    homepage = "http://merkaartor.be/";
+    license = licenses.gpl2Plus;
+    maintainers = with maintainers; [ ];
   };
 }

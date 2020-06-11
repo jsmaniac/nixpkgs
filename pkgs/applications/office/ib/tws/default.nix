@@ -2,7 +2,7 @@
 
 stdenv.mkDerivation rec {
   version = "9542";
-  name = "ib-tws-${version}";
+  pname = "ib-tws";
 
   src = requireFile rec {
     name = "ibtws_${version}.jar";
@@ -11,7 +11,7 @@ stdenv.mkDerivation rec {
       Download the TWS from
       https://download2.interactivebrokers.com/download/unixmacosx_latest.jar,
       rename the file to ${name}, and add it to the nix store with
-      "nix-prefetch-url file://${name}".
+      "nix-prefetch-url file://\$PWD/${name}".
     '';
     sha256 = "1a2jiwwnr5g3xfba1a89c257bdbnq4zglri8hz021vk7f6s4rlrf";
   };
@@ -88,7 +88,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "Trader Work Station of Interactive Brokers";
-    homepage = https://www.interactivebrokers.com;
+    homepage = "https://www.interactivebrokers.com";
     license = licenses.unfree;
     maintainers = [ maintainers.tstrobel ];
     platforms = platforms.linux;

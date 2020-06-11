@@ -1,23 +1,25 @@
-{ stdenv, fetchurl, unzip }:
+{ stdenv, fetchurl }:
 
 let arch = if stdenv.isx86_64 then "x86-64" else
            if stdenv.isi686 then "x86-32" else
            "unknown";
+
+    version = "11";
 in
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
 
-  name = "stockfish-7";
+  pname = "stockfish";
+  inherit version;
 
   src = fetchurl {
-    url = "https://stockfish.s3.amazonaws.com/${name}-src.zip";
-    sha256 = "0djzg3h5d9qs27snf0rr6zl6iaki1jb84v8m8k3c2lcjbj2vpwc9";
+    url = "https://github.com/official-stockfish/Stockfish/archive/sf_${version}.tar.gz";
+    sha256 = "16di83s79gf9kzdhcal5y0q9d59544gd5xqf1k8bwrqvc36628l0";
   };
 
-  buildInputs = [ unzip ];
   postUnpack = "sourceRoot+=/src";
   makeFlags = [ "PREFIX=$(out)" "ARCH=${arch}" ];
-  buildFlags = "build ";
+  buildFlags = [ "build" ];
 
   enableParallelBuilding = true;
 
@@ -29,7 +31,7 @@ stdenv.mkDerivation rec {
       much stronger than the best human chess grandmasters.
       '';
     maintainers = with maintainers; [ luispedro peti ];
-    platforms = with platforms; i686 ++ x86_64;
+    platforms = ["x86_64-linux" "i686-linux"];
     license = licenses.gpl2;
   };
 

@@ -1,13 +1,10 @@
 { callPackage, fetchurl, ... } @ args:
 
 callPackage ./generic.nix (args // rec {
-  version = "1.0.25";
+  version = "1.0.28";
+
   src = fetchurl {
-    sha256 = "0b3fvhrxl4l82bf3v0j47ypjv6a0k5lqbgknrq1agpmjca6vmmx4";
-    urls = [
-      "http://pkgs.fedoraproject.org/repo/pkgs/sane-backends/sane-backends-${version}.tar.gz/f9ed5405b3c12f07c6ca51ee60225fe7/sane-backends-${version}.tar.gz"
-      "https://alioth.debian.org/frs/download.php/file/4146/sane-backends-${version}.tar.gz"
-    ];
-    curlOpts = "--insecure";
+    url = "https://gitlab.com/sane-project/backends/uploads/9e718daff347826f4cfe21126c8d5091/sane-backends-${version}.tar.gz";
+    sha256 = "00yy8q9hqdf0zjxxl4d8njr9zf0hhi3a9ib23ikc2anqf8zhy9ii";
   };
 })

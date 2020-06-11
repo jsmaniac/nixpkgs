@@ -1,46 +1,79 @@
-{ stdenv, fetchFromGitHub, cmake, qt5, pythonPackages, libmsgpack
-, makeWrapper, neovim
-}:
+{ stdenv, mkDerivation, fetchFromGitHub, cmake, doxygen, makeWrapper
+, msgpack, neovim, pythonPackages, qtbase }:
 
-let # not very usable ATM
-  version = "0.2.3";
+let
+  unwrapped = mkDerivation rec {
+    pname = "neovim-qt-unwrapped";
+    version = "0.2.15";
+
+    src = fetchFromGitHub {
+      owner  = "equalsraf";
+      repo   = "neovim-qt";
+      rev    = "v${version}";
+      sha256 = "097nykglqp4jyvla4yp32sc1f1hph4cqqhp6rm9ww7br8c0j54xl";
+    };
+
+    cmakeFlags = [
+      "-DUSE_SYSTEM_MSGPACK=1"
+    ];
+
+    buildInputs = [
+      neovim.unwrapped # only used to generate help tags at build time
+      qtbase
+    ] ++ (with pythonPackages; [
+      jinja2 python msgpack
+    ]);
+
+    nativeBuildInputs = [ cmake doxygen ];
+
+    enableParallelBuilding = true;
+
+    preCheck = ''
+      # The GUI tests require a running X server, disable them
+      sed -i ../test/CMakeLists.txt \
+        -e '/^add_xtest_gui/d'
+    '';
+
+    doCheck = true;
+
+    meta = with stdenv.lib; {
+      description = "Neovim client library and GUI, in Qt5";
+      license     = licenses.isc;
+      maintainers = with maintainers; [ peterhoeg ];
+      inherit (neovim.meta) platforms;
+      inherit version;
+    };
+  };
 in
-stdenv.mkDerivation {
-  name = "neovim-qt-${version}";
+  stdenv.mkDerivation {
+    pname = "neovim-qt";
+    version = unwrapped.version;
+    buildCommand = if stdenv.isDarwin then ''
+      mkdir -p $out/Applications
+      cp -r ${unwrapped}/bin/nvim-qt.app $out/Applications
 
-  src = fetchFromGitHub {
-    owner = "equalsraf";
-    repo = "neovim-qt";
-    rev = "v${version}";
-    sha256 = "0ichqph7nfw3934jf0sp81bqd376xna3f899cc2xg88alb4f16dv";
-  };
+      chmod -R a+w "$out/Applications/nvim-qt.app/Contents/MacOS"
+      wrapProgram "$out/Applications/nvim-qt.app/Contents/MacOS/nvim-qt" \
+        --prefix PATH : "${neovim}/bin"
+    '' else ''
+      makeWrapper '${unwrapped}/bin/nvim-qt' "$out/bin/nvim-qt" \
+        --prefix PATH : "${neovim}/bin"
 
-  # It tries to download libmsgpack; let's use ours.
-  postPatch = let use-msgpack = ''
-    cmake_minimum_required(VERSION 2.8.11)
-    project(neovim-qt-deps)
+      # link .desktop file
+      mkdir -p "$out/share/pixmaps"
+      ln -s '${unwrapped}/share/applications' "$out/share/applications"
+      ln -s '${unwrapped}/share/pixmaps/nvim-qt.png' "$out/share/pixmaps/nvim-qt.png"
+    '';
 
-    # Similar enough to FindMsgpack
-    set(MSGPACK_INCLUDE_DIRS ${libmsgpack}/include PARENT_SCOPE)
-    set(MSGPACK_LIBRARIES msgpackc PARENT_SCOPE)
-  '';
-    in "echo '${use-msgpack}' > third-party/CMakeLists.txt";
+    preferLocalBuild = true;
 
-  buildInputs = with pythonPackages; [
-    cmake qt5.qtbase
-    python msgpack jinja2 libmsgpack
-    makeWrapper
-  ];
+    nativeBuildInputs = [
+      makeWrapper
+    ];
 
-  enableParallelBuilding = true;
+    passthru = {
+      inherit unwrapped;
+    };
 
-  postInstall = ''
-    wrapProgram "$out/bin/nvim-qt" --prefix PATH : "${neovim}/bin"
-  '';
-
-  meta = with stdenv.lib; {
-    description = "A prototype Qt5 GUI for neovim";
-    license = licenses.isc;
-    inherit (neovim.meta) platforms;
-  };
-}
+    inherit (unwrapped) meta;
+  }

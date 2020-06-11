@@ -1,34 +1,31 @@
-{ stdenv, fetchFromGitHub, pythonPackages, makeWrapper }:
+{ stdenv, buildPythonApplication, fetchFromGitHub, makeWrapper, cmake
+, pytestrunner, pytest, six, pyparsing, asn1ate }:
 
-stdenv.mkDerivation rec {
+buildPythonApplication rec {
   pname = "asn2quickder";
-  name = "${pname}-${version}";
-  version = "0.7-RC1";
+  version = "1.3.0";
 
   src = fetchFromGitHub {
-    sha256 = "0ynajhbml28m4ipbj5mscjcv6g1a7frvxfimxh813rhgl0w3sgq8";
+    sha256 = "15lxv8vcjnsjxg7ywcac5p6mj5vf5pxq1219yap653ci4f1liqfr";
     rev = "version-${version}";
     owner = "vanrein";
-    repo = "${pname}";
+    repo = "quick-der";
   };
 
-  propagatedBuildInputs = with pythonPackages; [ pyparsing makeWrapper ];
+  postPatch = ''
+    patchShebangs ./python/scripts/*
+  '';
 
-  patchPhase = with pythonPackages; ''
-    substituteInPlace Makefile \
-      --replace '..' '..:$(DESTDIR)/${python.sitePackages}:${pythonPackages.pyparsing}/${python.sitePackages}' \
-    '';
+  dontUseCmakeConfigure = true;
 
-  installPhase = ''
-    mkdir -p $out/${pythonPackages.python.sitePackages}/
-    mkdir -p $out/bin $out/lib $out/sbin $out/man
-    make DESTDIR=$out PREFIX=/ all
-    make DESTDIR=$out PREFIX=/ install
-    '';
+  nativeBuildInputs = [ makeWrapper cmake ];
+  checkInputs = [ pytestrunner pytest ];
+
+  propagatedBuildInputs = [ pyparsing asn1ate six ];
 
   meta = with stdenv.lib; {
     description = "An ASN.1 compiler with a backend for Quick DER";
-    homepage = https://github.com/vanrein/asn2quickder;
+    homepage = "https://github.com/vanrein/asn2quickder";
     license = licenses.bsd3;
     platforms = platforms.linux;
     maintainers = with maintainers; [ leenaars ];

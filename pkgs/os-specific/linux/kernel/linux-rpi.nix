@@ -1,39 +1,56 @@
-{ stdenv, fetchFromGitHub, perl, buildLinux, ... } @ args:
+{ stdenv, lib, buildPackages, fetchFromGitHub, perl, buildLinux, rpiVersion, ... } @ args:
 
 let
-  modDirVersion = "4.4.13";
-  tag = "1.20160620-1";
+  modDirVersion = "4.19.75";
+  tag = "1.20190925";
 in
-stdenv.lib.overrideDerivation (import ./generic.nix (args // rec {
+lib.overrideDerivation (buildLinux (args // {
   version = "${modDirVersion}-${tag}";
   inherit modDirVersion;
 
   src = fetchFromGitHub {
     owner = "raspberrypi";
     repo = "linux";
-    rev = "raspberrypi-kernel_${tag}";
-    sha256 = "0bydlzmd9mar07j6dihhzn1xm6vpn92y33vf1qsdkl3hjil6brfc";
+    rev = "raspberrypi-kernel_${tag}-1";
+    sha256 = "0l91kb4jjxg4fcp7d2aqm1fj34ns137rys93k907mdgnarcliafs";
   };
 
-  features.iwlwifi = true;
+  defconfig = {
+    "1" = "bcmrpi_defconfig";
+    "2" = "bcm2709_defconfig";
+    "3" = if stdenv.hostPlatform.isAarch64 then "bcmrpi3_defconfig" else "bcm2709_defconfig";
+    "4" = "bcm2711_defconfig";
+  }.${toString rpiVersion};
 
-  extraMeta.hydraPlatforms = [];
-})) (oldAttrs: {
+  features = {
+    efiBootStub = false;
+  } // (args.features or {});
+
+  extraMeta = if (rpiVersion < 3) then {
+    platforms = with lib.platforms; [ arm ];
+    hydraPlatforms = [];
+  } else {
+    platforms = with lib.platforms; [ arm aarch64 ];
+    hydraPlatforms = [ "aarch64-linux" ];
+  };
+} // (args.argsOverride or {}))) (oldAttrs: {
   postConfigure = ''
     # The v7 defconfig has this set to '-v7' which screws up our modDirVersion.
     sed -i $buildRoot/.config -e 's/^CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=""/'
+    sed -i $buildRoot/include/config/auto.conf -e 's/^CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=""/'
   '';
 
+  # Make copies of the DTBs named after the upstream names so that U-Boot finds them.
+  # This is ugly as heck, but I don't know a better solution so far.
   postFixup = ''
-    # Make copies of the DTBs so that U-Boot finds them, as it is looking for the upstream names.
-    # This is ugly as heck.
+    dtbDir=${if stdenv.isAarch64 then "$out/dtbs/broadcom" else "$out/dtbs"}
+    rm $dtbDir/bcm283*.dtb
     copyDTB() {
-      if [ -f "$out/dtbs/$1" ]; then
-        cp -v "$out/dtbs/$1" "$out/dtbs/$2"
-      fi
+      cp -v "$dtbDir/$1" "$dtbDir/$2"
     }
-
-    # I am not sure if all of these are correct...
+  '' + lib.optionalString (lib.elem stdenv.hostPlatform.system ["armv6l-linux"]) ''
+    copyDTB bcm2708-rpi-zero-w.dtb bcm2835-rpi-zero.dtb
+    copyDTB bcm2708-rpi-zero-w.dtb bcm2835-rpi-zero-w.dtb
     copyDTB bcm2708-rpi-b.dtb bcm2835-rpi-a.dtb
     copyDTB bcm2708-rpi-b.dtb bcm2835-rpi-b.dtb
     copyDTB bcm2708-rpi-b.dtb bcm2835-rpi-b-rev2.dtb
@@ -41,7 +58,13 @@ stdenv.lib.overrideDerivation (import ./generic.nix (args // rec {
     copyDTB bcm2708-rpi-b-plus.dtb bcm2835-rpi-b-plus.dtb
     copyDTB bcm2708-rpi-b-plus.dtb bcm2835-rpi-zero.dtb
     copyDTB bcm2708-rpi-cm.dtb bcm2835-rpi-cm.dtb
+  '' + lib.optionalString (lib.elem stdenv.hostPlatform.system ["armv7l-linux"]) ''
     copyDTB bcm2709-rpi-2-b.dtb bcm2836-rpi-2-b.dtb
+  '' + lib.optionalString (lib.elem stdenv.hostPlatform.system ["armv7l-linux" "aarch64-linux"]) ''
     copyDTB bcm2710-rpi-3-b.dtb bcm2837-rpi-3-b.dtb
+    copyDTB bcm2710-rpi-3-b-plus.dtb bcm2837-rpi-3-a-plus.dtb
+    copyDTB bcm2710-rpi-3-b-plus.dtb bcm2837-rpi-3-b-plus.dtb
+    copyDTB bcm2710-rpi-cm3.dtb bcm2837-rpi-cm3.dtb
+    copyDTB bcm2711-rpi-4-b.dtb bcm2838-rpi-4-b.dtb
   '';
 })

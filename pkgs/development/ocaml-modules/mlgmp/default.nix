@@ -1,5 +1,8 @@
 {stdenv, fetchurl, ocaml, findlib, gmp, mpfr, ncurses }:
 
+if stdenv.lib.versionAtLeast ocaml.version "4.03"
+then throw "mlgmp is not available for OCaml ${ocaml.version}" else
+
 let
   pname = "mlgmp";
 in
@@ -29,7 +32,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = {
-    homepage = http://opam.ocamlpro.com/pkg/mlgmp.20120224.html;
+    homepage = "http://opam.ocamlpro.com/pkg/mlgmp.20120224.html";
     description = "OCaml bindings to GNU MP library";
     license = "Free software ?";
   };

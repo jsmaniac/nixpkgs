@@ -1,11 +1,11 @@
 { stdenv, fetchurl, jre, makeWrapper }:
 
 stdenv.mkDerivation rec {
-  name = "VASSAL-3.2.15";
+  name = "VASSAL-3.2.17";
 
   src = fetchurl {
     url = "mirror://sourceforge/vassalengine/${name}-linux.tar.bz2";
-    sha256 = "10ng571nxr5zc2nlviyrk5bci8my67kq3qvhfn9bifzkxmjlqmk9";
+    sha256 = "0nxskr46janxnb31c03zv61kr46vy98l7cwxha3vll81l4ij1sjb";
   };
 
   buildInputs = [ makeWrapper ];
@@ -27,7 +27,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
       description = "A free, open-source boardgame engine";
-      homepage = http://www.vassalengine.org/;
+      homepage = "http://www.vassalengine.org/";
       license = licenses.lgpl21;
       maintainers = with maintainers; [ tvestelind ];
       platforms = platforms.linux;

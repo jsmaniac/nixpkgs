@@ -1,37 +1,40 @@
-{ stdenv, fetchurl, flex, bison }:
+{ stdenv, fetchurl, flex, bison, bluez, pkgconfig, withBluez ? false }:
+
+with stdenv.lib;
 
 stdenv.mkDerivation rec {
-  name = "libpcap-1.7.4";
-  
+  pname = "libpcap";
+  version = "1.9.1";
+
   src = fetchurl {
-    url = "http://www.tcpdump.org/release/${name}.tar.gz";
-    sha256 = "1c28ykkizd7jqgzrfkg7ivqjlqs9p6lygp26bsw2i0z8hwhi3lvs";
+    url = "https://www.tcpdump.org/release/${pname}-${version}.tar.gz";
+    sha256 = "153h1378diqyc27jjgz6gg5nxmb4ddk006d9xg69nqavgiikflk3";
   };
-  
-  nativeBuildInputs = [ flex bison ];
-  
+
+  nativeBuildInputs = [ flex bison ]
+    ++ optionals withBluez [ bluez.dev pkgconfig ];
+
   # We need to force the autodetection because detection doesn't
   # work in pure build enviroments.
-  configureFlags =
-    if stdenv.isLinux then [ "--with-pcap=linux" ]
-    else if stdenv.isDarwin then [ "--with-pcap=bpf" ]
-    else [];
+  configureFlags = [
+    ("--with-pcap=" + {
+      linux = "linux";
+      darwin = "bpf";
+    }.${stdenv.hostPlatform.parsed.kernel.name})
+  ] ++ optionals (stdenv.hostPlatform == stdenv.buildPlatform)
+    [ "ac_cv_linux_vers=2" ];
 
-  prePatch = stdenv.lib.optionalString stdenv.isDarwin ''
+  dontStrip = stdenv.hostPlatform != stdenv.buildPlatform;
+
+  prePatch = optionalString stdenv.isDarwin ''
     substituteInPlace configure --replace " -arch i386" ""
   '';
 
-  preInstall = ''mkdir -p $out/bin'';
-  
-  crossAttrs = {
-    # Stripping hurts in static libraries
-    dontStrip = true;
-    configureFlags = configureFlags ++ [ "ac_cv_linux_vers=2" ];
-  };
-
   meta = {
-    homepage = http://www.tcpdump.org;
+    homepage = "https://www.tcpdump.org";
     description = "Packet Capture Library";
-    platforms = stdenv.lib.platforms.unix;
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ fpletz ];
+    license = licenses.bsd3;
   };
 }

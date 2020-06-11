@@ -1,21 +1,36 @@
-{ stdenv, fetchurl, automoc4, cmake, perl, pkgconfig
-, kdelibs, kdepimlibs, boost, baloo }:
+{
+  mkDerivation, lib,
+  fetchurl,
+  extra-cmake-modules,
+  qtbase, boost,
+  akonadi-calendar, akonadi-notes, akonadi-search, kidentitymanagement, kontactinterface, kldap,
+  krunner, kwallet, kcalendarcore
+}:
 
-stdenv.mkDerivation rec {
-  name = "zanshin-0.3.1";
+mkDerivation rec {
+  pname = "zanshin";
+  version = "0.5.71";
 
   src = fetchurl {
-    url = "http://files.kde.org/zanshin/${name}.tar.bz2";
-    sha256 = "1ck2ncz8i816d6d1gcsdrh6agd2zri24swgz3bhn8vzbk4215yzl";
+    url = "mirror://kde/stable/${pname}/${pname}-${version}.tar.xz";
+    sha256 = "0b316ddcd46sawva84x5d8nsp19v66gbm83djrra7fv3k8nkv4xh";
   };
 
-  nativeBuildInputs = [ automoc4 cmake perl pkgconfig ];
+  nativeBuildInputs = [
+    extra-cmake-modules
+  ];
 
-  buildInputs = [ kdelibs kdepimlibs boost baloo ];
+  buildInputs = [
+    qtbase boost
+    akonadi-calendar akonadi-notes akonadi-search kidentitymanagement kontactinterface kldap
+    krunner kwallet kcalendarcore
+  ];
 
-  meta = {
-    description = "GTD for KDE";
-    maintainers = [ stdenv.lib.maintainers.urkud ];
-    inherit (kdelibs.meta) platforms;
+  meta = with lib; {
+    description = "A powerful yet simple application to manage your day to day actions, getting your mind like water";
+    homepage = "https://zanshin.kde.org/";
+    maintainers = with maintainers; [ zraexy ];
+    platforms = platforms.linux;
+    license = licenses.gpl2Plus;
   };
 }

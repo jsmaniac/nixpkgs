@@ -4,13 +4,11 @@ bundlerEnv {
   name = "taskjuggler-3.5.0";
 
   inherit ruby;
-  gemfile = ./Gemfile;
-  lockfile = ./Gemfile.lock;
-  gemset = ./gemset.nix;
+  gemdir = ./.;
 
   meta = {
     description = "A modern and powerful project management tool";
-    homepage    = http://taskjuggler.org/;
+    homepage    = "http://taskjuggler.org/";
     license     = lib.licenses.gpl2;
     platforms   = lib.platforms.unix;
   };

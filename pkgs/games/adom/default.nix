@@ -1,13 +1,12 @@
-{ stdenv, fetchurl, patchelf, zlib, libmad, libpng12, libcaca, mesa, alsaLib, libpulseaudio
+{ stdenv, fetchurl, patchelf, zlib, libmad, libpng12, libcaca, libGLU, libGL, alsaLib, libpulseaudio
 , xorg }:
 
-assert stdenv.system == "x86_64-linux";
 let
 
   inherit (xorg) libXext libX11;
 
   lpath = "${stdenv.cc.cc.lib}/lib64:" + stdenv.lib.makeLibraryPath [
-      zlib libmad libpng12 libcaca libXext libX11 mesa alsaLib libpulseaudio];
+      zlib libmad libpng12 libcaca libXext libX11 libGLU libGL alsaLib libpulseaudio];
 
 in
 stdenv.mkDerivation rec {
@@ -50,7 +49,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A rogue-like game with nice graphical interface";
-    homepage = http://adom.de/;
+    homepage = "http://adom.de/";
     license = licenses.unfreeRedistributable;
     maintainers = [maintainers.smironov];
 
@@ -58,5 +57,3 @@ stdenv.mkDerivation rec {
     platforms = ["x86_64-linux"];
   };
 }
-
-

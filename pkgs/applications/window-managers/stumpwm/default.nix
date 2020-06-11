@@ -1,4 +1,4 @@
-{ stdenv, pkgs, fetchgit, autoconf, sbcl, lispPackages, xdpyinfo, texinfo4
+{ stdenv, fetchgit, autoconf, sbcl, lispPackages, xdpyinfo, texinfo4
 , makeWrapper , rlwrap, gnused, gnugrep, coreutils, xprop
 , extraModulePaths ? []
 , version }:
@@ -10,27 +10,33 @@ let
     sha256 = "1ml6mjk2fsfv4sf65fdbji3q5x0qiq99g1k8w7a99gsl2i8h60gc";
   });
   versionSpec = {
-    "latest" = {
+    latest = {
+      name = "1.0.0";
+      rev = "refs/tags/1.0.0";
+      sha256 = "16r0lwhxl8g71masmfbjr7s7m7fah4ii4smi1g8zpbpiqjz48ryb";
+      patches = [];
+    };
+    "0.9.9" = {
       name = "0.9.9";
       rev = "refs/tags/0.9.9";
       sha256 = "0hmvbdk2yr5wrkiwn9dfzf65s4xc2qifj0sn6w2mghzp96cph79k";
       patches = [ ./fix-module-path.patch ];
     };
-    "git" = {
-        name = "git-20160617";
-        rev = "7d5b5eb76aa656baf5a8713f514937765f66b10a";
-	sha256 = "1jpj978r54086hypjxqxi0r3zacqpkr61dp6dbi0lykgx7m5bjfb";
-	patches = [];
+    git = {
+        name = "git-20170203";
+        rev = "d20f24e58ab62afceae2afb6262ffef3cc318b97";
+        sha256 = "1gi29ds1x6dq7lz8lamnhcvcrr3cvvrg5yappfkggyhyvib1ii70";
+        patches = [];
     };
   }.${version};
 in
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   name = "stumpwm-${versionSpec.name}";
 
   src = fetchgit {
     url = "https://github.com/stumpwm/stumpwm";
-    rev = "${versionSpec.rev}";
-    sha256 = "${versionSpec.sha256}";
+    rev = versionSpec.rev;
+    sha256 = versionSpec.sha256;
   };
 
   # NOTE: The patch needs an update for the next release.
@@ -42,6 +48,7 @@ stdenv.mkDerivation rec {
     sbcl
     lispPackages.clx
     lispPackages.cl-ppcre
+    lispPackages.alexandria
     xdpyinfo
   ];
 
@@ -83,14 +90,14 @@ stdenv.mkDerivation rec {
   '';
 
   passthru = {
-    inherit sbcl lispPackages;
+    inherit sbcl lispPackages contrib;
   };
 
   meta = with stdenv.lib; {
     description = "A tiling window manager for X11";
-    homepage    = https://github.com/stumpwm/;
+    homepage    = "https://github.com/stumpwm/";
     license     = licenses.gpl2Plus;
-    maintainers = with maintainers; [ the-kenny ];
     platforms   = platforms.linux;
+    broken = true; # 2018-04-11
   };
 }

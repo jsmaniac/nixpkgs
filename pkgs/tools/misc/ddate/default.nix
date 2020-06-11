@@ -11,10 +11,10 @@ stdenv.mkDerivation {
   buildInputs = [ cmake ];
 
   meta = {
-    homepage = https://github.com/bo0ts/ddate;
+    homepage = "https://github.com/bo0ts/ddate";
     description = "Discordian version of the date program";
     license = stdenv.lib.licenses.publicDomain;
     maintainers = with stdenv.lib.maintainers; [kovirobi];
-    platforms = with stdenv.lib.platforms; linux;
+    platforms = stdenv.lib.platforms.all;
   };
 }

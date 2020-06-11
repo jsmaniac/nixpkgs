@@ -1,42 +1,57 @@
-{
-  kdeDerivation, kdeWrapper, fetchFromGitHub, fetchurl, lib,
-  ecm, kdoctools,
-  baloo, kconfig, kfilemetadata, kinit, kirigami, plasma-framework
+{ mkDerivation
+, fetchFromGitHub
+, lib
+, extra-cmake-modules
+, kdoctools
+, wrapGAppsHook
+, baloo
+, karchive
+, kconfig
+, kcrash
+, kfilemetadata
+, kinit
+, kirigami2
+, knewstuff
+, plasma-framework
 }:
 
-let
+mkDerivation rec {
   pname = "peruse";
-  version = "1.1";
-  unarr = fetchFromGitHub {
-    owner  = "zeniko";
-    repo   = "unarr";
-    rev    = "d1be8c43a82a4320306c8e835a86fdb7b2574ca7";
-    sha256 = "03ds5da69zipa25rsp76l6xqivrh3wcgygwyqa5x2rgcz3rjnlpr";
-  };
-  unwrapped = kdeDerivation rec {
-    name = "${pname}-${version}";
+  version = "1.2.20200208";
 
-    src = fetchurl {
-      url = "mirror://kde/stable/${pname}/${name}.tar.xz";
-      sha256 = "1akk9hg12y6iis0rb5kdkznm3xk7hk04r9ccqyz8lr6y073n5f9j";
-    };
-
-    nativeBuildInputs = [ ecm kdoctools ];
-
-    propagatedBuildInputs = [ baloo kconfig kfilemetadata kinit kirigami plasma-framework ];
-
-    preConfigure = ''
-      rmdir src/qtquick/karchive-rar/external/unarr
-      ln -s ${unarr} src/qtquick/karchive-rar/external/unarr
-    '';
-
-    meta = with lib; {
-      license = licenses.gpl2;
-      maintainers = with maintainers; [ peterhoeg ];
-    };
-
+  # The last formal release from 2016 uses kirigami1 which is deprecated
+  src = fetchFromGitHub {
+    owner = "KDE";
+    repo = pname;
+    rev = "4a1b3f954d2fe7e4919c0c5dbee1917776da582e";
+    sha256 = "1s5yy240x4cvrk93acygnrp5m10xp7ln013gdfbm0r5xvd8xy19k";
   };
 
-in kdeWrapper unwrapped {
-  targets = [ "bin/peruse" ];
+  nativeBuildInputs = [
+    extra-cmake-modules
+    kdoctools
+    wrapGAppsHook
+  ];
+
+  propagatedBuildInputs = [
+    baloo
+    karchive
+    kconfig
+    kcrash
+    kfilemetadata
+    kinit
+    kirigami2
+    knewstuff
+    plasma-framework
+  ];
+
+  pathsToLink = [ "/etc/xdg/peruse.knsrc" ];
+
+  meta = with lib; {
+    description = "A comic book reader";
+    homepage = "https://peruse.kde.org";
+    license = licenses.gpl2;
+    maintainers = with maintainers; [ peterhoeg ];
+  };
+
 }

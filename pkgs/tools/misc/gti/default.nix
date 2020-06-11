@@ -1,19 +1,15 @@
 { stdenv, fetchFromGitHub }:
 
 stdenv.mkDerivation rec {
-  name = "gti-${version}";
-  version = "2015-05-21";
+  pname = "gti";
+  version = "1.7.0";
 
   src = fetchFromGitHub {
     owner = "rwos";
     repo = "gti";
-    rev = "edaac795b0b0ff01f2347789f96c740c764bf376";
-    sha256 = "1wki7d61kcmv9s3xayky9cz84qa773x3y1z88y768hq8ifwadcbn";
+    rev = "v${version}";
+    sha256 = "1jivnjswlhwjfg5v9nwfg3vfssvqbdxxf9znwmfb5dgfblg9wxw9";
   };
-
-  prePatch = ''
-    substituteInPlace Makefile --replace gcc cc
-  '';
 
   installPhase = ''
     mkdir -p $out/bin $out/share/man/man6
@@ -22,7 +18,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = with stdenv.lib; {
-    homepage = http://r-wos.org/hacks/gti;
+    homepage = "http://r-wos.org/hacks/gti";
     license = licenses.mit;
     description = "Humorous typo-based git runner; drives a car over the terminal";
     maintainers = with maintainers; [ fadenb ];

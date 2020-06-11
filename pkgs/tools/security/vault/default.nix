@@ -1,27 +1,37 @@
-{ stdenv, lib, buildGoPackage, fetchFromGitHub }:
+{ stdenv, fetchFromGitHub, buildGoPackage, installShellFiles }:
 
 buildGoPackage rec {
-  name = "vault-${version}";
-  version = "0.6.1";
-
-  goPackagePath = "github.com/hashicorp/vault";
+  pname = "vault";
+  version = "1.4.2";
 
   src = fetchFromGitHub {
     owner = "hashicorp";
     repo = "vault";
     rev = "v${version}";
-    sha256 = "06xf2dpn0q398qb6wbh9j1wjl5smqq9nrrn2039g48haqm8853jx";
+    sha256 = "0aschysngs6f50plqkqbnhgl6zryd0bpypr50zd45cgww7jvvqd4";
   };
 
-  buildFlagsArray = ''
-    -ldflags=
-      -X github.com/hashicorp/vault/version.GitCommit=${version}
+  goPackagePath = "github.com/hashicorp/vault";
+
+  subPackages = [ "." ];
+
+  nativeBuildInputs = [ installShellFiles ];
+
+  buildFlagsArray = [
+    "-tags='vault'"
+    "-ldflags=\"-X github.com/hashicorp/vault/sdk/version.GitCommit='v${version}'\""
+  ];
+
+  postInstall = ''
+    echo "complete -C $out/bin/vault vault" > vault.bash
+    installShellCompletion vault.bash
   '';
 
   meta = with stdenv.lib; {
-    homepage = https://www.vaultproject.io;
+    homepage = "https://www.vaultproject.io/";
     description = "A tool for managing secrets";
+    platforms = platforms.linux ++ platforms.darwin;
     license = licenses.mpl20;
-    maintainers = [ maintainers.rushmorem ];
+    maintainers = with maintainers; [ rushmorem lnl7 offline pradeepchhetri ];
   };
 }

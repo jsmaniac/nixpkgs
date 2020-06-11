@@ -1,17 +1,17 @@
-{ fetchurl, fetchFromGitHub, stdenv, wxGTK30, freeimage, cmake, zziplib, mesa, boost,
-  pkgconfig, libuuid, openal, ogre, ois, curl, gtk2, pixman, mygui, unzip,
+{ fetchFromGitHub, stdenv, wxGTK30, freeimage, cmake, zziplib, libGLU, libGL, boost,
+  pkgconfig, libuuid, openal, ogre, ois, curl, gtk2, mygui, unzip,
   angelscript, ogrepaged, mysocketw, libxcb
   }:
 
 stdenv.mkDerivation rec {
-  version = "git-20160412";
-  name = "rigsofrods-${version}";
+  version = "0.4.7.0";
+  pname = "rigsofrods";
 
   src = fetchFromGitHub {
     owner = "RigsOfRods";
     repo = "rigs-of-rods";
-    rev = "1ebd359dbd467b4c3171dd6d054e7d8ec39f78ba";
-    sha256 = "0h71nrgq5r5cnh20c7wl8jzyaf50dj1b5jdrwihnklpsfyfvjlw4";
+    rev = version;
+    sha256 = "0cb1il7qm45kfhh6h6jwfpxvjlh2dmg8z1yz9kj4d6098myf2lg4";
   };
 
   enableParallelBuilding = true;
@@ -25,15 +25,16 @@ stdenv.mkDerivation rec {
     ln -s $out/share/rigsofrods/{RoR,RoRConfig} $out/bin
   '';
 
-  buildInputs = [ wxGTK30 freeimage cmake zziplib mesa boost pkgconfig
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ wxGTK30 freeimage cmake zziplib libGLU libGL boost
     libuuid openal ogre ois curl gtk2 mygui unzip angelscript
     ogrepaged mysocketw libxcb ];
 
   meta = {
     description = "3D simulator game where you can drive, fly and sail various vehicles";
-    homepage = http://rigsofrods.sourceforge.net/;
+    homepage = "http://rigsofrods.sourceforge.net/";
     license = stdenv.lib.licenses.gpl3;
-    maintainers = with stdenv.lib.maintainers; [viric raskin];
+    maintainers = with stdenv.lib.maintainers; [raskin];
     platforms = stdenv.lib.platforms.linux;
     hydraPlatforms = [];
   };

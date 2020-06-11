@@ -1,28 +1,63 @@
-{ stdenv, fetchFromGitHub
-, legacySupport ? false }:
+{ stdenv, fetchFromGitHub, fetchpatch, cmake, gnugrep
+, fixDarwinDylibNames
+, file
+, legacySupport ? false
+, enableShared ? true }:
 
 stdenv.mkDerivation rec {
-  name = "zstd-${version}";
-  version = "1.1.1";
+  pname = "zstd";
+  version = "1.4.5";
 
   src = fetchFromGitHub {
-    sha256 = "18snd1jiz0j6r1yk4vkgqmil2gbzwxgmcv2chvpnc5i93pp18hri";
-    rev = "v${version}";
-    repo = "zstd";
     owner = "facebook";
+    repo = "zstd";
+    rev = "v${version}";
+    sha256 = "0ay3qlk4sffnmcl3b34q4zd7mkcmjds023icmib1mdli97qcp38l";
   };
 
-  # The Makefiles don't properly use file targets, but blindly rebuild
-  # all dependencies on every make invocation. So no nice phases. :-(
-  phases = [ "unpackPhase" "installPhase" "fixupPhase" ];
+  nativeBuildInputs = [ cmake ]
+   ++ stdenv.lib.optional stdenv.isDarwin fixDarwinDylibNames;
 
-  makeFlags = [
-    "ZSTD_LEGACY_SUPPORT=${if legacySupport then "1" else "0"}"
-  ];
+  patches = [
+    ./playtests-darwin.patch
+    (fetchpatch {
+      url = "https://github.com/facebook/zstd/pull/2163.patch";
+      sha256 = "07mfjc5f9wy0w2xlj36hyf7g5ax9r2rf6ixhkffhnwc6rwy0q54p";
+    })
+  ] # This I didn't upstream because if you use posix threads with MinGW it will
+    # work fine, and I'm not sure how to write the condition.
+    ++ stdenv.lib.optional stdenv.hostPlatform.isWindows ./mcfgthreads-no-pthread.patch;
 
-  installFlags = [
-    "PREFIX=$(out)"
+  cmakeFlags = [
+    "-DZSTD_BUILD_SHARED:BOOL=${if enableShared then "ON" else "OFF"}"
+    # They require STATIC for bin/zstd and tests.
+    "-DZSTD_LEGACY_SUPPORT:BOOL=${if legacySupport then "ON" else "OFF"}"
+    "-DZSTD_BUILD_TESTS:BOOL=ON"
   ];
+  cmakeDir = "../build/cmake";
+  dontUseCmakeBuildDir = true;
+  preConfigure = ''
+    mkdir -p build_ && cd $_
+  '';
+
+  checkInputs = [ file ];
+  doCheck = true;
+  checkPhase = ''
+    runHook preCheck
+    ctest -R playTests # The only relatively fast test.
+    runHook postCheck
+  '';
+
+  preInstall = ''
+    substituteInPlace ../programs/zstdgrep \
+      --replace ":-grep" ":-${gnugrep}/bin/grep" \
+      --replace ":-zstdcat" ":-$out/bin/zstdcat"
+
+    substituteInPlace ../programs/zstdless \
+      --replace "zstdcat" "$out/bin/zstdcat"
+  '';
+  # Don't duplicate the library code in runtime closures.
+  postInstall = stdenv.lib.optionalString enableShared ''rm "$out"/lib/libzstd.a'';
 
   meta = with stdenv.lib; {
     description = "Zstandard real-time compression algorithm";
@@ -35,11 +70,10 @@ stdenv.mkDerivation rec {
       speed is preserved and remain roughly the same at all settings, a
       property shared by most LZ compression algorithms, such as zlib.
     '';
-    homepage = http://www.zstd.net/;
-    # The licence of the CLI programme is GPLv2+, that of the library BSD-2.
-    license = with licenses; [ gpl2Plus bsd2 ];
+    homepage = "https://facebook.github.io/zstd/";
+    license = with licenses; [ bsd3 ]; # Or, at your opinion, GPL-2.0-only.
 
-    platforms = platforms.unix;
-    maintainers = with maintainers; [ nckx ];
+    platforms = platforms.all;
+    maintainers = with maintainers; [ orivej ];
   };
 }

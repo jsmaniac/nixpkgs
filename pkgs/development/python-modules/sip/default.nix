@@ -1,24 +1,44 @@
-{ lib, fetchurl, mkPythonDerivation, python, isPyPy }:
+{ lib, fetchurl, buildPythonPackage, python, isPyPy, sip-module ? "sip" }:
 
-if isPyPy then throw "sip not supported for interpreter ${python.executable}" else mkPythonDerivation rec {
-  name = "sip-4.18.1";
+buildPythonPackage rec {
+  pname = sip-module;
+  version = "4.19.22";
+  format = "other";
+
+  disabled = isPyPy;
 
   src = fetchurl {
-    url = "mirror://sourceforge/pyqt/sip/${name}/${name}.tar.gz";
-    sha256 = "1452zy3g0qv4fpd9c0y4gq437kn0xf7bbfniibv5n43zpwnpmklv";
+    url = "https://www.riverbankcomputing.com/static/Downloads/sip/${version}/sip-${version}.tar.gz";
+    sha256 = "0idywc326l8v1m3maprg1aq2gph67mmnnsskvlwfx8n19s16idz1";
   };
 
   configurePhase = ''
     ${python.executable} ./configure.py \
-      -d $out/lib/${python.libPrefix}/site-packages \
+      --sip-module ${sip-module} \
+      -d $out/${python.sitePackages} \
       -b $out/bin -e $out/include
   '';
+
+  enableParallelBuilding = true;
+
+  installCheckPhase = let
+    modules = [
+      sip-module
+      "sipconfig"
+    ];
+    imports = lib.concatMapStrings (module: "import ${module};") modules;
+  in ''
+    echo "Checking whether modules can be imported..."
+    PYTHONPATH=$out/${python.sitePackages}:$PYTHONPATH ${python.interpreter} -c "${imports}"
+  '';
+
+  doCheck = true;
 
   meta = with lib; {
     description = "Creates C++ bindings for Python modules";
     homepage    = "http://www.riverbankcomputing.co.uk/";
     license     = licenses.gpl2Plus;
-    maintainers = with maintainers; [ lovek323 sander urkud ];
+    maintainers = with maintainers; [ lovek323 sander ];
     platforms   = platforms.all;
   };
 }

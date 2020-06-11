@@ -1,24 +1,75 @@
-{ stdenv
+{stdenv
+, removeReferencesTo
+, lib
 , fetchFromGitHub
-, autoreconfHook }:
+, utillinux
+, openssl
+, coreutils
+, go
+, which
+, makeWrapper
+, squashfsTools
+, buildGoPackage}:
 
-stdenv.mkDerivation rec {
-  name = "singularity-${version}";
-  version = "2.2";
+with lib;
+
+buildGoPackage rec {
+  pname = "singularity";
+  version = "3.2.1";
 
   src = fetchFromGitHub {
-    owner = "singularityware";
+    owner = "sylabs";
     repo = "singularity";
-    rev = version;
-    sha256 = "19g43gfdy5s8y4252474cp39d6ypn5dd37wp0s21fgd13vqy26px";
+    rev = "v${version}";
+    sha256 = "14lhxwy21s7q081x7kbnvkjsbxgsg2f181qlzmlxcn6n7gfav3kj";
   };
 
-  buildInputs = [ autoreconfHook ];
+  goPackagePath = "github.com/sylabs/singularity";
+  goDeps = ./deps.nix;
+
+  buildInputs = [ openssl utillinux ];
+  nativeBuildInputs = [ removeReferencesTo which makeWrapper ];
+  propagatedBuildInputs = [ coreutils squashfsTools ];
+
+  prePatch = ''
+    substituteInPlace internal/pkg/build/copy/copy.go \
+      --replace /bin/cp ${coreutils}/bin/cp
+  '';
+
+  postConfigure = ''
+    cd go/src/github.com/sylabs/singularity
+
+    patchShebangs .
+    sed -i 's|defaultPath := "[^"]*"|defaultPath := "${stdenv.lib.makeBinPath propagatedBuildInputs}"|' cmd/internal/cli/actions.go
+
+    ./mconfig -V ${version} -p $out --localstatedir=/var
+
+    # Don't install SUID binaries
+    sed -i 's/-m 4755/-m 755/g' builddir/Makefile
+
+  '';
+
+  buildPhase = ''
+    make -C builddir
+  '';
+
+  installPhase = ''
+    make -C builddir install LOCALSTATEDIR=$out/var
+    chmod 755 $out/libexec/singularity/bin/starter-suid
+    wrapProgram $out/bin/singularity --prefix PATH : ${stdenv.lib.makeBinPath propagatedBuildInputs}
+  '';
+
+  postFixup = ''
+    find $out/libexec/ -type f -executable -exec remove-references-to -t ${go} '{}' + || true
+
+    # These etc scripts shouldn't have their paths patched
+    cp etc/actions/* $out/etc/singularity/actions/
+  '';
 
   meta = with stdenv.lib; {
-    homepage = http://singularity.lbl.gov/;
-    description = "Designed around the notion of extreme mobility of compute and reproducible science, Singularity enables users to have full control of their operating system environment";
-    license = "BSD license with 2 modifications";
+    homepage = "http://www.sylabs.io/";
+    description = "Application containers for linux";
+    license = licenses.bsd3;
     platforms = platforms.linux;
     maintainers = [ maintainers.jbedo ];
   };

@@ -1,28 +1,40 @@
 { stdenv, fetchFromGitHub, asciidoc-full, gettext
-, gobjectIntrospection, gtk3, hicolor_icon_theme, libnotify, librsvg
-, pythonPackages, udisks2, wrapGAppsHook }:
+, gobject-introspection, gtk3, libappindicator-gtk3, libnotify, librsvg
+, udisks2, wrapGAppsHook
+, python3Packages
+}:
 
-pythonPackages.buildPythonApplication rec {
-  name = "udiskie-${version}";
-  version = "1.5.1";
+python3Packages.buildPythonApplication rec {
+  pname = "udiskie";
+  version = "2.2.0";
 
   src = fetchFromGitHub {
     owner = "coldfix";
     repo = "udiskie";
     rev = version;
-    sha256 = "01x5fvllb262x6r3547l23z7p6hr7ddz034bkhmj2cqmf83sxwxd";
+    sha256 = "0kn5w6bm3rmbszphzbxpjfnkawb2naa230svzkpmh3n6dcdvk4qa";
   };
 
-  buildInputs = [
+  nativeBuildInputs = [
+    gettext
     asciidoc-full        # For building man page.
-    hicolor_icon_theme
+    gobject-introspection
     wrapGAppsHook
-    librsvg              # required for loading svg icons (udiskie uses svg icons)
   ];
 
-  propagatedBuildInputs = [
-    gettext gobjectIntrospection gtk3 libnotify pythonPackages.docopt
-    pythonPackages.pygobject3 pythonPackages.pyyaml udisks2
+  buildInputs = [
+    librsvg              # required for loading svg icons (udiskie uses svg icons)
+    gobject-introspection
+    libnotify
+    gtk3
+    udisks2
+    libappindicator-gtk3
+  ];
+
+  propagatedBuildInputs = with python3Packages; [
+    docopt
+    pygobject3
+    pyyaml
   ];
 
   postBuild = "make -C doc";
@@ -32,13 +44,19 @@ pythonPackages.buildPythonApplication rec {
     cp -v doc/udiskie.8 $out/share/man/man8/
   '';
 
-  # tests require dbusmock
-  doCheck = false;
+  checkInputs = with python3Packages; [
+    nose
+    keyutils
+  ];
+
+  checkPhase = ''
+    nosetests
+  '';
 
   meta = with stdenv.lib; {
     description = "Removable disk automounter for udisks";
     license = licenses.mit;
-    homepage = https://github.com/coldfix/udiskie;
+    homepage = "https://github.com/coldfix/udiskie";
     maintainers = with maintainers; [ AndersonTorres ];
   };
 }

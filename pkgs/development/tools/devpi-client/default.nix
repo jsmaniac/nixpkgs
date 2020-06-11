@@ -1,26 +1,59 @@
-{ stdenv, fetchurl, pythonPackages, glibcLocales} :
+{ stdenv
+, buildPythonApplication
+, fetchPypi
+# buildInputs
+, glibcLocales
+, pkginfo
+, check-manifest
+# propagatedBuildInputs
+, py
+, devpi-common
+, pluggy
+, setuptools
+# CheckInputs
+, pytest
+, pytest-flake8
+, webtest
+, mock
+, devpi-server
+, tox
+, sphinx
+, wheel
+, git
+, mercurial
+}:
 
-pythonPackages.buildPythonApplication rec {
-  name = "devpi-client-${version}";
-  version = "2.7.0";
+buildPythonApplication rec {
+  pname = "devpi-client";
+  version = "5.2.0";
 
-  src = fetchurl {
-    url = "mirror://pypi/d/devpi-client/${name}.tar.gz";
-    sha256 = "0z7vaf0a66n82mz0vx122pbynjvkhp2mjf9lskgyv09y3bxzzpj3";
+  src = fetchPypi {
+    inherit pname version;
+    sha256 = "1y8r1pjav0gyrbnyqjnc202sa962n1gasi8233xj7jc39lv3iq40";
   };
 
-  doCheck = false;
+  buildInputs = [ glibcLocales pkginfo check-manifest ];
+
+  propagatedBuildInputs = [ py devpi-common pluggy setuptools ];
+
+  checkInputs = [
+    pytest pytest-flake8 webtest mock
+    devpi-server tox
+    sphinx wheel git mercurial
+  ];
+
+  # --fast skips tests which try to start a devpi-server improperly
+  checkPhase = ''
+    HOME=$TMPDIR py.test --fast
+  '';
 
   LC_ALL = "en_US.UTF-8";
-  buildInputs = with pythonPackages; [ glibcLocales tox check-manifest pkginfo ];
 
-  propagatedBuildInputs = with pythonPackages; [ py devpi-common ];
-
-  meta = {
-    homepage = http://doc.devpi.net;
-    description = "Github-style pypi index server and packaging meta tool";
-    license = stdenv.lib.licenses.mit;
-    maintainers = with stdenv.lib.maintainers; [ lewo makefu ];
-
+  meta = with stdenv.lib; {
+    homepage = "http://doc.devpi.net";
+    description = "Client for devpi, a pypi index server and packaging meta tool";
+    license = licenses.mit;
+    maintainers = with maintainers; [ lewo makefu ];
   };
+
 }

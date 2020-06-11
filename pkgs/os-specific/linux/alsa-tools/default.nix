@@ -3,18 +3,16 @@
 # some use gtk2, some gtk3 (and some even fltk13).
 
 stdenv.mkDerivation rec {
-  name = "alsa-tools-${version}";
-  version = "1.1.0";
+  pname = "alsa-tools";
+  version = "1.2.2";
 
   src = fetchurl {
-    urls = [
-      "ftp://ftp.alsa-project.org/pub/tools/${name}.tar.bz2"
-      "http://alsa.cybermirror.org/tools/${name}.tar.bz2"
-    ];
-    sha256 = "0ldbaz3qr7z0639xg37ba7cmrb512rrjavap6r5jjl0ab665ad3x";
+    url = "mirror://alsa/tools/${pname}-${version}.tar.bz2";
+    sha256 = "0jbkjmq038zapj66a7nkppdf644v2mwj581xbmh6k4i8w6mcglxz";
   };
 
-  buildInputs = [ alsaLib pkgconfig gtk2 gtk3 fltk13 ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ alsaLib gtk2 gtk3 fltk13 ];
 
   patchPhase = ''
     export tools="as10k1 hda-verb hdspmixer echomixer hdajackretask hdspconf hwmixvolume mixartloader rmedigicontrol sscape_ctl vxloader envy24control hdajacksensetest hdsploader ld10k1 pcxhrloader sb16_csp us428control"
@@ -40,8 +38,8 @@ stdenv.mkDerivation rec {
     done
   '';
 
-  meta = {
-    homepage = http://www.alsa-project.org/;
+  meta = with stdenv.lib; {
+    homepage = "http://www.alsa-project.org/";
     description = "ALSA, the Advanced Linux Sound Architecture tools";
 
     longDescription = ''
@@ -49,7 +47,8 @@ stdenv.mkDerivation rec {
       MIDI functionality to the Linux-based operating system.
     '';
 
-    platforms = stdenv.lib.platforms.linux;
-    maintainers = [ stdenv.lib.maintainers.fps ];
+    license = licenses.gpl2;
+    platforms = platforms.linux;
+    maintainers = [ maintainers.fps ];
   };
 }

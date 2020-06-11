@@ -1,16 +1,16 @@
 { stdenv, fetchurl, fetchgit, autogen, flex, bison, python, autoconf, automake
-, gettext, ncurses, libusb, freetype, qemu, devicemapper
+, gettext, ncurses, libusb-compat-0_1, freetype, qemu, lvm2
 , for_HP_laptop ? false
 }:
 
 with stdenv.lib;
 let
   pcSystems = {
-    "i686-linux".target = "i386";
-    "x86_64-linux".target = "i386";
+    i686-linux.target = "i386";
+    x86_64-linux.target = "i386";
   };
 
-  inPCSystems = any (system: stdenv.system == system) (mapAttrsToList (name: _: name) pcSystems);
+  inPCSystems = any (system: stdenv.hostPlatform.system == system) (mapAttrsToList (name: _: name) pcSystems);
 
   version = if for_HP_laptop then "1.2.1" else "1.2.0";
 
@@ -21,7 +21,7 @@ let
 
   po_src = fetchurl {
     name = "grub-2.02-beta2.tar.gz";
-    url = "http://alpha.gnu.org/gnu/grub/grub-2.02~beta2.tar.gz";
+    url = "https://alpha.gnu.org/gnu/grub/grub-2.02~beta2.tar.gz";
     sha256 = "1lr9h3xcx0wwrnkxdnkfjwy08j7g7mdlmmbdip2db4zfgi69h0rm";
 
   };
@@ -29,7 +29,8 @@ let
 in
 
 stdenv.mkDerivation rec {
-  name = "trustedGRUB2-${version}";
+  pname = "trustedGRUB2";
+  inherit version;
 
   src = if for_HP_laptop
         then fetchgit {
@@ -44,15 +45,17 @@ stdenv.mkDerivation rec {
         };
 
   nativeBuildInputs = [ autogen flex bison python autoconf automake ];
-  buildInputs = [ ncurses libusb freetype gettext devicemapper ]
+  buildInputs = [ ncurses libusb-compat-0_1 freetype gettext lvm2 ]
     ++ optional doCheck qemu;
 
   hardeningDisable = [ "stackprotector" "pic" ];
 
+  NIX_CFLAGS_COMPILE = "-Wno-error"; # generated code redefines yyfree
+
   preConfigure =
     '' for i in "tests/util/"*.in
        do
-         sed -i "$i" -e's|/bin/bash|/bin/sh|g'
+         sed -i "$i" -e's|/bin/bash|${stdenv.shell}|g'
        done
 
        # Apparently, the QEMU executable is no longer called
@@ -82,20 +85,16 @@ stdenv.mkDerivation rec {
 
   # save target that grub is compiled for
   grubTarget = if inPCSystems
-               then "${pcSystems.${stdenv.system}.target}-pc"
+               then "${pcSystems.${stdenv.hostPlatform.system}.target}-pc"
                else "";
 
   doCheck = false;
   enableParallelBuilding = true;
 
-  postInstall = ''
-    paxmark pms $out/sbin/grub-{probe,bios-setup}
-  '';
-
   meta = with stdenv.lib; {
     description = "GRUB 2.0 extended with TCG (TPM) support for integrity measured boot process (trusted boot)";
-    homepage = https://github.com/Sirrix-AG/TrustedGRUB2;
+    homepage = "https://github.com/Sirrix-AG/TrustedGRUB2";
     license = licenses.gpl3Plus;
-    platforms = platforms.gnu;
+    platforms = platforms.gnu ++ platforms.linux;
   };
 }

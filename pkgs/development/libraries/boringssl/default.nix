@@ -1,31 +1,40 @@
 { stdenv, fetchgit, cmake, perl, go }:
 
-stdenv.mkDerivation rec {
-  name = "boringssl-${version}";
-  version = "2016-03-08";
+# reference: https://boringssl.googlesource.com/boringssl/+/2661/BUILDING.md
+stdenv.mkDerivation {
+  pname = "boringssl";
+  version = "2019-12-04";
 
   src = fetchgit {
     url    = "https://boringssl.googlesource.com/boringssl";
-    rev    = "bfb38b1a3c5e37d43188bbd02365a87bebc8d122";
-    sha256 = "0bm7vqg3bk716xmw2af99p44zizfhknq9z3cphf7klfdrr7ibqm5";
+    rev    = "243b5cc9e33979ae2afa79eaa4e4c8d59db161d4";
+    sha256 = "1ak27dln0zqy2vj4llqsb99g03sk0sg25wlp09b58cymrh3gccvl";
   };
 
-  buildInputs = [ cmake perl go ];
+  nativeBuildInputs = [ cmake perl go ];
   enableParallelBuilding = true;
-  NIX_CFLAGS_COMPILE = "-Wno-error";
+
+  makeFlags = [ "GOCACHE=$(TMPDIR)/go-cache" ];
 
   installPhase = ''
-    mkdir -p $out/bin $out/include $out/lib
+    mkdir -p $bin/bin $out/include $out/lib
 
-    mv tool/bssl    $out/bin
-    mv ssl/libssl.a $out/lib
+    mv tool/bssl $bin/bin
+
+    mv ssl/libssl.a           $out/lib
+    mv crypto/libcrypto.a     $out/lib
+    mv decrepit/libdecrepit.a $out/lib
+
     mv ../include/openssl $out/include
   '';
 
-  meta = {
+  outputs = [ "out" "bin" ];
+
+  meta = with stdenv.lib; {
     description = "Free TLS/SSL implementation";
     homepage    = "https://boringssl.googlesource.com";
-    platforms   = stdenv.lib.platforms.all;
-    maintainers = [ stdenv.lib.maintainers.thoughtpolice ];
+    platforms   = platforms.all;
+    maintainers = [ maintainers.thoughtpolice ];
+    license = with licenses; [ openssl isc mit bsd3 ];
   };
 }

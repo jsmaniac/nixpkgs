@@ -1,45 +1,45 @@
-{ stdenv, fetchFromGitHub, pythonPackages, wrapGAppsHook
-, gst_all_1, glib_networking, gobjectIntrospection
-}:
+{ newScope, python }:
 
-pythonPackages.buildPythonApplication rec {
-  name = "mopidy-${version}";
+# Create a custom scope so we are consistent in which python version is used
 
-  version = "2.0.1";
+let
+  callPackage = newScope self;
 
-  src = fetchFromGitHub {
-    owner = "mopidy";
-    repo = "mopidy";
-    rev = "v${version}";
-    sha256 = "15i17rj2bh2kda6d6rwcjhs2m3nfsrcyq3lj9vbgmacg0cdb22pp";
+  self = {
+
+    inherit python;
+    pythonPackages = python.pkgs;
+
+    mopidy = callPackage ./mopidy.nix { };
+
+    mopidy-gmusic = callPackage ./gmusic.nix { };
+
+    mopidy-local-images = callPackage ./local-images.nix { };
+
+    mopidy-local-sqlite = callPackage ./local-sqlite.nix { };
+
+    mopidy-spotify = callPackage ./spotify.nix { };
+
+    mopidy-moped = callPackage ./moped.nix { };
+
+    mopidy-mopify = callPackage ./mopify.nix { };
+
+    mopidy-mpd = callPackage ./mpd.nix { };
+
+    mopidy-mpris = callPackage ./mpris.nix { };
+
+    mopidy-somafm = callPackage ./somafm.nix { };
+
+    mopidy-spotify-tunigo = callPackage ./spotify-tunigo.nix { };
+
+    mopidy-youtube = callPackage ./youtube.nix { };
+
+    mopidy-soundcloud = callPackage ./soundcloud.nix { };
+
+    mopidy-musicbox-webclient = callPackage ./musicbox-webclient.nix { };
+
+    mopidy-iris = callPackage ./iris.nix { };
+
   };
 
-  nativeBuildInputs = [ wrapGAppsHook ];
-
-  buildInputs = with gst_all_1; [
-    gst-plugins-base gst-plugins-good gst-plugins-ugly
-    glib_networking gobjectIntrospection
-  ];
-
-  propagatedBuildInputs = with pythonPackages; [
-    gst-python pygobject3 pykka tornado requests2 dbus-python
-  ];
-
-  # There are no tests
-  doCheck = false;
-
-  preFixup = ''
-    gappsWrapperArgs+=(--prefix GST_PLUGIN_SYSTEM_PATH : "$GST_PLUGIN_SYSTEM_PATH")
-  '';
-
-  meta = with stdenv.lib; {
-    homepage = http://www.mopidy.com/;
-    description = ''
-      An extensible music server that plays music from local disk, Spotify,
-      SoundCloud, Google Play Music, and more
-    '';
-    license = licenses.asl20;
-    maintainers = with maintainers; [ rickynils fpletz ];
-    hydraPlatforms = [];
-  };
-}
+in self

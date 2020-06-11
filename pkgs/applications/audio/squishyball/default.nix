@@ -16,6 +16,8 @@ stdenv.mkDerivation rec {
 
   buildInputs = [ flac libao libvorbis ncurses opusfile ];
 
+  NIX_CFLAGS_COMPILE = "-DNCURSES_INTERNALS";
+
   patches = [ ./gnu-screen.patch ];
 
   postInstall = ''
@@ -40,7 +42,7 @@ stdenv.mkDerivation rec {
        comparisons of groups of up to ten samples; this is the default
        mode of operation.
     '';
-    homepage = https://svn.xiph.org/trunk/squishyball;
+    homepage = "https://svn.xiph.org/trunk/squishyball";
     license = licenses.gpl2Plus;
     maintainers = with maintainers; [ michalrus ];
     platforms = platforms.linux;

@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg   = config.services.terraria;
-  worldSizeMap = { "small" = 1; "medium" = 2; "large" = 3; };
+  worldSizeMap = { small = 1; medium = 2; large = 3; };
   valFlag = name: val: optionalString (val != null) "-${name} \"${escape ["\\" "\""] (toString val)}\"";
   boolFlag = name: val: optionalString val "-${name}";
   flags = [ 
@@ -18,6 +18,16 @@ let
     (boolFlag "secure" cfg.secure)
     (boolFlag "noupnp" cfg.noUPnP)
   ];
+  stopScript = pkgs.writeScript "terraria-stop" ''
+    #!${pkgs.runtimeShell}
+
+    if ! [ -d "/proc/$1" ]; then
+      exit 0
+    fi
+
+    ${getBin pkgs.tmux}/bin/tmux -S /var/lib/terraria/terraria.sock send-keys Enter exit Enter
+    ${getBin pkgs.coreutils}/bin/tail --pid="$1" -f /dev/null
+  '';
 in
 {
   options = {
@@ -64,7 +74,7 @@ in
       };
 
       worldPath = mkOption {
-        type        = types.path;
+        type        = types.nullOr types.path;
         default     = null;
         description = ''
           The path to the world file (<literal>.wld</literal>) which should be loaded.
@@ -105,14 +115,14 @@ in
   };
 
   config = mkIf cfg.enable {
-    users.extraUsers.terraria = {
+    users.users.terraria = {
       description = "Terraria server service user";
       home        = "/var/lib/terraria";
       createHome  = true;
       uid         = config.ids.uids.terraria;
     };
 
-    users.extraGroups.terraria = {
+    users.groups.terraria = {
       gid = config.ids.gids.terraria;
       members = [ "terraria" ];
     };
@@ -124,10 +134,10 @@ in
 
       serviceConfig = {
         User    = "terraria";
-        Type = "oneshot";
-        RemainAfterExit = true;
-        ExecStart = "${pkgs.tmux.bin}/bin/tmux -S /var/lib/terraria/terraria.sock new -d ${pkgs.terraria-server}/bin/TerrariaServer ${concatStringsSep " " flags}";
-        ExecStop = "${pkgs.tmux.bin}/bin/tmux -S /var/lib/terraria/terraria.sock send-keys Enter \"exit\" Enter";
+        Type = "forking";
+        GuessMainPID = true;
+        ExecStart = "${getBin pkgs.tmux}/bin/tmux -S /var/lib/terraria/terraria.sock new -d ${pkgs.terraria-server}/bin/TerrariaServer ${concatStringsSep " " flags}";
+        ExecStop = "${stopScript} $MAINPID";
       };
 
       postStart = ''

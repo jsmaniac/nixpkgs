@@ -1,37 +1,33 @@
-{ stdenv, fetchurl, pythonPackages, makeWrapper, gettext, git }:
+{ stdenv, fetchFromGitHub, python3Packages, gettext, git, qt5 }:
 
 let
-  inherit (pythonPackages) buildPythonApplication pyqt4 sip pyinotify python mock;
-in buildPythonApplication rec {
-  name = "git-cola-${version}";
-  version = "2.8";
+  inherit (python3Packages) buildPythonApplication pyqt5 sip pyinotify;
 
-  src = fetchurl {
-    url = "https://github.com/git-cola/git-cola/archive/v${version}.tar.gz";
-    sha256 = "19ff7i0h5fznrkm17lp3xkxwkq27whhiil6y6bm16b1wny5hjqlr";
+in buildPythonApplication rec {
+  pname = "git-cola";
+  version = "3.5";
+
+  src = fetchFromGitHub {
+    owner = "git-cola";
+    repo = "git-cola";
+    rev = "v${version}";
+    sha256 = "09b60jbpdr4czx7h4vqahqmmi7m9vn77jlkpjfhys7crrdnxjp9i";
   };
 
-  buildInputs = [ git makeWrapper gettext ];
-  propagatedBuildInputs = [ pyqt4 sip pyinotify ];
-
-  # HACK: wrapPythonPrograms adds 'import sys; sys.argv[0] = "git-cola"', but
-  # "import __future__" must be placed above that. This removes the argv[0] line.
-  postFixup = ''
-    wrapPythonPrograms
-
-    sed -i "$out/bin/.git-dag-wrapped" -e '{
-      /import sys; sys.argv/d
-    }'
-    
-    sed -i "$out/bin/.git-cola-wrapped" -e '{
-      /import sys; sys.argv/d
-    }'
-  '';
+  buildInputs = [ git gettext ];
+  propagatedBuildInputs = [ pyqt5 sip pyinotify ];
+  nativeBuildInputs = [ qt5.wrapQtAppsHook ];
 
   doCheck = false;
 
+  postFixup = ''
+    wrapQtApp $out/bin/git-cola
+    wrapQtApp $out/bin/git-dag
+
+  '';
+
   meta = with stdenv.lib; {
-    homepage = https://github.com/git-cola/git-cola;
+    homepage = "https://github.com/git-cola/git-cola";
     description = "A sleek and powerful Git GUI";
     license = licenses.gpl2;
     platforms = platforms.linux;

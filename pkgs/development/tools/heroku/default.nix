@@ -1,28 +1,32 @@
-{ stdenv, fetchurl, postgresql, ruby, makeWrapper, nodejs-6_x }:
+{ stdenv, lib, fetchurl, makeWrapper, nodejs }:
 
-with stdenv.lib;
 stdenv.mkDerivation rec {
-  version = "3.43.2";
-  name = "heroku-${version}";
-
-  meta = {
-    homepage = "https://toolbelt.heroku.com";
-    description = "Everything you need to get started using Heroku";
-    maintainers = with maintainers; [ aflatter mirdhyn ];
-    license = licenses.mit;
-    platforms = with platforms; unix;
-  };
+  pname = "heroku";
+  version = "7.41.1";
 
   src = fetchurl {
-    url = "https://s3.amazonaws.com/assets.heroku.com/heroku-client/heroku-client-${version}.tgz";
-    sha256 = "1sapbxg7pzi89c95k0vsp8k5bysggkjf58jwck2xs0y4ly36wbnc";
+    url = "https://cli-assets.heroku.com/heroku-v${version}/heroku-v${version}.tar.xz";
+    sha256 = "12ilk0rkpwx8n9b7dird2jfmwnkqndlwjf5wgdcbl014mkl1411b";
   };
 
+  nativeBuildInputs = [ makeWrapper ];
+
+  dontBuild = true;
+
   installPhase = ''
-    mkdir -p $out
-    cp -R * $out/
-    wrapProgram $out/bin/heroku --set HEROKU_NODE_PATH ${nodejs-6_x}/bin/node
+    mkdir -p $out/share/heroku $out/bin
+    cp -pr * $out/share/heroku
+    substituteInPlace $out/share/heroku/bin/run \
+      --replace "/usr/bin/env node" "${nodejs}/bin/node"
+    makeWrapper $out/share/heroku/bin/run $out/bin/heroku \
+      --set HEROKU_DISABLE_AUTOUPDATE 1
   '';
 
-  buildInputs = [ ruby postgresql makeWrapper ];
+  meta = {
+    homepage = "https://cli.heroku.com";
+    description = "Everything you need to get started using Heroku";
+    maintainers = with lib.maintainers; [ aflatter mirdhyn peterhoeg marsam ];
+    license = lib.licenses.mit;
+    platforms = with lib.platforms; unix;
+  };
 }

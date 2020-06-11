@@ -1,15 +1,17 @@
-{ stdenv, fetchurl, cmake, bison, ncurses, openssl, readline, zlib, perl
-, boost, cctools, CoreServices }:
+{ stdenv, fetchurl, cmake, bison, pkgconfig
+, boost, libedit, libevent, lz4, ncurses, openssl, protobuf, readline, zlib, perl
+, cctools, CoreServices, developer_cmds }:
 
 # Note: zlib is not required; MySQL can use an internal zlib.
 
-stdenv.mkDerivation rec {
-  name = "mysql-${version}";
-  version = "5.7.16";
+let
+self = stdenv.mkDerivation rec {
+  pname = "mysql";
+  version = "5.7.27";
 
   src = fetchurl {
-    url = "mirror://mysql/MySQL-5.7/${name}.tar.gz";
-    sha256 = "198qhd9bdm0fnpp307mgby2aar92yzya0937kxi7bcpdfjcvada9";
+    url = "mirror://mysql/MySQL-5.7/${pname}-${version}.tar.gz";
+    sha256 = "1fhv16zr46pxm1j8vb8x8mh3nwzglg01arz8gnazbmjqldr5idpq";
   };
 
   preConfigure = stdenv.lib.optional stdenv.isDarwin ''
@@ -17,20 +19,29 @@ stdenv.mkDerivation rec {
     export PATH=$PATH:$TMPDIR
   '';
 
-  buildInputs = [ cmake bison ncurses openssl readline zlib boost ]
-     ++ stdenv.lib.optionals stdenv.isDarwin [ perl cctools CoreServices ];
+  nativeBuildInputs = [ cmake bison pkgconfig ];
 
-  enableParallelBuilding = true;
+  buildInputs = [ boost libedit libevent lz4 ncurses openssl protobuf readline zlib ]
+     ++ stdenv.lib.optionals stdenv.isDarwin [ perl cctools CoreServices developer_cmds ];
+
+  outputs = [ "out" "static" ];
 
   cmakeFlags = [
+    "-DCMAKE_SKIP_BUILD_RPATH=OFF" # To run libmysql/libmysql_api_test during build.
     "-DWITH_SSL=yes"
-    "-DWITH_READLINE=yes"
     "-DWITH_EMBEDDED_SERVER=yes"
-    "-DWITH_ZLIB=yes"
+    "-DWITH_UNIT_TESTS=no"
+    "-DWITH_EDITLINE=system"
+    "-DWITH_LIBEVENT=system"
+    "-DWITH_LZ4=system"
+    "-DWITH_PROTOBUF=system"
+    "-DWITH_ZLIB=system"
+    "-DWITH_ARCHIVE_STORAGE_ENGINE=yes"
+    "-DWITH_BLACKHOLE_STORAGE_ENGINE=yes"
+    "-DWITH_FEDERATED_STORAGE_ENGINE=yes"
     "-DHAVE_IPV6=yes"
     "-DMYSQL_UNIX_ADDR=/run/mysqld/mysqld.sock"
     "-DMYSQL_DATADIR=/var/lib/mysql"
-    "-DINSTALL_SYSCONFDIR=etc/mysql"
     "-DINSTALL_INFODIR=share/mysql/docs"
     "-DINSTALL_MANDIR=share/man"
     "-DINSTALL_PLUGINDIR=lib/mysql/plugin"
@@ -39,26 +50,36 @@ stdenv.mkDerivation rec {
     "-DINSTALL_DOCREADMEDIR=share/mysql"
     "-DINSTALL_SUPPORTFILESDIR=share/mysql"
     "-DINSTALL_MYSQLSHAREDIR=share/mysql"
+    "-DINSTALL_MYSQLTESTDIR="
     "-DINSTALL_DOCDIR=share/mysql/docs"
     "-DINSTALL_SHAREDIR=share/mysql"
   ];
 
+  CXXFLAGS = "-fpermissive -std=c++11";
   NIX_LDFLAGS = stdenv.lib.optionalString stdenv.isLinux "-lgcc_s";
 
   prePatch = ''
-    sed -i -e "s|/usr/bin/libtool|libtool|" cmake/libutils.cmake
+    sed -i -e "s|/usr/bin/libtool|libtool|" cmake/merge_archives.cmake.in
   '';
   postInstall = ''
-    sed -i -e "s|basedir=\"\"|basedir=\"$out\"|" $out/bin/mysql_install_db
-    rm -r $out/mysql-test "$out"/lib/*.a
-    rm $out/share/man/man1/mysql-test-run.pl.1
+    moveToOutput "lib/*.a" $static
+    ln -s libmysqlclient${stdenv.hostPlatform.extensions.sharedLibrary} $out/lib/libmysqlclient_r${stdenv.hostPlatform.extensions.sharedLibrary}
   '';
 
-  passthru.mysqlVersion = "5.7";
-
-  meta = {
-    homepage = http://www.mysql.com/;
-    description = "The world's most popular open source database";
-    platforms = stdenv.lib.platforms.unix;
+  passthru = {
+    client = self;
+    connector-c = self;
+    server = self;
+    mysqlVersion = "5.7";
   };
-}
+
+  meta = with stdenv.lib; {
+    homepage = "https://www.mysql.com/";
+    description = "The world's most popular open source database";
+    platforms = platforms.unix;
+    license = with licenses; [
+      artistic1 bsd0 bsd2 bsd3 bsdOriginal
+      gpl2 lgpl2 lgpl21 mit publicDomain licenses.zlib
+    ];
+  };
+}; in self

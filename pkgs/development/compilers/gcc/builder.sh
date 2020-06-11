@@ -1,152 +1,155 @@
 source $stdenv/setup
 
 
-export NIX_FIXINC_DUMMY=$NIX_BUILD_TOP/dummy
-mkdir $NIX_FIXINC_DUMMY
+oldOpts="$(shopt -po nounset)" || true
+set -euo pipefail
+
+
+export NIX_FIXINC_DUMMY="$NIX_BUILD_TOP/dummy"
+mkdir "$NIX_FIXINC_DUMMY"
 
 
 if test "$staticCompiler" = "1"; then
     EXTRA_LDFLAGS="-static"
 else
-    EXTRA_LDFLAGS="-Wl,-rpath,$lib/lib"
+    EXTRA_LDFLAGS="-Wl,-rpath,${!outputLib}/lib"
 fi
 
 
 # GCC interprets empty paths as ".", which we don't want.
-if test -z "$CPATH"; then unset CPATH; fi
-if test -z "$LIBRARY_PATH"; then unset LIBRARY_PATH; fi
-echo "\$CPATH is \`$CPATH'"
-echo "\$LIBRARY_PATH is \`$LIBRARY_PATH'"
+if test -z "${CPATH-}"; then unset CPATH; fi
+if test -z "${LIBRARY_PATH-}"; then unset LIBRARY_PATH; fi
+echo "\$CPATH is \`${CPATH-}'"
+echo "\$LIBRARY_PATH is \`${LIBRARY_PATH-}'"
 
 if test "$noSysDirs" = "1"; then
 
-    if test -e $NIX_CC/nix-support/orig-libc; then
+    declare \
+        EXTRA_FLAGS_FOR_BUILD EXTRA_FLAGS EXTRA_FLAGS_FOR_TARGET \
+        EXTRA_LDFLAGS_FOR_BUILD EXTRA_LDFLAGS_FOR_TARGET
 
-        # Figure out what extra flags to pass to the gcc compilers
-        # being generated to make sure that they use our glibc.
-        extraFlags="$(cat $NIX_CC/nix-support/libc-cflags)"
-        extraLDFlags="$(cat $NIX_CC/nix-support/libc-ldflags) $(cat $NIX_CC/nix-support/libc-ldflags-before || true)"
+    # Extract flags from Bintools Wrappers
+    for post in '_FOR_BUILD' ''; do
+        curBintools="NIX_BINTOOLS${post}"
 
-        # Use *real* header files, otherwise a limits.h is generated
-        # that does not include Glibc's limits.h (notably missing
-        # SSIZE_MAX, which breaks the build).
-        export NIX_FIXINC_DUMMY=$libc_dev/include
+        declare -a extraLDFlags=()
+        if [[ -e "${!curBintools}/nix-support/orig-libc" ]]; then
+            # Figure out what extra flags when linking to pass to the gcc
+            # compilers being generated to make sure that they use our libc.
+            extraLDFlags=($(< "${!curBintools}/nix-support/libc-ldflags") $(< "${!curBintools}/nix-support/libc-ldflags-before" || true))
 
-        # The path to the Glibc binaries such as `crti.o'.
-        glibc_libdir="$(cat $NIX_CC/nix-support/orig-libc)/lib"
-
-    else
-        # Hack: support impure environments.
-        extraFlags="-isystem /usr/include"
-        extraLDFlags="-L/usr/lib64 -L/usr/lib"
-        glibc_libdir="/usr/lib"
-        export NIX_FIXINC_DUMMY=/usr/include
-    fi
-
-    extraFlags="-I$NIX_FIXINC_DUMMY $extraFlags"
-    extraLDFlags="-L$glibc_libdir -rpath $glibc_libdir $extraLDFlags"
-
-    # BOOT_CFLAGS defaults to `-g -O2'; since we override it below,
-    # make sure to explictly add them so that files compiled with the
-    # bootstrap compiler are optimized and (optionally) contain
-    # debugging information (info "(gccinstall) Building").
-    if test -n "$dontStrip"; then
-        extraFlags="-O2 -g $extraFlags"
-    else
-        # Don't pass `-g' at all; this saves space while building.
-        extraFlags="-O2 $extraFlags"
-    fi
-
-    EXTRA_FLAGS="$extraFlags"
-    for i in $extraLDFlags; do
-        EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,$i"
+            # The path to the Libc binaries such as `crti.o'.
+            libc_libdir="$(< "${!curBintools}/nix-support/orig-libc")/lib"
+        else
+            # Hack: support impure environments.
+            extraLDFlags=("-L/usr/lib64" "-L/usr/lib")
+            libc_libdir="/usr/lib"
+        fi
+        extraLDFlags=("-L$libc_libdir" "-rpath" "$libc_libdir"
+                      "${extraLDFlags[@]}")
+        for i in "${extraLDFlags[@]}"; do
+            declare EXTRA_LDFLAGS${post}+=" -Wl,$i"
+        done
     done
 
-    if test -n "$targetConfig"; then
-        # Cross-compiling, we need gcc not to read ./specs in order to build
-        # the g++ compiler (after the specs for the cross-gcc are created).
-        # Having LIBRARY_PATH= makes gcc read the specs from ., and the build
-        # breaks. Having this variable comes from the default.nix code to bring
-        # gcj in.
-        unset LIBRARY_PATH
-        unset CPATH
-    else
-        if test -z "$NIX_CC_CROSS"; then
-            EXTRA_TARGET_CFLAGS="$EXTRA_FLAGS"
-            EXTRA_TARGET_CXXFLAGS="$EXTRA_FLAGS"
-            EXTRA_TARGET_LDFLAGS="$EXTRA_LDFLAGS"
+    # Extract flags from CC Wrappers
+    for post in '_FOR_BUILD' ''; do
+        curCC="NIX_CC${post}"
+        curFIXINC="NIX_FIXINC_DUMMY${post}"
+
+        declare -a extraFlags=()
+        if [[ -e "${!curCC}/nix-support/orig-libc" ]]; then
+            # Figure out what extra compiling flags to pass to the gcc compilers
+            # being generated to make sure that they use our libc.
+            extraFlags=($(< "${!curCC}/nix-support/libc-cflags"))
+
+            # The path to the Libc headers
+            libc_devdir="$(< "${!curCC}/nix-support/orig-libc-dev")"
+
+            # Use *real* header files, otherwise a limits.h is generated that
+            # does not include Libc's limits.h (notably missing SSIZE_MAX,
+            # which breaks the build).
+            declare NIX_FIXINC_DUMMY${post}="$libc_devdir/include"
         else
-            # This the case of cross-building the gcc.
-            # We need special flags for the target, different than those of the build
-            # Assertion:
-            test -e $NIX_CC_CROSS/nix-support/orig-libc
-
-            # Figure out what extra flags to pass to the gcc compilers
-            # being generated to make sure that they use our glibc.
-            extraFlags="$(cat $NIX_CC_CROSS/nix-support/libc-cflags)"
-            extraLDFlags="$(cat $NIX_CC_CROSS/nix-support/libc-ldflags) $(cat $NIX_CC_CROSS/nix-support/libc-ldflags-before)"
-
-            # The path to the Glibc binaries such as `crti.o'.
-            glibc_dir="$(cat $NIX_CC_CROSS/nix-support/orig-libc)"
-            glibc_libdir="$glibc_dir/lib"
-            glibc_devdir="$(cat $NIX_CC_CROSS/nix-support/orig-libc-dev)"
-            configureFlags="$configureFlags --with-native-system-header-dir=$glibc_devdir/include"
-
-            # Use *real* header files, otherwise a limits.h is generated
-            # that does not include Glibc's limits.h (notably missing
-            # SSIZE_MAX, which breaks the build).
-            NIX_FIXINC_DUMMY_CROSS="$glibc_devdir/include"
-
-            extraFlags="-I$NIX_FIXINC_DUMMY_CROSS $extraFlags"
-            extraLDFlags="-L$glibc_libdir -rpath $glibc_libdir $extraLDFlags"
-
-            EXTRA_TARGET_CFLAGS="$extraFlags"
-            for i in $extraLDFlags; do
-                EXTRA_TARGET_LDFLAGS="$EXTRA_TARGET_LDFLAGS -Wl,$i"
-            done
+            # Hack: support impure environments.
+            extraFlags=("-isystem" "/usr/include")
+            declare NIX_FIXINC_DUMMY${post}=/usr/include
         fi
+
+        extraFlags=("-I${!curFIXINC}" "${extraFlags[@]}")
+
+        # BOOT_CFLAGS defaults to `-g -O2'; since we override it below, make
+        # sure to explictly add them so that files compiled with the bootstrap
+        # compiler are optimized and (optionally) contain debugging information
+        # (info "(gccinstall) Building").
+        if test -n "${dontStrip-}"; then
+            extraFlags=("-O2" "-g" "${extraFlags[@]}")
+        else
+            # Don't pass `-g' at all; this saves space while building.
+            extraFlags=("-O2" "${extraFlags[@]}")
+        fi
+
+        declare EXTRA_FLAGS${post}="${extraFlags[*]}"
+    done
+
+    if test -z "${targetConfig-}"; then
+        # host = target, so the flags are the same
+        EXTRA_FLAGS_FOR_TARGET="$EXTRA_FLAGS"
+        EXTRA_LDFLAGS_FOR_TARGET="$EXTRA_LDFLAGS"
     fi
 
     # CFLAGS_FOR_TARGET are needed for the libstdc++ configure script to find
     # the startfiles.
     # FLAGS_FOR_TARGET are needed for the target libraries to receive the -Bxxx
     # for the startfiles.
-    makeFlagsArray+=( \
-        NATIVE_SYSTEM_HEADER_DIR="$NIX_FIXINC_DUMMY" \
-        SYSTEM_HEADER_DIR="$NIX_FIXINC_DUMMY" \
-        CFLAGS_FOR_BUILD="$EXTRA_FLAGS $EXTRA_LDFLAGS" \
-        CXXFLAGS_FOR_BUILD="$EXTRA_FLAGS $EXTRA_LDFLAGS" \
-        CFLAGS_FOR_TARGET="$EXTRA_TARGET_CFLAGS $EXTRA_TARGET_LDFLAGS" \
-        CXXFLAGS_FOR_TARGET="$EXTRA_TARGET_CFLAGS $EXTRA_TARGET_LDFLAGS" \
-        FLAGS_FOR_TARGET="$EXTRA_TARGET_CFLAGS $EXTRA_TARGET_LDFLAGS" \
-        LDFLAGS_FOR_BUILD="$EXTRA_FLAGS $EXTRA_LDFLAGS" \
-        LDFLAGS_FOR_TARGET="$EXTRA_TARGET_LDFLAGS $EXTRA_TARGET_LDFLAGS" \
-        )
+    makeFlagsArray+=(
+        "BUILD_SYSTEM_HEADER_DIR=$NIX_FIXINC_DUMMY_FOR_BUILD"
+        "SYSTEM_HEADER_DIR=$NIX_FIXINC_DUMMY_FOR_BUILD"
+        "NATIVE_SYSTEM_HEADER_DIR=$NIX_FIXINC_DUMMY"
 
-    if test -z "$targetConfig"; then
-        makeFlagsArray+=( \
-            BOOT_CFLAGS="$EXTRA_FLAGS $EXTRA_LDFLAGS" \
-            BOOT_LDFLAGS="$EXTRA_TARGET_CFLAGS $EXTRA_TARGET_LDFLAGS" \
-            )
+        "LDFLAGS_FOR_BUILD=$EXTRA_LDFLAGS_FOR_BUILD"
+        #"LDFLAGS=$EXTRA_LDFLAGS"
+        "LDFLAGS_FOR_TARGET=$EXTRA_LDFLAGS_FOR_TARGET"
+
+        "CFLAGS_FOR_BUILD=$EXTRA_FLAGS_FOR_BUILD $EXTRA_LDFLAGS_FOR_BUILD"
+        "CXXFLAGS_FOR_BUILD=$EXTRA_FLAGS_FOR_BUILD $EXTRA_LDFLAGS_FOR_BUILD"
+        "FLAGS_FOR_BUILD=$EXTRA_FLAGS_FOR_BUILD $EXTRA_LDFLAGS_FOR_BUILD"
+
+        # It seems there is a bug in GCC 5
+        #"CFLAGS=$EXTRA_FLAGS $EXTRA_LDFLAGS"
+        #"CXXFLAGS=$EXTRA_FLAGS $EXTRA_LDFLAGS"
+
+        "CFLAGS_FOR_TARGET=$EXTRA_FLAGS_FOR_TARGET $EXTRA_LDFLAGS_FOR_TARGET"
+        "CXXFLAGS_FOR_TARGET=$EXTRA_FLAGS_FOR_TARGET $EXTRA_LDFLAGS_FOR_TARGET"
+        "FLAGS_FOR_TARGET=$EXTRA_FLAGS_FOR_TARGET $EXTRA_LDFLAGS_FOR_TARGET"
+    )
+
+    if test -z "${targetConfig-}"; then
+        makeFlagsArray+=(
+            "BOOT_CFLAGS=$EXTRA_FLAGS $EXTRA_LDFLAGS"
+            "BOOT_LDFLAGS=$EXTRA_FLAGS_FOR_TARGET $EXTRA_LDFLAGS_FOR_TARGET"
+        )
     fi
 
-    if test -n "$targetConfig" -a "$crossStageStatic" == 1; then
+    if test "$crossStageStatic" == 1; then
         # We don't want the gcc build to assume there will be a libc providing
-        # limits.h in this stagae
-        makeFlagsArray+=( \
-            LIMITS_H_TEST=false \
-            )
+        # limits.h in this stage
+        makeFlagsArray+=(
+            'LIMITS_H_TEST=false'
+        )
     else
-        makeFlagsArray+=( \
-            LIMITS_H_TEST=true \
-            )
+        makeFlagsArray+=(
+            'LIMITS_H_TEST=true'
+        )
     fi
 fi
 
-if test -n "$targetConfig"; then
+if test -n "${targetConfig-}"; then
     # The host strip will destroy some important details of the objects
     dontStrip=1
 fi
+
+eval "$oldOpts"
 
 providedPreConfigure="$preConfigure";
 preConfigure() {
@@ -198,32 +201,35 @@ postConfigure() {
 
 
 preInstall() {
+    mkdir -p "$out/${targetConfig}/lib"
+    mkdir -p "${!outputLib}/${targetConfig}/lib"
     # Make ‘lib64’ symlinks to ‘lib’.
     if [ -n "$is64bit" -a -z "$enableMultilib" ]; then
-        mkdir -p "$out/lib"
-        ln -s lib "$out/lib64"
-        mkdir -p "$lib/lib"
-        ln -s lib "$lib/lib64"
+        ln -s lib "$out/${targetConfig}/lib64"
+        ln -s lib "${!outputLib}/${targetConfig}/lib64"
     fi
 }
 
 
 postInstall() {
-    # Move runtime libraries to $lib.
-    moveToOutput "lib/lib*.so*" "$lib"
-    moveToOutput "lib/lib*.la"  "$lib"
-    moveToOutput "share/gcc-*/python" "$lib"
+    # Move runtime libraries to lib output.
+    moveToOutput "${targetConfig+$targetConfig/}lib/lib*.so*" "${!outputLib}"
+    moveToOutput "${targetConfig+$targetConfig/}lib/lib*.la"  "${!outputLib}"
+    moveToOutput "${targetConfig+$targetConfig/}lib/lib*.dylib" "${!outputLib}"
+    moveToOutput "${targetConfig+$targetConfig/}lib/lib*.dll.a" "${!outputLib}"
+    moveToOutput "share/gcc-*/python" "${!outputLib}"
 
-    for i in "$lib"/lib/*.{la,py}; do
-        substituteInPlace "$i" --replace "$out" "$lib"
+    for i in "${!outputLib}/${targetConfig}"/lib/*.{la,py}; do
+        substituteInPlace "$i" --replace "$out" "${!outputLib}"
     done
 
     if [ -n "$enableMultilib" ]; then
-        moveToOutput "lib64/lib*.so*" "$lib"
-        moveToOutput "lib64/lib*.la"  "$lib"
+        moveToOutput "${targetConfig+$targetConfig/}lib64/lib*.so*" "${!outputLib}"
+        moveToOutput "${targetConfig+$targetConfig/}lib64/lib*.la"  "${!outputLib}"
+        moveToOutput "${targetConfig+$targetConfig/}lib64/lib*.dylib" "${!outputLib}"
 
-        for i in "$lib"/lib64/*.{la,py}; do
-            substituteInPlace "$i" --replace "$out" "$lib"
+        for i in "${!outputLib}/${targetConfig}"/lib64/*.{la,py}; do
+            substituteInPlace "$i" --replace "$out" "${!outputLib}"
         done
     fi
 
@@ -242,12 +248,15 @@ postInstall() {
             NEW_RPATH=`echo "$PREV_RPATH" | sed 's,:[^:]*bootstrap-tools/lib,,g'`
             patchelf --set-rpath "$NEW_RPATH" "$i" && echo OK
         done
+    fi
 
-        # For some reason the libs retain RPATH to $out
-        for i in "$lib"/lib/{libtsan,libasan,libubsan}.so.*.*.*; do
-            PREV_RPATH=`patchelf --print-rpath "$i"`
-            NEW_RPATH=`echo "$PREV_RPATH" | sed "s,:${out}[^:]*,,g"`
-            patchelf --set-rpath "$NEW_RPATH" "$i" && echo OK
+    if type "install_name_tool"; then
+        for i in "${!outputLib}"/lib/*.*.dylib; do
+            install_name_tool -id "$i" "$i" || true
+            for old_path in $(otool -L "$i" | grep "$out" | awk '{print $1}'); do
+              new_path=`echo "$old_path" | sed "s,$out,${!outputLib},"`
+              install_name_tool -change "$old_path" "$new_path" "$i" || true
+            done
         done
     fi
 
@@ -266,13 +275,6 @@ postInstall() {
             ln -sfn g++ $i
         fi
     done
-
-    # Disable RANDMMAP on grsec, which causes segfaults when using
-    # precompiled headers.
-    # See https://bugs.gentoo.org/show_bug.cgi?id=301299#c31
-    paxmark r $out/libexec/gcc/*/*/{cc1,cc1plus}
-
-    eval "$postInstallGhdl"
 
     # Two identical man pages are shipped (moving and compressing is done later)
     ln -sf gcc.1 "$out"/share/man/man1/g++.1

@@ -1,32 +1,38 @@
-{ stdenv, lib, fetchFromGitHub, rustPlatform, pkgconfig
-, libsodium, libarchive, openssl }:
+{ stdenv, fetchFromGitHub, rustPlatform, pkgconfig
+, libsodium, libarchive, openssl, zeromq }:
 
-with rustPlatform;
-
-buildRustPackage rec {
-  name = "habitat-${version}";
-  version = "0.8.0";
+rustPlatform.buildRustPackage rec {
+  pname = "habitat";
+  # Newer versions required protobuf, which requires some finesse to get to
+  # compile with the vendored protobuf crate.
+  version = "0.90.6";
 
   src = fetchFromGitHub {
     owner = "habitat-sh";
     repo = "habitat";
     rev = version;
-    sha256 = "1h9wv2v4hcv79jkkjf8j96lzxni9d51755zfflfr5s3ayaip7rzj";
+    sha256 = "0rwi0lkmhlq4i8fba3s9nd9ajhz2dqxzkgfp5i8y0rvbfmhmfd6b";
   };
 
-  sourceRoot = "habitat-${version}-src/components/hab";
-
-  depsSha256 = "1612jaw3zdrgrb56r755bb18l8szdmf1wi7p9lpv3d2gklqcb7l1";
-
-  buildInputs = [ libsodium libarchive openssl ];
+  cargoSha256 = "08sncz0jgsr2s821j3s4bk7d54xqwmnld7m57avavym1xqvsnbmy";
 
   nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ libsodium libarchive openssl zeromq ];
 
-  meta = with lib; {
+  cargoBuildFlags = ["--package hab"];
+
+  checkPhase = ''
+    runHook preCheck
+    echo "Running cargo test"
+    cargo test --package hab
+    runHook postCheck
+  '';
+
+  meta = with stdenv.lib; {
     description = "An application automation framework";
-    homepage = https://www.habitat.sh;
+    homepage = "https://www.habitat.sh";
     license = licenses.asl20;
-    maintainers = [ maintainers.rushmorem ];
-    platforms = [ "x86_64-linux" "x86_64-darwin" ];
+    maintainers = with maintainers; [ rushmorem ];
+    platforms = [ "x86_64-linux" ];
   };
 }

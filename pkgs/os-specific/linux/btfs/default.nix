@@ -1,26 +1,21 @@
-{ stdenv, fetchFromGitHub, autoreconfHook, pkgconfig,
-  python, boost, fuse, libtorrentRasterbar, curl }:
+{ stdenv, fetchFromGitHub, autoreconfHook, pkgconfig
+, python3, boost, fuse, libtorrentRasterbar, curl }:
 
 stdenv.mkDerivation rec {
-  name = "btfs-${version}";
-  version = "2.12";
+  pname = "btfs";
+  version = "2.21";
 
   src = fetchFromGitHub {
-    owner = "johang";
-    repo = "btfs";
-    rev = "daeb2fd43795f0bb9a4861279b6064b35186ff25";
-    sha256 = "1apvf1gp5973s4wlzwndxp711yd9pj9zf2ypdssfxv2a3rihly2b";
+    owner  = "johang";
+    repo   = pname;
+    rev    = "v${version}";
+    sha256 = "0zqkzfc49jl9kn3m0cg7q0156xyzrdl5w4v70p16sqxdly86mwb0";
   };
 
+  nativeBuildInputs = [ autoreconfHook pkgconfig ];
   buildInputs = [
-    boost autoreconfHook pkgconfig
-    fuse libtorrentRasterbar curl
+    boost fuse libtorrentRasterbar curl python3
   ];
-
-  preInstall = ''
-    substituteInPlace scripts/btplay \
-      --replace "/usr/bin/env python" "${python}/bin/python"
-  '';
 
   meta = with stdenv.lib; {
     description = "A bittorrent filesystem based on FUSE";

@@ -1,30 +1,38 @@
-{ stdenv, fetchurl, cmake, shared ? false }:
+{ stdenv, fetchFromGitHub, fetchpatch, cmake, shared ? false }:
 
 stdenv.mkDerivation rec {
-  name = "pugixml-${version}";
-  version = "1.7";
+  pname = "pugixml";
+  version = "1.9";
 
-  src = fetchurl {
-    url = "https://github.com/zeux/pugixml/releases/download/v${version}/${name}.tar.gz";
-    sha256 = "1jpml475kbhs1aqwa48g2cbfxlrb9qp115m2j9yryxhxyr30vqgv";
+  src = fetchFromGitHub {
+    owner = "zeux";
+    repo = "pugixml";
+    rev = "v${version}";
+    sha256 = "0iraznwm78pyyzc9snvd3dyz8gddvmxsm1b3kpw7wixkvcawdviv";
   };
 
-  nativeBuildInputs = [ cmake ];
+  patches = [
+    # To be removed after a version newer than 1.9 is released
+    (fetchpatch {
+      url = "https://github.com/zeux/pugixml/pull/193.patch";
+      sha256 = "0s4anqlr2ppfibxyl29nrqbcprrg89k7il6303dm91s6620ydmka";
+    })
+  ];
 
-  sourceRoot = "${name}/scripts";
+  nativeBuildInputs = [ cmake ];
 
   cmakeFlags = [ "-DBUILD_SHARED_LIBS=${if shared then "ON" else "OFF"}" ];
 
   preConfigure = ''
     # Enable long long support (required for filezilla)
-    sed -ire '/PUGIXML_HAS_LONG_LONG/ s/^\/\///' ../src/pugiconfig.hpp
+    sed -ire '/PUGIXML_HAS_LONG_LONG/ s/^\/\///' src/pugiconfig.hpp
   '';
 
   meta = with stdenv.lib; {
     description = "Light-weight, simple and fast XML parser for C++ with XPath support";
-    homepage = http://pugixml.org/;
+    homepage = "https://pugixml.org";
     license = licenses.mit;
     maintainers = with maintainers; [ pSub ];
-    platforms = platforms.linux;
+    platforms = platforms.unix;
   };
 }

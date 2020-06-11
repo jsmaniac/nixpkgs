@@ -4,10 +4,14 @@ with lib;
 
 let
   cfg = config.services.matrix-synapse;
+  pg = config.services.postgresql;
+  usePostgresql = cfg.database_type == "psycopg2";
   logConfigFile = pkgs.writeText "log_config.yaml" cfg.logConfig;
-  mkResource = r: ''{names: ${builtins.toJSON r.names}, compress: ${fromBool r.compress}}'';
-  mkListener = l: ''{port: ${toString l.port}, bind_address: "${l.bind_address}", type: ${l.type}, tls: ${fromBool l.tls}, x_forwarded: ${fromBool l.x_forwarded}, resources: [${concatStringsSep "," (map mkResource l.resources)}]}'';
-  fromBool = x: if x then "true" else "false";
+  mkResource = r: ''{names: ${builtins.toJSON r.names}, compress: ${boolToString r.compress}}'';
+  mkListener = l: ''{port: ${toString l.port}, bind_address: "${l.bind_address}", type: ${l.type}, tls: ${boolToString l.tls}, x_forwarded: ${boolToString l.x_forwarded}, resources: [${concatStringsSep "," (map mkResource l.resources)}]}'';
+  pluginsEnv = cfg.package.python.buildEnv.override {
+    extraLibs = cfg.plugins;
+  };
   configFile = pkgs.writeText "homeserver.yaml" ''
 ${optionalString (cfg.tls_certificate_path != null) ''
 tls_certificate_path: "${cfg.tls_certificate_path}"
@@ -18,7 +22,7 @@ tls_private_key_path: "${cfg.tls_private_key_path}"
 ${optionalString (cfg.tls_dh_params_path != null) ''
 tls_dh_params_path: "${cfg.tls_dh_params_path}"
 ''}
-no_tls: ${fromBool cfg.no_tls}
+no_tls: ${boolToString cfg.no_tls}
 ${optionalString (cfg.bind_port != null) ''
 bind_port: ${toString cfg.bind_port}
 ''}
@@ -29,8 +33,7 @@ ${optionalString (cfg.bind_host != null) ''
 bind_host: "${cfg.bind_host}"
 ''}
 server_name: "${cfg.server_name}"
-pid_file: "/var/run/matrix-synapse.pid"
-web_client: ${fromBool cfg.web_client}
+pid_file: "/run/matrix-synapse.pid"
 ${optionalString (cfg.public_baseurl != null) ''
 public_baseurl: "${cfg.public_baseurl}"
 ''}
@@ -39,13 +42,12 @@ database: {
   name: "${cfg.database_type}",
   args: {
     ${concatStringsSep ",\n    " (
-      mapAttrsToList (n: v: "\"${n}\": ${v}") cfg.database_args
+      mapAttrsToList (n: v: "\"${n}\": ${builtins.toJSON v}") cfg.database_args
     )}
   }
 }
 event_cache_size: "${cfg.event_cache_size}"
 verbose: ${cfg.verbose}
-log_file: "/var/log/matrix-synapse/homeserver.log"
 log_config: "${logConfigFile}"
 rc_messages_per_second: ${cfg.rc_messages_per_second}
 rc_message_burst_count: ${cfg.rc_message_burst_count}
@@ -54,18 +56,23 @@ federation_rc_sleep_limit: ${cfg.federation_rc_sleep_limit}
 federation_rc_sleep_delay: ${cfg.federation_rc_sleep_delay}
 federation_rc_reject_limit: ${cfg.federation_rc_reject_limit}
 federation_rc_concurrent: ${cfg.federation_rc_concurrent}
-media_store_path: "/var/lib/matrix-synapse/media"
-uploads_path: "/var/lib/matrix-synapse/uploads"
+media_store_path: "${cfg.dataDir}/media"
+uploads_path: "${cfg.dataDir}/uploads"
 max_upload_size: "${cfg.max_upload_size}"
 max_image_pixels: "${cfg.max_image_pixels}"
-dynamic_thumbnails: ${fromBool cfg.dynamic_thumbnails}
-url_preview_enabled: False
+dynamic_thumbnails: ${boolToString cfg.dynamic_thumbnails}
+url_preview_enabled: ${boolToString cfg.url_preview_enabled}
+${optionalString (cfg.url_preview_enabled == true) ''
+url_preview_ip_range_blacklist: ${builtins.toJSON cfg.url_preview_ip_range_blacklist}
+url_preview_ip_range_whitelist: ${builtins.toJSON cfg.url_preview_ip_range_whitelist}
+url_preview_url_blacklist: ${builtins.toJSON cfg.url_preview_url_blacklist}
+''}
 recaptcha_private_key: "${cfg.recaptcha_private_key}"
 recaptcha_public_key: "${cfg.recaptcha_public_key}"
-enable_registration_captcha: ${fromBool cfg.enable_registration_captcha}
+enable_registration_captcha: ${boolToString cfg.enable_registration_captcha}
 turn_uris: ${builtins.toJSON cfg.turn_uris}
 turn_shared_secret: "${cfg.turn_shared_secret}"
-enable_registration: ${fromBool cfg.enable_registration}
+enable_registration: ${boolToString cfg.enable_registration}
 ${optionalString (cfg.registration_shared_secret != null) ''
 registration_shared_secret: "${cfg.registration_shared_secret}"
 ''}
@@ -73,16 +80,20 @@ recaptcha_siteverify_api: "https://www.google.com/recaptcha/api/siteverify"
 turn_user_lifetime: "${cfg.turn_user_lifetime}"
 user_creation_max_duration: ${cfg.user_creation_max_duration}
 bcrypt_rounds: ${cfg.bcrypt_rounds}
-allow_guest_access: ${fromBool cfg.allow_guest_access}
-trusted_third_party_id_servers: ${builtins.toJSON cfg.trusted_third_party_id_servers}
+allow_guest_access: ${boolToString cfg.allow_guest_access}
+
+account_threepid_delegates:
+  ${optionalString (cfg.account_threepid_delegates.email != null) "email: ${cfg.account_threepid_delegates.email}"}
+  ${optionalString (cfg.account_threepid_delegates.msisdn != null) "msisdn: ${cfg.account_threepid_delegates.msisdn}"}
+
 room_invite_state_types: ${builtins.toJSON cfg.room_invite_state_types}
 ${optionalString (cfg.macaroon_secret_key != null) ''
   macaroon_secret_key: "${cfg.macaroon_secret_key}"
 ''}
-expire_access_token: ${fromBool cfg.expire_access_token}
-enable_metrics: ${fromBool cfg.enable_metrics}
-report_stats: ${fromBool cfg.report_stats}
-signing_key_path: "/var/lib/matrix-synapse/homeserver.signing.key"
+expire_access_token: ${boolToString cfg.expire_access_token}
+enable_metrics: ${boolToString cfg.enable_metrics}
+report_stats: ${boolToString cfg.report_stats}
+signing_key_path: "${cfg.dataDir}/homeserver.signing.key"
 key_refresh_interval: "${cfg.key_refresh_interval}"
 perspectives:
   servers: {
@@ -97,10 +108,14 @@ perspectives:
     '') cfg.servers)}
     }
   }
+redaction_retention_period: ${toString cfg.redaction_retention_period}
 app_service_config_files: ${builtins.toJSON cfg.app_service_config_files}
 
 ${cfg.extraConfig}
 '';
+
+  hasLocalPostgresDB = let args = cfg.database_args; in
+    usePostgresql && (!(args ? host) || (elem args.host [ "localhost" "127.0.0.1" "::1" ]));
 in {
   options = {
     services.matrix-synapse = {
@@ -111,6 +126,14 @@ in {
         defaultText = "pkgs.matrix-synapse";
         description = ''
           Overridable attribute of the matrix synapse server package to use.
+        '';
+      };
+      plugins = mkOption {
+        type = types.listOf types.package;
+        default = [ ];
+        defaultText = "with config.services.matrix-synapse.package.plugins [ matrix-synapse-ldap3 matrix-synapse-pam ]";
+        description = ''
+          List of additional Matrix plugins to make available.
         '';
       };
       no_tls = mkOption {
@@ -152,7 +175,7 @@ in {
       tls_certificate_path = mkOption {
         type = types.nullOr types.str;
         default = null;
-        example = "/var/lib/matrix-synapse/homeserver.tls.crt";
+        example = "${cfg.dataDir}/homeserver.tls.crt";
         description = ''
           PEM encoded X509 certificate for TLS.
           You can replace the self-signed certificate that synapse
@@ -164,7 +187,7 @@ in {
       tls_private_key_path = mkOption {
         type = types.nullOr types.str;
         default = null;
-        example = "/var/lib/matrix-synapse/homeserver.tls.key";
+        example = "${cfg.dataDir}/homeserver.tls.key";
         description = ''
           PEM encoded private key for TLS. Specify null if synapse is not
           speaking TLS directly.
@@ -173,7 +196,7 @@ in {
       tls_dh_params_path = mkOption {
         type = types.nullOr types.str;
         default = null;
-        example = "/var/lib/matrix-synapse/homeserver.tls.dh";
+        example = "${cfg.dataDir}/homeserver.tls.dh";
         description = ''
           PEM dh parameters for ephemeral keys
         '';
@@ -181,18 +204,12 @@ in {
       server_name = mkOption {
         type = types.str;
         example = "example.com";
+        default = config.networking.hostName;
         description = ''
           The domain name of the server, with optional explicit port.
           This is used by remote servers to connect to this server,
           e.g. matrix.org, localhost:8080, etc.
           This is also the last part of your UserID.
-        '';
-      };
-      web_client = mkOption {
-        type = types.bool;
-        default = false;
-        description = ''
-          Whether to serve a web client from the HTTP/HTTPS root resource.
         '';
       };
       public_baseurl = mkOption {
@@ -336,16 +353,32 @@ in {
       };
       database_type = mkOption {
         type = types.enum [ "sqlite3" "psycopg2" ];
-        default = "sqlite3";
+        default = if versionAtLeast config.system.stateVersion "18.03"
+          then "psycopg2"
+          else "sqlite3";
         description = ''
           The database engine name. Can be sqlite or psycopg2.
         '';
       };
+      database_name = mkOption {
+        type = types.str;
+        default = "matrix-synapse";
+        description = "Database name.";
+      };
+      database_user = mkOption {
+        type = types.str;
+        default = "matrix-synapse";
+        description = "Database user name.";
+      };
       database_args = mkOption {
         type = types.attrs;
         default = {
-          database = "/var/lib/matrix-synapse/homeserver.db";
-        };
+          sqlite3 = { database = "${cfg.dataDir}/homeserver.db"; };
+          psycopg2 = {
+            user = cfg.database_user;
+            database = cfg.database_name;
+          };
+        }.${cfg.database_type};
         description = ''
           Arguments to pass to the engine.
         '';
@@ -354,6 +387,50 @@ in {
         type = types.str;
         default = "10K";
         description = "Number of events to cache in memory.";
+      };
+      url_preview_enabled = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Is the preview URL API enabled?  If enabled, you *must* specify an
+          explicit url_preview_ip_range_blacklist of IPs that the spider is
+          denied from accessing.
+        '';
+      };
+      url_preview_ip_range_blacklist = mkOption {
+        type = types.listOf types.str;
+        default = [
+          "127.0.0.0/8"
+          "10.0.0.0/8"
+          "172.16.0.0/12"
+          "192.168.0.0/16"
+          "100.64.0.0/10"
+          "169.254.0.0/16"
+          "::1/128"
+          "fe80::/64"
+          "fc00::/7"
+        ];
+        description = ''
+          List of IP address CIDR ranges that the URL preview spider is denied
+          from accessing.
+        '';
+      };
+      url_preview_ip_range_whitelist = mkOption {
+        type = types.listOf types.str;
+        default = [];
+        description = ''
+          List of IP address CIDR ranges that the URL preview spider is allowed
+          to access even if they are specified in
+          url_preview_ip_range_blacklist.
+        '';
+      };
+      url_preview_url_blacklist = mkOption {
+        type = types.listOf types.str;
+        default = [];
+        description = ''
+          Optional list of URL matches that the URL preview spider is
+          denied from accessing.
+        '';
       };
       recaptcha_private_key = mkOption {
         type = types.str;
@@ -482,11 +559,18 @@ in {
           accessible to anonymous users.
         '';
       };
-      trusted_third_party_id_servers = mkOption {
-        type = types.listOf types.str;
-        default = ["matrix.org"];
+      account_threepid_delegates.email = mkOption {
+        type = types.nullOr types.str;
+        default = null;
         description = ''
-          The list of identity servers trusted to verify third party identifiers by this server.
+          Delegate email sending to https://example.org
+        '';
+      };
+      account_threepid_delegates.msisdn = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          Delegate SMS sending to this local process (https://localhost:8090)
         '';
       };
       room_invite_state_types = mkOption {
@@ -527,11 +611,30 @@ in {
           A list of application service config file to use
         '';
       };
+      redaction_retention_period = mkOption {
+        type = types.int;
+        default = 7;
+        description = ''
+          How long to keep redacted events in unredacted form in the database.
+        '';
+      };
       extraConfig = mkOption {
         type = types.lines;
         default = "";
         description = ''
           Extra config options for matrix-synapse.
+        '';
+      };
+      extraConfigFiles = mkOption {
+        type = types.listOf types.path;
+        default = [];
+        description = ''
+          Extra config files to include.
+
+          The configuration files will be included based on the command line
+          argument --config-path. This allows to configure secrets without
+          having to go through the Nix store, e.g. based on deployment keys if
+          NixOPS is in use.
         '';
       };
       logConfig = mkOption {
@@ -541,41 +644,88 @@ in {
           A yaml python logging config file
         '';
       };
+      dataDir = mkOption {
+        type = types.str;
+        default = "/var/lib/matrix-synapse";
+        description = ''
+          The directory where matrix-synapse stores its stateful data such as
+          certificates, media and uploads.
+        '';
+      };
     };
   };
 
   config = mkIf cfg.enable {
-    users.extraUsers = [
-      { name = "matrix-synapse";
+    assertions = [
+      { assertion = hasLocalPostgresDB -> config.services.postgresql.enable;
+        message = ''
+          Cannot deploy matrix-synapse with a configuration for a local postgresql database
+            and a missing postgresql service. Since 20.03 it's mandatory to manually configure the
+            database (please read the thread in https://github.com/NixOS/nixpkgs/pull/80447 for
+            further reference).
+
+            If you
+            - try to deploy a fresh synapse, you need to configure the database yourself. An example
+              for this can be found in <nixpkgs/nixos/tests/matrix-synapse.nix>
+            - update your existing matrix-synapse instance, you simply need to add `services.postgresql.enable = true`
+              to your configuration.
+
+          For further information about this update, please read the release-notes of 20.03 carefully.
+        '';
+      }
+    ];
+
+    users.users.matrix-synapse = { 
         group = "matrix-synapse";
-        home = "/var/lib/matrix-synapse";
+        home = cfg.dataDir;
         createHome = true;
         shell = "${pkgs.bash}/bin/bash";
         uid = config.ids.uids.matrix-synapse;
-      } ];
+      };
 
-    users.extraGroups = [
-      { name = "matrix-synapse";
-        gid = config.ids.gids.matrix-synapse;
-      } ];
+    users.groups.matrix-synapse = {
+      gid = config.ids.gids.matrix-synapse;
+    };
 
     systemd.services.matrix-synapse = {
-      after = [ "network.target" ];
+      description = "Synapse Matrix homeserver";
+      after = [ "network.target" ] ++ optional hasLocalPostgresDB "postgresql.service";
       wantedBy = [ "multi-user.target" ];
       preStart = ''
         ${cfg.package}/bin/homeserver \
           --config-path ${configFile} \
-          --keys-directory /var/lib/matrix-synapse \
+          --keys-directory ${cfg.dataDir} \
           --generate-keys
       '';
+      environment.PYTHONPATH = makeSearchPathOutput "lib" cfg.package.python.sitePackages [ pluginsEnv ];
       serviceConfig = {
-        Type = "simple";
+        Type = "notify";
         User = "matrix-synapse";
         Group = "matrix-synapse";
-        WorkingDirectory = "/var/lib/matrix-synapse";
-        PermissionsStartOnly = true;
-        ExecStart = "${cfg.package}/bin/homeserver --config-path ${configFile} --keys-directory /var/lib/matrix-synapse";
+        WorkingDirectory = cfg.dataDir;
+        ExecStart = ''
+          ${cfg.package}/bin/homeserver \
+            ${ concatMapStringsSep "\n  " (x: "--config-path ${x} \\") ([ configFile ] ++ cfg.extraConfigFiles) }
+            --keys-directory ${cfg.dataDir}
+        '';
+        ExecReload = "${pkgs.utillinux}/bin/kill -HUP $MAINPID";
+        Restart = "on-failure";
       };
     };
   };
+
+  imports = [
+    (mkRemovedOptionModule [ "services" "matrix-synapse" "trusted_third_party_id_servers" ] ''
+      The `trusted_third_party_id_servers` option as been removed in `matrix-synapse` v1.4.0
+      as the behavior is now obsolete.
+    '')
+    (mkRemovedOptionModule [ "services" "matrix-synapse" "create_local_database" ] ''
+      Database configuration must be done manually. An exemplary setup is demonstrated in
+      <nixpkgs/nixos/tests/matrix-synapse.nix>
+    '')
+    (mkRemovedOptionModule [ "services" "matrix-synapse" "web_client" ] "")
+  ];
+
+  meta.doc = ./matrix-synapse.xml;
+
 }

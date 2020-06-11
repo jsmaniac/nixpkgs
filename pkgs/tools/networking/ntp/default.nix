@@ -1,15 +1,23 @@
-{ stdenv, fetchurl, openssl, perl, libcap ? null, libseccomp ? null }:
+{ stdenv, lib, fetchurl, openssl, perl, libcap ? null, libseccomp ? null, pps-tools }:
 
 assert stdenv.isLinux -> libcap != null;
 assert stdenv.isLinux -> libseccomp != null;
 
+let
+  withSeccomp = stdenv.isLinux && (stdenv.isi686 || stdenv.isx86_64);
+in
+
 stdenv.mkDerivation rec {
-  name = "ntp-4.2.8p9";
+  name = "ntp-4.2.8p14";
 
   src = fetchurl {
-    url = "http://www.eecis.udel.edu/~ntp/ntp_spool/ntp4/ntp-4.2/${name}.tar.gz";
-    sha256 = "0whbyf82lrczbri4adbsa4hg1ppfa6c7qcj7nhjwdfp1g1vjh95p";
+    url = "https://www.eecis.udel.edu/~ntp/ntp_spool/ntp4/ntp-4.2/${name}.tar.gz";
+    sha256 = "1dsfbrad5adwjnm3k0y0ip8dzs7r2nmw66vjil8gvapnh7qf8q0r";
   };
+
+  # The hardcoded list of allowed system calls for seccomp is
+  # insufficient for NixOS, add more to make it work (issue #21136).
+  patches = [ ./seccomp.patch ];
 
   configureFlags = [
     "--sysconfdir=/etc"
@@ -17,12 +25,13 @@ stdenv.mkDerivation rec {
     "--with-openssl-libdir=${openssl.out}/lib"
     "--with-openssl-incdir=${openssl.dev}/include"
     "--enable-ignore-dns-errors"
-  ] ++ stdenv.lib.optionals stdenv.isLinux [
-    "--enable-linuxcaps"
-    "--enable-libseccomp"
-  ];
+    "--with-yielding-select=yes"
+  ] ++ stdenv.lib.optional stdenv.isLinux "--enable-linuxcaps"
+    ++ stdenv.lib.optional withSeccomp "--enable-libseccomp";
 
-  buildInputs = [ libcap openssl libseccomp perl ];
+  buildInputs = [ libcap openssl perl ]
+    ++ lib.optional withSeccomp libseccomp
+    ++ lib.optional stdenv.isLinux pps-tools;
 
   hardeningEnable = [ "pie" ];
 
@@ -30,10 +39,14 @@ stdenv.mkDerivation rec {
     rm -rf $out/share/doc
   '';
 
-  meta = {
-    homepage = http://www.ntp.org/;
+  meta = with stdenv.lib; {
+    homepage = "http://www.ntp.org/";
     description = "An implementation of the Network Time Protocol";
-    maintainers = [ stdenv.lib.maintainers.eelco ];
-    platforms = stdenv.lib.platforms.linux;
+    license = {
+      # very close to isc and bsd2
+      url = "https://www.eecis.udel.edu/~mills/ntp/html/copyright.html";
+    };
+    maintainers = with maintainers; [ eelco thoughtpolice ];
+    platforms = platforms.linux;
   };
 }

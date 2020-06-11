@@ -1,41 +1,27 @@
-{stdenv, buildOcaml, fetchFromGitHub, ocamlbuild, findlib, topkg, ocaml, opam,
- ppx_tools, ppx_sexp_conv, cstruct, sexplib, result, nocrypto, astring}:
+{ lib, fetchurl, buildDunePackage
+, cstruct, sexplib0, rresult, mirage-crypto, mirage-crypto-pk, astring, base64
+, mirage-crypto-rng
+}:
 
-let ocamlFlags = "-I ${findlib}/lib/ocaml/${ocaml.version}/site-lib/"; in
+buildDunePackage rec {
+  pname = "otr";
+  version = "0.3.8";
 
-buildOcaml rec {
-  name = "otr";
-  version = "0.3.3";
-
-  minimumSupportedOcamlVersion = "4.02";
-
-  src = fetchFromGitHub {
-    owner  = "hannesm";
-    repo   = "ocaml-otr";
-    rev    = "${version}";
-    sha256 = "07zzix5mfsasqpqdx811m0x04gp8mq1ayf4b64998k98027v01rr";
+  src = fetchurl {
+    url = "https://github.com/hannesm/ocaml-otr/releases/download/v${version}/otr-v${version}.tbz";
+    sha256 = "18hn9l8wznqnlh2jf1hpnp36f1cx80ncwiiivsbj34llhgp3893d";
   };
 
-  buildInputs = [ ocamlbuild findlib topkg ppx_tools ppx_sexp_conv opam ];
-  propagatedBuildInputs = [ cstruct sexplib result nocrypto astring ];
+  useDune2 = true;
 
-  buildPhase = ''
-    ocaml ${ocamlFlags} pkg/pkg.ml build \
-      --tests true
-  '';
-
-  installPhase = ''
-    opam-installer --prefix=$out --script | sh
-    ln -s $out/lib/otr $out/lib/ocaml/${ocaml.version}/site-lib
-  '';
+  propagatedBuildInputs = [ cstruct sexplib0 mirage-crypto mirage-crypto-pk
+                            astring rresult base64 ];
 
   doCheck = true;
-  checkPhase = "ocaml ${ocamlFlags} pkg/pkg.ml test";
+  checkInputs = [ mirage-crypto-rng ];
 
-  createFindlibDestdir = true;
-
-  meta = with stdenv.lib; {
-    homepage = https://github.com/hannesm/ocaml-otr;
+  meta = with lib; {
+    homepage = "https://github.com/hannesm/ocaml-otr";
     description = "Off-the-record messaging protocol, purely in OCaml";
     license = licenses.bsd2;
     maintainers = with maintainers; [ sternenseemann ];

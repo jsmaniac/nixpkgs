@@ -1,32 +1,29 @@
-{ stdenv, fetchurl, glibcLocales, python3Packages }:
+{ stdenv, glibcLocales, python3 }:
 
-python3Packages.buildPythonApplication rec {
-  version = "0.11.1";
-  name = "khard-${version}";
-  namePrefix = "";
+python3.pkgs.buildPythonApplication rec {
+  version = "0.16.1";
+  pname = "khard";
 
-  src = fetchurl {
-    url = "https://github.com/scheibler/khard/archive/v${version}.tar.gz";
-    sha256 = "0055xx9icmsr6l7v0iqrndmygygdpdv10550w6pyrb96svzhry27";
+  src = python3.pkgs.fetchPypi {
+    inherit pname version;
+    sha256 = "0fg4qh5gzki5wg958wlpc8a2icnk74gzg33lqxjm755cfnjng7qd";
   };
 
-  # setup.py reads the UTF-8 encoded readme.
-  LC_ALL = "en_US.UTF-8";
-  buildInputs = [ glibcLocales ];
-
-  propagatedBuildInputs = with python3Packages; [
+  propagatedBuildInputs = with python3.pkgs; [
     atomicwrites
     configobj
     vobject
-    argparse
-    pyyaml
+    ruamel_yaml
+    ruamel_base
+    unidecode
   ];
 
-  # Fails; but there are no tests anyway.
-  doCheck = false;
+  postInstall = ''
+    install -D misc/zsh/_khard $out/share/zsh/site-functions/_khard
+  '';
 
   meta = {
-    homepage = https://github.com/scheibler/khard;
+    homepage = "https://github.com/scheibler/khard";
     description = "Console carddav client";
     license = stdenv.lib.licenses.gpl3;
     maintainers = with stdenv.lib.maintainers; [ matthiasbeyer ];

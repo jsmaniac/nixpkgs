@@ -10,7 +10,7 @@ buildGoPackage rec {
     inherit rev;
     owner = "kubernetes";
     repo = "heapster";
-    sha256 = "057z9imgd2gvcbvahja3i26jzgm33dmfaxraakmcr4a2xfhj50hq";
+    sha256 = "1vg83207y7yigydnnhlvzs3s94vx02i56lqgs6a96c6i3mr3ydpb";
   };
 
   preBuild = ''
@@ -20,7 +20,7 @@ buildGoPackage rec {
   meta = with lib; {
     description = "Compute Resource Usage Analysis and Monitoring of Container Clusters";
     license = licenses.asl20;
-    homepage = https://github.com/kubernetes/heapster;
+    homepage = "https://github.com/kubernetes/heapster";
     maintainers = with maintainers; [ offline ];
     platforms = docker.meta.platforms;
   };

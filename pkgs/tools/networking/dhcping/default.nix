@@ -1,12 +1,12 @@
 { stdenv, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "dhcping-${version}";
+  pname = "dhcping";
   version = "1.2";
 
   src = fetchurl {
     sha256 = "0sk4sg3hn88n44dxikipf3ggfj3ixrp22asb7nry9p0bkfaqdvrj";
-    url = "http://www.mavetju.org/download/dhcping-${version}.tar.gz";
+    url = "https://www.mavetju.org/download/dhcping-${version}.tar.gz";
   };
 
   enableParallelBuilding = true;
@@ -25,9 +25,8 @@ stdenv.mkDerivation rec {
       privileges are dropped as soon as the program has bound itself to that
       port.
     '';
-    homepage = http://www.mavetju.org/unix/general.php;
+    homepage = "http://www.mavetju.org/unix/general.php";
     license = licenses.bsd2;
     platforms = platforms.linux;
-    maintainers = with maintainers; [ nckx ];
   };
 }

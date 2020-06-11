@@ -3,10 +3,10 @@ let
   s = # Generated upstream information
   rec {
     baseName="apache-jena-fuseki";
-    version = "2.4.0";
+    version = "3.13.1";
     name="${baseName}-${version}";
     url="http://archive.apache.org/dist/jena/binaries/apache-jena-fuseki-${version}.tar.gz";
-    sha256 = "0jjrgvnc571wdkv722k0xc43n94w0rn1ci4ndxya9fvlag1rjhlb";
+    sha256 = "018b07icvjhd44c046rxfjiczcs63cic77cymgg4w8pd3na06c7y";
   };
   buildInputs = [
     makeWrapper
@@ -24,7 +24,7 @@ stdenv.mkDerivation {
     for i in "$out"/bin/*; do
       wrapProgram "$i" \
         --prefix "PATH" : "${java}/bin/" \
-        --set "FUSEKI_HOME" '"''${FUSEKI_HOME:-'"$out"'}"' \
+        --set-default "FUSEKI_HOME" "$out" \
         ;
     done
   '';

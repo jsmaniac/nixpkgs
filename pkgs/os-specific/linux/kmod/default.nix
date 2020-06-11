@@ -1,29 +1,32 @@
-{ stdenv, lib, fetchurl, autoreconfHook, xz, zlib, pkgconfig, libxslt }:
+{ stdenv, lib, fetchurl, autoreconfHook, pkgconfig
+, libxslt, xz, elf-header
+, withStatic ? false }:
 
 let
   systems = [ "/run/current-system/kernel-modules" "/run/booted-system/kernel-modules" "" ];
   modulesDirs = lib.concatMapStringsSep ":" (x: "${x}/lib/modules") systems;
 
 in stdenv.mkDerivation rec {
-  name = "kmod-${version}";
-  version = "23";
+  pname = "kmod";
+  version = "26";
 
   src = fetchurl {
-    url = "mirror://kernel/linux/utils/kernel/kmod/${name}.tar.xz";
-    sha256 = "0mc12sx06p8il1ym3hdmgxxb37apn9yv7xij26gddjdfkx8xa0yk";
+    url = "mirror://kernel/linux/utils/kernel/${pname}/${pname}-${version}.tar.xz";
+    sha256 = "17dvrls70nr3b3x1wm8pwbqy4r8a5c20m0dhys8mjhsnpg425fsp";
   };
 
   nativeBuildInputs = [ autoreconfHook pkgconfig libxslt ];
-  buildInputs = [ xz /* zlib */ ];
+  buildInputs = [ xz ] ++ lib.optional stdenv.isDarwin elf-header;
 
   configureFlags = [
     "--sysconfdir=/etc"
     "--with-xz"
     "--with-modulesdirs=${modulesDirs}"
-    # "--with-zlib"
-  ];
+  ] ++ lib.optional withStatic "--enable-static";
 
-  patches = [ ./module-dir.patch ];
+  patches = [ ./module-dir.patch ]
+    ++ lib.optional stdenv.isDarwin ./darwin.patch
+    ++ lib.optional withStatic ./enable-static.patch;
 
   postInstall = ''
     for prog in rmmod insmod lsmod modinfo modprobe depmod; do
@@ -34,9 +37,10 @@ in stdenv.mkDerivation rec {
     ln -s bin $out/sbin
   '';
 
-  meta = {
-    homepage = http://www.kernel.org/pub/linux/utils/kernel/kmod/;
+  meta = with stdenv.lib; {
+    homepage = "https://www.kernel.org/pub/linux/utils/kernel/kmod/";
     description = "Tools for loading and managing Linux kernel modules";
-    platforms = stdenv.lib.platforms.linux;
+    license = licenses.lgpl21;
+    platforms = platforms.unix;
   };
 }

@@ -1,32 +1,36 @@
 { fetchurl, stdenv, pkgconfig, intltool, gettext, glib, libxml2, zlib, bzip2
-, python, perl, gdk_pixbuf, libiconv, libintlOrEmpty }:
-
-with { inherit (stdenv.lib) optionals; };
+, perl, gdk-pixbuf, libiconv, libintl, gnome3 }:
 
 stdenv.mkDerivation rec {
-  name = "libgsf-1.14.36";
+  pname = "libgsf";
+  version = "1.14.47";
 
   src = fetchurl {
-    url    = "mirror://gnome/sources/libgsf/1.14/${name}.tar.xz";
-    sha256 = "0h19ssxzz0cmznwga2xy55kjibm24mwxqarnpd0w7xy0hrzm1dvi";
+    url = "mirror://gnome/sources/${pname}/${stdenv.lib.versions.majorMinor version}/${pname}-${version}.tar.xz";
+    sha256 = "0kbpp9ksl7977xiga37sk1gdw1r039v6zviqznl7alvvg39yp26i";
   };
 
-  nativeBuildInputs = [ pkgconfig intltool ];
+  nativeBuildInputs = [ pkgconfig intltool libintl ];
 
-  buildInputs = [ gettext bzip2 zlib python ]
-    ++ stdenv.lib.optional doCheck perl;
+  buildInputs = [ gettext bzip2 zlib ];
+  checkInputs = [ perl ];
 
-  propagatedBuildInputs = [ libxml2 glib gdk_pixbuf libiconv ]
-    ++ libintlOrEmpty;
+  propagatedBuildInputs = [ libxml2 glib gdk-pixbuf libiconv ];
+
+  outputs = [ "out" "dev" ];
 
   doCheck = true;
   preCheck = "patchShebangs ./tests/";
 
-  NIX_LDFLAGS = stdenv.lib.optionalString stdenv.isDarwin "-lintl";
+  passthru = {
+    updateScript = gnome3.updateScript {
+      packageName = pname;
+    };
+  };
 
   meta = with stdenv.lib; {
     description = "GNOME's Structured File Library";
-    homepage    = http://www.gnome.org/projects/libgsf;
+    homepage    = "https://www.gnome.org/projects/libgsf";
     license     = licenses.lgpl2Plus;
     maintainers = with maintainers; [ lovek323 ];
     platforms   = stdenv.lib.platforms.unix;

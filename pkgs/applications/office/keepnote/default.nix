@@ -1,6 +1,6 @@
-{ stdenv, fetchurl, pythonPackages }:
+{ stdenv, fetchurl, python2Packages }:
 
-pythonPackages.buildPythonApplication {
+python2Packages.buildPythonApplication {
   name = "keepnote-0.7.8";
   namePrefix = "";
 
@@ -9,14 +9,14 @@ pythonPackages.buildPythonApplication {
     sha256 = "0nhkkv1n0lqf3zn17pxg5cgryv1wwlj4hfmhixwd76rcy8gs45dh";
   };
 
-  propagatedBuildInputs = with pythonPackages; [ pyGtkGlade ];
+  propagatedBuildInputs = with python2Packages; [ pyGtkGlade ];
 
   # Testing fails.
   doCheck = false;
 
   meta = {
     description = "Note taking application";
-    homepage = http://rasm.ods.org/keepnote;
+    homepage = "http://keepnote.org";
     license = stdenv.lib.licenses.gpl2Plus;
   };
 }

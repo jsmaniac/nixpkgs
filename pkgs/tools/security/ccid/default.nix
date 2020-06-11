@@ -1,15 +1,15 @@
 { stdenv, fetchurl, pcsclite, pkgconfig, libusb1, perl }:
 
 stdenv.mkDerivation rec {
-  version = "1.4.23";
-  name = "ccid-${version}";
+  pname = "ccid";
+  version = "1.4.32";
 
   src = fetchurl {
-    url = "https://alioth.debian.org/frs/download.php/file/4169/ccid-1.4.23.tar.bz2";
-    sha256 = "0s7c2g8idnnh19958aswaa2s51ncr2j7gqrkk5g95qpfnv7asdh8";
+    url = "https://ccid.apdu.fr/files/${pname}-${version}.tar.bz2";
+    sha256 = "0f8nzk7379ip4x2ii5vn6h67jyx733pq0ywnnsj2llbxi2vllpsl";
   };
 
-  patchPhase = ''
+  postPatch = ''
     patchShebangs .
     substituteInPlace src/Makefile.in --replace /bin/echo echo
   '';
@@ -23,9 +23,8 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "ccid drivers for pcsclite";
-    homepage = http://pcsclite.alioth.debian.org/;
+    homepage = "https://ccid.apdu.fr/";
     license = licenses.gpl2Plus;
-    maintainers = with maintainers; [ viric wkennington ];
-    platforms = platforms.linux;
+    platforms = platforms.unix;
   };
 }

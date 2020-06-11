@@ -1,22 +1,34 @@
-{ lib, stdenv, fetchurl, libgpgerror, enableCapabilities ? false, libcap }:
+{ stdenv, fetchurl, gettext, libgpgerror, enableCapabilities ? false, libcap
+, buildPackages
+}:
 
 assert enableCapabilities -> stdenv.isLinux;
 
 stdenv.mkDerivation rec {
-  name = "libgcrypt-${version}";
-  version = "1.7.3";
+  pname = "libgcrypt";
+  version = "1.8.5";
 
   src = fetchurl {
-    url = "mirror://gnupg/libgcrypt/${name}.tar.bz2";
-    sha256 = "0wbh6fq5zi9wg2xcfvfpwh7dv52jihivx1vm4h91c2kx0w8n3b6x";
+    url = "mirror://gnupg/libgcrypt/${pname}-${version}.tar.bz2";
+    sha256 = "1hvsazms1bfd769q0ngl0r9g5i4m9mpz9jmvvrdzyzk3rfa2ljiv";
   };
 
   outputs = [ "out" "dev" "info" ];
   outputBin = "dev";
 
-  buildInputs =
-    [ libgpgerror ]
-    ++ lib.optional enableCapabilities libcap;
+  # The CPU Jitter random number generator must not be compiled with
+  # optimizations and the optimize -O0 pragma only works for gcc.
+  # The build enables -O2 by default for everything else.
+  hardeningDisable = stdenv.lib.optional stdenv.cc.isClang "fortify";
+
+  depsBuildBuild = [ buildPackages.stdenv.cc ];
+
+  buildInputs = [ libgpgerror ]
+    ++ stdenv.lib.optional stdenv.isDarwin gettext
+    ++ stdenv.lib.optional enableCapabilities libcap;
+
+  configureFlags = [ "--with-libgpg-error-prefix=${libgpgerror.dev}" ]
+   ++ stdenv.lib.optional stdenv.hostPlatform.isMusl "--disable-asm";
 
   # Make sure libraries are correct for .pc and .la files
   # Also make sure includes are fixed for callers who don't use libgpgcrypt-config
@@ -36,11 +48,11 @@ stdenv.mkDerivation rec {
   doCheck = true;
 
   meta = with stdenv.lib; {
-    homepage = https://www.gnu.org/software/libgcrypt/;
-    description = "General-pupose cryptographic library";
+    homepage = "https://www.gnu.org/software/libgcrypt/";
+    description = "General-purpose cryptographic library";
     license = licenses.lgpl2Plus;
     platforms = platforms.all;
-    maintainers = [ maintainers.wkennington maintainers.vrthra ];
-    repositories.git = git://git.gnupg.org/libgcrypt.git;
+    maintainers = with maintainers; [ vrthra ];
+    repositories.git = "git://git.gnupg.org/libgcrypt.git";
   };
 }

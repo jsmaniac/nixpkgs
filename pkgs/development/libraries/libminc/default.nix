@@ -1,27 +1,45 @@
-{ stdenv, fetchurl, cmake, zlib, netcdf, hdf5 }:
+{ stdenv, fetchFromGitHub, cmake, zlib, netcdf, nifticlib, hdf5 }:
 
 stdenv.mkDerivation rec {
-  _name = "libminc";
-  name  = "${_name}-2.3.00";
+  pname   = "libminc";
+  version = "2.4.03";
 
-  src = fetchurl {
-    url = "https://github.com/BIC-MNI/${_name}/archive/${_name}-2-3-00.tar.gz";
-    sha256 = "04ngqx4wkssxs9qqcgq2bvfs1cldcycmpcx587wy3b3m6lwf004c";
+  owner = "BIC-MNI";
+
+  src = fetchFromGitHub {
+    inherit owner;
+    repo   = pname;
+    rev    = "release-${version}";
+    sha256 = "0kpmqs9df836ywsqj749qbsfavf5bnldblxrmnmxqq9pywc8yfrm";
   };
 
+  postPatch = ''
+    patchShebangs .
+  '';
+
   nativeBuildInputs = [ cmake ];
-  buildInputs = [ zlib netcdf hdf5 ];
+  buildInputs = [ zlib netcdf nifticlib hdf5 ];
 
-  cmakeFlags = [ "-DBUILD_TESTING=${if doCheck then "ON" else "OFF"}"
-                 "-DLIBMINC_MINC1_SUPPORT=ON" ];
+  cmakeFlags = [
+    "-DLIBMINC_MINC1_SUPPORT=ON"
+    "-DLIBMINC_BUILD_SHARED_LIBS=ON"
+    "-DLIBMINC_USE_SYSTEM_NIFTI=ON"
+  ];
 
-  checkPhase = "ctest";
-  doCheck = true;
+  doCheck = !stdenv.isDarwin;
+  checkPhase = ''
+    export LD_LIBRARY_PATH="$(pwd)"  # see #22060
+    ctest -E 'ezminc_rw_test|minc_conversion' --output-on-failure
+    # ezminc_rw_test can't find libminc_io.so.5.2.0; minc_conversion hits netcdf compilation issue
+  '';
+
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
-    homepage = https://github.com/BIC-MNI/libminc;
+    homepage = "https://github.com/${owner}/${pname}";
     description = "Medical imaging library based on HDF5";
     maintainers = with maintainers; [ bcdarwin ];
     platforms = platforms.unix;
+    license   = licenses.free;
   };
 }

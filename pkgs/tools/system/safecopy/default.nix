@@ -20,11 +20,11 @@ stdenv.mkDerivation rec {
          resets and other helpful low level operations on a number of other device classes.
        '';
 
-    homepage = http://safecopy.sourceforge.net;
+    homepage = "http://safecopy.sourceforge.net";
 
     license = stdenv.lib.licenses.gpl2Plus;
 
-    platforms = stdenv.lib.platforms.all;
+    platforms = stdenv.lib.platforms.linux;
     maintainers = [ stdenv.lib.maintainers.bluescreen303 ];
   };
 }

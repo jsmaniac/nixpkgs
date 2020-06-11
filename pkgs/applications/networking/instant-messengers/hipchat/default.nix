@@ -1,10 +1,9 @@
 { stdenv, fetchurl, xorg, freetype, fontconfig, openssl, glib, nss, nspr, expat
 , alsaLib, dbus, zlib, libxml2, libxslt, makeWrapper, xkeyboard_config, systemd
-, mesa_noglu, xcbutilkeysyms, xdg_utils, libtool }:
+, libGL, xcbutilkeysyms, xdg_utils, libtool }:
 
 let
-
-  version = "4.28.0.1659";
+  version = "4.30.5.1682";
 
   rpath = stdenv.lib.makeLibraryPath [
     xdg_utils
@@ -37,24 +36,16 @@ let
     expat
     xcbutilkeysyms
     systemd
-    mesa_noglu
+    libGL
   ] + ":${stdenv.cc.cc.lib}/lib64";
+in stdenv.mkDerivation {
+  pname = "hipchat";
+  inherit version;
 
-  src =
-    if stdenv.system == "x86_64-linux" then
-      fetchurl {
-        url = "https://atlassian.artifactoryonline.com/atlassian/hipchat-apt-client/pool/HipChat4-${version}-Linux.deb";
-        sha256 = "091njvbihn0l7j5ymnl8ynz51pcy9varbvvny880r8szldash90y";
-      }
-    else
-      throw "HipChat is not supported on ${stdenv.system}";
-
-in
-
-stdenv.mkDerivation {
-  name = "hipchat-${version}";
-
-  inherit src;
+  src = fetchurl {
+    url = "https://atlassian.artifactoryonline.com/atlassian/hipchat-apt-client/pool/HipChat4-${version}-Linux.deb";
+    sha256 = "03pz8wskafn848yvciq29kwdvqcgjrk6sjnm8nk9acl89xf0sn96";
+  };
 
   buildInputs = [ makeWrapper ];
 
@@ -78,8 +69,8 @@ stdenv.mkDerivation {
       --replace /opt/HipChat4/bin/HipChat4 $out/bin/hipchat
 
     makeWrapper $d/HipChat.bin $out/bin/hipchat \
-      --set HIPCHAT_LD_LIBRARY_PATH '"$LD_LIBRARY_PATH"' \
-      --set HIPCHAT_QT_PLUGIN_PATH '"$QT_PLUGIN_PATH"' \
+      --run 'export HIPCHAT_LD_LIBRARY_PATH=$LD_LIBRARY_PATH' \
+      --run 'export HIPCHAT_QT_PLUGIN_PATH=$QT_PLUGIN_PATH' \
       --set QT_XKB_CONFIG_ROOT ${xkeyboard_config}/share/X11/xkb \
       --set QTWEBENGINEPROCESS_PATH $d/QtWebEngineProcess
 
@@ -89,9 +80,9 @@ stdenv.mkDerivation {
 
   meta = with stdenv.lib; {
     description = "Desktop client for HipChat services";
-    homepage = http://www.hipchat.com;
+    homepage = "http://www.hipchat.com";
     license = licenses.unfree;
     platforms = [ "x86_64-linux" ];
-    maintainers = with maintainers; [ jgeerds puffnfresh ];
+    maintainers = with maintainers; [ puffnfresh ];
   };
 }

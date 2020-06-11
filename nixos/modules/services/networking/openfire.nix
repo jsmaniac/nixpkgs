@@ -9,14 +9,10 @@ with lib;
 
     services.openfire = {
 
-      enable = mkOption {
-        default = false;
-        description = "
-          Whether to enable OpenFire XMPP server.
-        ";
-      };
+      enable = mkEnableOption "OpenFire XMPP server";
 
       usePostgreSQL = mkOption {
+        type = types.bool;
         default = true;
         description = "
           Whether you use PostgreSQL service for your storage back-end.
@@ -34,7 +30,7 @@ with lib;
 
     assertions = singleton
       { assertion = !(config.services.openfire.usePostgreSQL -> config.services.postgresql.enable);
-        message = "OpenFire assertion failed.";
+        message = "OpenFire configured to use PostgreSQL but services.postgresql.enable is not enabled.";
       };
 
     systemd.services.openfire = {

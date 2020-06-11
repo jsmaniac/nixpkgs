@@ -1,42 +1,30 @@
-{ stdenv, fetchFromGitHub, cmake, python }:
-
+{ stdenv, fetchFromGitHub, cmake, python3, spirv-headers }:
 let
-
-spirv_sources = {
-  # `vulkan-loader` requires a specific version of `spirv-tools` and `spirv-headers` as specified in
-  # `<vulkan-loader-repo>/spirv-tools_revision`.
-  tools = fetchFromGitHub {
-    owner = "KhronosGroup";
-    repo = "SPIRV-Tools";
-    rev = "923a4596b44831a07060df45caacb522613730c9";
-    sha256 = "0hmgng2sv34amfsag3ya09prnv1w535djwlzfn8h2vh430vgawxa";
-  };
-  headers = fetchFromGitHub {
-    owner = "KhronosGroup";
-    repo = "SPIRV-Headers";
-    rev = "33d41376d378761ed3a4c791fc4b647761897f26";
-    sha256 = "1s103bpi3g6hhq453qa4jbabfkyxxpf9vn213j8k4vm26lsi8hs2";
-  };
-};
-
+  # Update spirv-headers rev in lockstep according to DEPs file
+  version = "2019.4";
 in
 
 stdenv.mkDerivation rec {
-  name = "spirv-tools-${version}";
-  version = "2016-07-18";
+  pname = "spirv-tools";
+  inherit version;
 
-  src = spirv_sources.tools;
-  patchPhase = ''ln -sv ${spirv_sources.headers} external/spirv-headers'';
+  src = fetchFromGitHub {
+    owner = "KhronosGroup";
+    repo = "SPIRV-Tools";
+    rev = "v${version}";
+    sha256 = "17bbvhk4p42x4jlvcr5p9903xiiryw57c8yyfxmqik10s8601an9";
+  };
   enableParallelBuilding = true;
 
-  buildInputs = [ cmake python ];
+  nativeBuildInputs = [ cmake python3 ];
 
-  passthru = {
-    headers = spirv_sources.headers;
-  };
+  cmakeFlags = [ "-DSPIRV-Headers_SOURCE_DIR=${spirv-headers.src}" ];
 
   meta = with stdenv.lib; {
     inherit (src.meta) homepage;
-    description = "The SPIR-V Tools project provides an API and commands for processing SPIR-V modules.";
+    description = "The SPIR-V Tools project provides an API and commands for processing SPIR-V modules";
+    license = licenses.asl20;
+    platforms = platforms.linux;
+    maintainers = [ maintainers.ralith ];
   };
 }

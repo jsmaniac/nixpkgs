@@ -1,29 +1,58 @@
-{ stdenv, fetchurl }:
+{ stdenv, fetchurl, fetchFromGitHub, buildGoPackage, buildEnv }:
 
-stdenv.mkDerivation rec {
-  name = "mattermost-${version}";
-  version = "3.3.0";
+let
+  version = "5.15.0";
 
-  src = fetchurl {
-    url = "https://releases.mattermost.com/${version}/mattermost-team-${version}-linux-amd64.tar.gz";
-    sha256 = "16mp75hv4lzkj99lj18c5vyqsmk9kqk5r81hirq41fgb6bdqx509";
+  mattermost-server = buildGoPackage rec {
+    pname = "mattermost-server";
+    inherit version;
+
+    src = fetchFromGitHub {
+      owner = "mattermost";
+      repo = "mattermost-server";
+      rev = "v${version}";
+      sha256 = "1bh53h0bmpc1qmnbpsmwkfrvj66z18m7b1xg7pqikid57ssqxjx9";
+    };
+
+    goPackagePath = "github.com/mattermost/mattermost-server";
+
+    buildFlagsArray = ''
+      -ldflags=
+        -X ${goPackagePath}/model.BuildNumber=nixpkgs-${version}
+    '';
+
   };
 
-  installPhase = ''
-    mkdir -p $out
-    mv * $out/
-    ln -s ./platform $out/bin/mattermost-platform
-  '';
+  mattermost-webapp = stdenv.mkDerivation {
+    pname = "mattermost-webapp";
+    inherit version;
 
-  postFixup = ''
-    patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" $out/bin/platform
-  '';
+    src = fetchurl {
+      url = "https://releases.mattermost.com/${version}/mattermost-${version}-linux-amd64.tar.gz";
+      sha256 = "13xmc2y4pp0b0svzaf4v7ynx6rxcvznx3vqmlrpiil414s69xv45";
+    };
 
-  meta = with stdenv.lib; {
-    description = "Open-Source, self-hosted Slack-alternative";
-    homepage = "https://www.mattermost.org";
-    license = with licenses; [ agpl3 asl20 ];
-    maintainers = with maintainers; [ fpletz ];
-    platforms = [ "x86_64-linux" ];
+    installPhase = ''
+      mkdir -p $out
+      tar --strip 1 --directory $out -xf $src \
+        mattermost/client \
+        mattermost/i18n \
+        mattermost/fonts \
+        mattermost/templates \
+        mattermost/config
+    '';
   };
-}
+
+in
+  buildEnv {
+    name = "mattermost-${version}";
+    paths = [ mattermost-server mattermost-webapp ];
+
+    meta = with stdenv.lib; {
+      description = "Open-source, self-hosted Slack-alternative";
+      homepage = "https://www.mattermost.org";
+      license = with licenses; [ agpl3 asl20 ];
+      maintainers = with maintainers; [ fpletz ryantm ];
+      platforms = platforms.unix;
+    };
+  }

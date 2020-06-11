@@ -1,46 +1,81 @@
-{ lib, pkgs, stdenv, pythonPackages, fetchurl, fetchFromGitHub }:
+{ lib, stdenv, python3, openssl
+, enableSystemd ? stdenv.isLinux, nixosTests
+}:
+
+with python3.pkgs;
+
 let
-  matrix-angular-sdk = pythonPackages.buildPythonApplication rec {
-    name = "matrix-angular-sdk-${version}";
-    version = "0.6.8";
+  plugins = python3.pkgs.callPackage ./plugins { };
+in
+buildPythonApplication rec {
+  pname = "matrix-synapse";
+  version = "1.14.0";
 
-    src = fetchurl {
-      url = "mirror://pypi/m/matrix-angular-sdk/matrix-angular-sdk-${version}.tar.gz";
-      sha256 = "0gmx4y5kqqphnq3m7xk2vpzb0w2a4palicw7wfdr1q2schl9fhz2";
-    };
-  };
-in pythonPackages.buildPythonApplication rec {
-  name = "matrix-synapse-${version}";
-  version = "0.18.0";
-
-  src = fetchFromGitHub {
-    owner = "matrix-org";
-    repo = "synapse";
-    rev = "v${version}";
-    sha256 = "1wvamw5crncz5ic6waq7v1bw54zg93af1lmw4y45w3r0vzyfxp68";
+  src = fetchPypi {
+    inherit pname version;
+    sha256 = "09drdqcjvpk9s3hq5rx9yxsxq0wak5fg5gfaiqfnbnxav2c2v7kq";
   };
 
-  patches = [ ./matrix-synapse.patch ];
-
-  propagatedBuildInputs = with pythonPackages; [
-    blist canonicaljson daemonize dateutil frozendict pillow pybcrypt pyasn1
-    pydenticon pymacaroons-pynacl pynacl pyopenssl pysaml2 pytz requests2
-    service-identity signedjson systemd twisted ujson unpaddedbase64 pyyaml
-    matrix-angular-sdk bleach netaddr jinja2 psycopg2
-    ldap3 psutil msgpack
+  patches = [
+    # adds an entry point for the service
+    ./homeserver-script.patch
   ];
 
-  # Checks fail because of Tox.
-  doCheck = false;
+  propagatedBuildInputs = [
+    setuptools
+    bcrypt
+    bleach
+    canonicaljson
+    daemonize
+    frozendict
+    jinja2
+    jsonschema
+    lxml
+    msgpack
+    netaddr
+    phonenumbers
+    pillow
+    (prometheus_client.overrideAttrs (x: {
+      src = fetchPypi {
+        pname = "prometheus_client";
+        version = "0.3.1";
+        sha256 = "093yhvz7lxl7irnmsfdnf2030lkj4gsfkg6pcmy4yr1ijk029g0p";
+      };
+    }))
+    psutil
+    psycopg2
+    pyasn1
+    pymacaroons
+    pynacl
+    pyopenssl
+    pysaml2
+    pyyaml
+    requests
+    signedjson
+    sortedcontainers
+    treq
+    twisted
+    unpaddedbase64
+    typing-extensions
+    authlib
+  ] ++ lib.optional enableSystemd systemd;
 
-  buildInputs = with pythonPackages; [
-    mock setuptoolsTrial
-  ];
+  checkInputs = [ mock parameterized openssl ];
+
+  doCheck = !stdenv.isDarwin;
+
+  checkPhase = ''
+    PYTHONPATH=".:$PYTHONPATH" ${python3.interpreter} -m twisted.trial tests
+  '';
+
+  passthru.tests = { inherit (nixosTests) matrix-synapse; };
+  passthru.plugins = plugins;
+  passthru.python = python3;
 
   meta = with stdenv.lib; {
-    homepage = https://matrix.org;
+    homepage = "https://matrix.org";
     description = "Matrix reference homeserver";
     license = licenses.asl20;
-    maintainers = [ maintainers.ralith maintainers.roblabla ];
+    maintainers = with maintainers; [ ralith roblabla ekleog pacien ma27 ];
   };
 }

@@ -16,14 +16,14 @@ stdenv.mkDerivation rec {
     done
   '';
 
-  buildInputs = [ pkgconfig ];
+  nativeBuildInputs = [ pkgconfig ];
   propagatedBuildInputs = [ pure ];
-  makeFlags = "libdir=$(out)/lib prefix=$(out)/";
+  makeFlags = [ "libdir=$(out)/lib" "prefix=$(out)/" ];
   setupHook = ../generic-setup-hook.sh;
 
   meta = {
     description = "An “umbrella” package that contains a pair of Pure addons, pure-stlvec and pure-stlmap";
-    homepage = http://puredocs.bitbucket.org/pure-stllib.html;
+    homepage = "http://puredocs.bitbucket.org/pure-stllib.html";
     license = stdenv.lib.licenses.bsd3;
     platforms = stdenv.lib.platforms.linux;
     maintainers = with stdenv.lib.maintainers; [ asppsa ];

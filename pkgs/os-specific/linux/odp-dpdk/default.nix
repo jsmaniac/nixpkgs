@@ -1,40 +1,60 @@
-{ stdenv, fetchgit, autoreconfHook, openssl, libpcap, dpdk }:
+{ stdenv, fetchurl, autoreconfHook, pkgconfig
+, dpdk, libconfig, libpcap, numactl, openssl, zlib, libbsd, libelf, jansson
+}: let
+  dpdk_18_11 = dpdk.overrideAttrs (old: rec {
+    version = "18.11.5";
+    src = fetchurl {
+      url = "https://fast.dpdk.org/rel/dpdk-${version}.tar.xz";
+      sha256 = "1n6nfaj7703l19jcw540lm8avni48hj9q1rq4mfp8b8gd4zjprj0";
+    };
+  });
 
-stdenv.mkDerivation rec {
-  name = "odp-dpdk-${version}";
-  version = "2016-08-16";
+in stdenv.mkDerivation rec {
+  pname = "odp-dpdk";
+  version = "1.22.0.0_DPDK_18.11";
 
-  src = fetchgit {
-    url = "https://git.linaro.org/lng/odp-dpdk.git";
-    rev = "7068593f600e2b5a23ee1780d5c722c54e966df1";
-    sha256 = "0pz0zkxqaac193x21wmj3x88gfza6bvhmv5yf8fzkpm9zxnl2sy4";
+  src = fetchurl {
+    url = "https://git.linaro.org/lng/odp-dpdk.git/snapshot/${pname}-${version}.tar.gz";
+    sha256 = "1m8xhmfjqlj2gkkigq5ka3yh0xgzrcpfpaxp1pnh8d1g99094vbx";
   };
 
-  nativeBuildInputs = [ autoreconfHook ];
-  buildInputs = [ openssl dpdk libpcap ];
+  nativeBuildInputs = [
+    autoreconfHook
+    pkgconfig
+  ];
+  buildInputs = [
+    dpdk_18_11
+    libconfig
+    libpcap
+    numactl
+    openssl
+    zlib
+    libbsd
+    libelf
+    jansson
+  ];
 
-  RTE_SDK = "${dpdk}";
-  RTE_TARGET = "x86_64-native-linuxapp-gcc";
+  NIX_CFLAGS_COMPILE = [ "-Wno-error=address-of-packed-member" ];
 
-  patchPhase = ''
-    substituteInPlace scripts/git_hash.sh --replace /bin/bash /bin/sh
-    substituteInPlace scripts/get_impl_str.sh --replace /bin/bash /bin/sh
-    echo -n ${version} > .scmversion
+  # for some reason, /build/odp-dpdk-1.22.0.0_DPDK_18.11/lib/.libs ends up in all binaries,
+  # while it should be $out/lib instead.
+  # prepend rpath with the proper location, the /build will get removed during rpath shrinking
+  preFixup = ''
+    for prog in $out/bin/*; do
+      patchelf --set-rpath $out/lib:`patchelf --print-rpath $prog` $prog
+    done
   '';
 
-  dontDisableStatic = true;
+  # binaries will segfault otherwise
+  dontStrip = true;
 
-  configureFlags = [
-    "--with-platform=linux-dpdk"
-    "--disable-shared"
-    "--with-sdk-install-path=${dpdk}/${RTE_TARGET}"
-  ];
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
     description = "Open Data Plane optimized for DPDK";
-    homepage = http://www.opendataplane.org;
+    homepage = "https://www.opendataplane.org";
     license = licenses.bsd3;
-    platforms =  [ "x86_64-linux" ];
+    platforms =  platforms.linux;
     maintainers = [ maintainers.abuibrahim ];
   };
 }

@@ -1,32 +1,32 @@
-{ stdenv, fetchurl, pkgconfig, efl }:
+{ stdenv, fetchurl, meson, ninja, pkgconfig, efl, pcre, mesa, makeWrapper }:
 
 stdenv.mkDerivation rec {
-  name = "terminology-${version}";
-  version = "0.9.1";
+  pname = "terminology";
+  version = "1.7.0";
 
   src = fetchurl {
-    url = "http://download.enlightenment.org/rel/apps/terminology/${name}.tar.xz";
-    sha256 = "1kwv9vkhngdm5v38q93xpcykghnyawhjjcb5bgy0p89gpbk7mvpc";
+    url = "http://download.enlightenment.org/rel/apps/${pname}/${pname}-${version}.tar.xz";
+    sha256 = "11qan2k6w94cglysh95yxkbv6hw9x15ri927hkiy3k0hbmpbrxc8";
   };
 
-  nativeBuildInputs = [ pkgconfig ];
+  nativeBuildInputs = [
+    meson
+    ninja
+    pkgconfig
+    makeWrapper
+  ];
 
-  buildInputs = [ efl ];
-
-  NIX_CFLAGS_COMPILE = [
-    "-I${efl}/include/ecore-con-1"
-    "-I${efl}/include/eldbus-1"
-    "-I${efl}/include/elocation-1"
-    "-I${efl}/include/emile-1"
-    "-I${efl}/include/eo-1"
-    "-I${efl}/include/ethumb-1"
+  buildInputs = [
+    efl
+    pcre
+    mesa
   ];
 
   meta = {
-    description = "The best terminal emulator written with the EFL";
-    homepage = http://enlightenment.org/;
-    maintainers = with stdenv.lib.maintainers; [ matejc tstrobel ftrvxmtrx ];
-    platforms = stdenv.lib.platforms.linux;
+    description = "Powerful terminal emulator based on EFL";
+    homepage = "https://www.enlightenment.org/about-terminology";
     license = stdenv.lib.licenses.bsd2;
+    platforms = stdenv.lib.platforms.linux;
+    maintainers = with stdenv.lib.maintainers; [ matejc tstrobel ftrvxmtrx romildo ];
   };
 }

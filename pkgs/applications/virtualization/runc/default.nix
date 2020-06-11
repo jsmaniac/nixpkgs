@@ -1,62 +1,58 @@
-{ stdenv, lib, fetchFromGitHub, go-md2man
-, go, pkgconfig, libapparmor, apparmor-parser, libseccomp }:
+{ lib
+, fetchFromGitHub
+, buildGoPackage
+, go-md2man
+, installShellFiles
+, pkg-config
+, which
+, libapparmor
+, apparmor-parser
+, libseccomp
+, libselinux
+, nixosTests
+}:
 
-with lib;
-
-stdenv.mkDerivation rec {
-  name = "runc-${version}";
-  version = "2016-06-15";
+buildGoPackage rec {
+  pname = "runc";
+  version = "1.0.0-rc90";
 
   src = fetchFromGitHub {
     owner = "opencontainers";
     repo = "runc";
-    rev = "cc29e3dded8e27ba8f65738f40d251c885030a28";
-    sha256 = "18fwb3kq10zhhx184yn3j396gpbppy3y4ypb8m2b2pdms39s6pyx";
+    rev = "v${version}";
+    sha256 = "0pi3rvj585997m4z9ljkxz2z9yxf9p2jr0pmqbqrc7bc95f5hagk";
   };
 
+  goPackagePath = "github.com/opencontainers/runc";
   outputs = [ "out" "man" ];
 
-  hardeningDisable = ["fortify"];
+  nativeBuildInputs = [ go-md2man installShellFiles pkg-config which ];
 
-  buildInputs = [ go-md2man go pkgconfig libseccomp libapparmor apparmor-parser ];
+  buildInputs = [ libselinux libseccomp libapparmor apparmor-parser ];
 
-  makeFlags = ''BUILDTAGS+=seccomp BUILDTAGS+=apparmor'';
+  # these will be the default in the next release
+  makeFlags = [ "BUILDTAGS+=seccomp" "BUILDTAGS+=apparmor" "BUILDTAGS+=selinux" ];
 
-  preBuild = ''
+  buildPhase = ''
+    cd go/src/${goPackagePath}
     patchShebangs .
     substituteInPlace libcontainer/apparmor/apparmor.go \
       --replace /sbin/apparmor_parser ${apparmor-parser}/bin/apparmor_parser
+    make ${toString makeFlags} runc man
   '';
 
   installPhase = ''
     install -Dm755 runc $out/bin/runc
-
-    # Include contributed man pages
-    man/md2man-all.sh -q
-    manRoot="$man/share/man"
-    mkdir -p "$manRoot"
-    for manDir in man/man?; do
-      manBase="$(basename "$manDir")" # "man1"
-      for manFile in "$manDir"/*; do
-        manName="$(basename "$manFile")" # "docker-build.1"
-        mkdir -p "$manRoot/$manBase"
-        gzip -c "$manFile" > "$manRoot/$manBase/$manName.gz"
-      done
-    done
+    installManPage man/*/*.[1-9]
   '';
 
-  preFixup = ''
-    # remove references to go compiler
-    while read file; do
-      sed -ri "s,${go},$(echo "${go}" | sed "s,$NIX_STORE/[^-]*,$NIX_STORE/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee,"),g" $file
-    done < <(find $out/bin -type f 2>/dev/null)
-  '';
+  passthru.tests.podman = nixosTests.podman;
 
-  meta = {
-    homepage = https://runc.io/;
+  meta = with lib; {
+    homepage = "https://github.com/opencontainers/runc";
     description = "A CLI tool for spawning and running containers according to the OCI specification";
     license = licenses.asl20;
-    maintainers = with maintainers; [ offline ];
+    maintainers = with maintainers; [ offline ] ++ teams.podman.members;
     platforms = platforms.linux;
   };
 }

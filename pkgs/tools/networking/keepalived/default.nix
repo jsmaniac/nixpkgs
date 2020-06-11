@@ -1,39 +1,38 @@
-{ stdenv, fetchurl, openssl, net_snmp, libnl }:
+{ stdenv, fetchFromGitHub, nixosTests
+, libnfnetlink, libnl, net-snmp, openssl
+, pkgconfig, autoreconfHook }:
 
 stdenv.mkDerivation rec {
-  name = "keepalived-1.2.19";
+  pname = "keepalived";
+  version = "2.0.20";
 
-  src = fetchurl {
-    url = "http://keepalived.org/software/${name}.tar.gz";
-    sha256 = "0lrq963pxhgh74qmxjyy5hvxdfpm4r50v4vsrp559n0w5irsxyrj";
+  src = fetchFromGitHub {
+    owner = "acassen";
+    repo = "keepalived";
+    rev = "v${version}";
+    sha256 = "0ijzw56hbac24dhrgjd0hjgf45072imyzq3mcgsirdl3xqjc6x12";
   };
 
-  buildInputs = [ openssl net_snmp libnl ];
+  buildInputs = [
+    libnfnetlink
+    libnl
+    net-snmp
+    openssl
+  ];
 
-  postPatch = ''
-    sed -i 's,$(DESTDIR)/usr/share,$out/share,g' Makefile.in
-  '';
+  passthru.tests.keepalived = nixosTests.keepalived;
 
-  # It doesn't know about the include/libnl<n> directory
-  NIX_CFLAGS_COMPILE="-I${libnl.dev}/include/libnl3";
-  NIX_LDFLAGS="-lnl-3 -lnl-genl-3";
+  nativeBuildInputs = [ pkgconfig autoreconfHook ];
 
   configureFlags = [
-    "--sysconfdir=/etc"
-    "--localstatedir=/var"
-    "--enable-snmp"
     "--enable-sha1"
-  ];
-
-  installFlags = [
-    "sysconfdir=\${out}/etc"
-  ];
+    "--enable-snmp"
+ ];
 
   meta = with stdenv.lib; {
-    homepage = http://keepalived.org;
+    homepage = "https://keepalived.org";
     description = "Routing software written in C";
     license = licenses.gpl2;
     platforms = platforms.linux;
-    maintainers = with maintainers; [ wkennington ];
   };
 }

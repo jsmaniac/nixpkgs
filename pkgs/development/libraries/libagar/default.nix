@@ -1,11 +1,11 @@
 { stdenv, fetchurl, pkgconfig, libtool, perl, bsdbuild, gettext, mandoc
-, libpng, libjpeg, xlibsWrapper, libXinerama, freetype, SDL, mesa
-, libsndfile, portaudio, mysql, fontconfig
+, libpng, libjpeg, xlibsWrapper, libXinerama, freetype, SDL, libGLU, libGL
+, libsndfile, portaudio, libmysqlclient, fontconfig
 }:
 
 let srcs = import ./srcs.nix { inherit fetchurl; }; in
-stdenv.mkDerivation rec {
-  name = "libagar-${version}";
+stdenv.mkDerivation {
+  pname = "libagar";
   inherit (srcs) version src;
 
   preConfigure = ''
@@ -19,22 +19,23 @@ stdenv.mkDerivation rec {
     "--enable-nls=yes"
     "--with-gettext=${gettext}"
     "--with-jpeg=${libjpeg.dev}"
-    "--with-gl=${mesa}"
-    "--with-mysql=yes"
+    "--with-gl=${libGL}"
+    "--with-mysql=${libmysqlclient}"
     "--with-manpages=yes"
   ];
 
   outputs = [ "out" "devdoc" ];
 
   nativeBuildInputs = [ pkgconfig libtool gettext ];
+
   buildInputs = [
-    bsdbuild perl xlibsWrapper libXinerama SDL mesa  mysql.client mandoc
+    bsdbuild perl xlibsWrapper libXinerama SDL libGL libmysqlclient mandoc
     freetype.dev libpng libjpeg.dev fontconfig portaudio libsndfile
   ];
 
   meta = with stdenv.lib; {
     description = "Cross-platform GUI toolkit";
-    homepage = http://libagar.org/index.html;
+    homepage = "http://libagar.org/index.html";
     license = with licenses; bsd3;
     maintainers = with maintainers; [ ramkromberg ];
     platforms = with platforms; linux;

@@ -1,19 +1,21 @@
 { stdenv, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "di-4.42";
+  pname = "di";
+  version = "4.47.3";
 
   src = fetchurl {
-    url = "http://gentoo.com/di/${name}.tar.gz";
-    sha256 = "1i6m9zdnidn8268q1lz9fd8payk7s4pgwh5zlam9rr4dy6h6a67n";
+    url = "https://gentoo.com/${pname}/${pname}-${version}.tar.gz";
+    sha256 = "0m4npba50sf5s61g5z3xd2r7937zwja941f2h3f081xi24c2hfck";
   };
 
   makeFlags = [ "INSTALL_DIR=$(out)" ];
 
   meta = with stdenv.lib; {
     description = "Disk information utility; displays everything 'df' does and more";
-    homepage = http://www.gentoo.com/di/;
+    homepage = "https://gentoo.com/di/";
     license = licenses.zlib;
+    updateWalker = true;
     maintainers = with maintainers; [ manveru ];
     platforms = platforms.all;
   };

@@ -1,36 +1,31 @@
-{ fetchurl, stdenv, dejagnu, doCheck ? false }:
+{ stdenv, fetchurl, fetchpatch
+, autoreconfHook
+
+}:
 
 stdenv.mkDerivation rec {
-  name = "libffi-3.2.1";
+  name = "libffi-3.3";
 
   src = fetchurl {
-    url = "ftp://sourceware.org/pub/libffi/${name}.tar.gz";
-    sha256 = "0dya49bnhianl0r65m65xndz6ls2jn1xngyn72gd28ls3n7bnvnh";
+    url = "https://sourceware.org/pub/libffi/${name}.tar.gz";
+    sha256 = "0mi0cpf8aa40ljjmzxb7im6dbj45bb0kllcd09xgmp834y9agyvj";
   };
 
-  patches = stdenv.lib.optional stdenv.isCygwin ./3.2.1-cygwin.patch;
+  patches = [];
 
-  outputs = [ "out" "dev" "doc" ];
-
-  buildInputs = stdenv.lib.optional doCheck dejagnu;
+  outputs = [ "out" "dev" "man" "info" ];
 
   configureFlags = [
     "--with-gcc-arch=generic" # no detection of -march= or -mtune=
     "--enable-pax_emutramp"
   ];
 
-  inherit doCheck;
-
-  dontStrip = stdenv ? cross; # Don't run the native `strip' when cross-compiling.
-
-  # Install headers and libs in the right places.
-  postFixup = ''
-    mkdir -p "$dev/"
-    mv "$out/lib/${name}/include" "$dev/include"
-    rmdir "$out/lib/${name}"
-    substituteInPlace "$dev/lib/pkgconfig/libffi.pc" \
-      --replace 'includedir=''${libdir}/libffi-3.2.1' "includedir=$dev"
+  preCheck = ''
+    # The tests use -O0 which is not compatible with -D_FORTIFY_SOURCE.
+    NIX_HARDENING_ENABLE=''${NIX_HARDENING_ENABLE/fortify/}
   '';
+
+  dontStrip = stdenv.hostPlatform != stdenv.buildPlatform; # Don't run the native `strip' when cross-compiling.
 
   meta = with stdenv.lib; {
     description = "A foreign function call interface library";
@@ -48,10 +43,9 @@ stdenv.mkDerivation rec {
       interface.  A layer must exist above libffi that handles type
       conversions for values passed between the two languages.
     '';
-    homepage = http://sourceware.org/libffi/;
-    # See http://github.com/atgreen/libffi/blob/master/LICENSE .
-    license = licenses.free;
-    maintainers = [ ];
+    homepage = "http://sourceware.org/libffi/";
+    license = licenses.mit;
+    maintainers = with maintainers; [ matthewbauer ];
     platforms = platforms.all;
   };
 }

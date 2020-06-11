@@ -1,69 +1,89 @@
-{ fetchurl, stdenv, ncurses, readline, gmp, mpfr, expat, texinfo, zlib
-, dejagnu, perl, pkgconfig
-, python ? null
-, guile ? null
-, target ? null
-# Support all known targets in one gdb binary.
-, multitarget ? false
-# Additional dependencies for GNU/Hurd.
-, mig ? null, hurd ? null
+{ stdenv, targetPackages
 
+# Build time
+, fetchurl, pkgconfig, perl, texinfo, setupDebugInfoDirs, buildPackages
+
+# Run time
+, ncurses, readline, gmp, mpfr, expat, libipt, zlib, dejagnu
+
+, pythonSupport ? stdenv.hostPlatform == stdenv.buildPlatform && !stdenv.hostPlatform.isCygwin, python3 ? null
+, guile ? null
+, safePaths ? [
+   # $debugdir:$datadir/auto-load are whitelisted by default by GDB
+   "$debugdir" "$datadir/auto-load"
+   # targetPackages so we get the right libc when cross-compiling and using buildPackages.gdb
+   targetPackages.stdenv.cc.cc.lib
+  ]
 }:
 
 let
-
-  basename = "gdb-7.12";
-
-  # Whether (cross-)building for GNU/Hurd.  This is an approximation since
-  # having `stdenv ? cross' doesn't tell us if we're building `crossDrv' and
-  # `nativeDrv'.
-  isGNU =
-      stdenv.system == "i686-gnu"
-      || (stdenv ? cross && stdenv.cross.config == "i586-pc-gnu");
-
+  basename = "gdb-${version}";
+  version = "9.1";
 in
 
-assert isGNU -> mig != null && hurd != null;
+assert pythonSupport -> python3 != null;
 
 stdenv.mkDerivation rec {
-  name = basename + stdenv.lib.optionalString (target != null)
-      ("-" + target.config);
+  name =
+    stdenv.lib.optionalString (stdenv.targetPlatform != stdenv.hostPlatform)
+                              (stdenv.targetPlatform.config + "-")
+    + basename;
 
   src = fetchurl {
     url = "mirror://gnu/gdb/${basename}.tar.xz";
-    sha256 = "152g2qa8337cxif3lkvabjcxfd9jphfb2mza8f1p2c4bjk2z6kw3";
+    sha256 = "0dqp1p7w836iwijg1zb4a784n0j4pyjiw5v6h8fg5lpx6b40x7k9";
   };
 
-  nativeBuildInputs = [ pkgconfig texinfo perl ]
-    ++ stdenv.lib.optional isGNU mig;
+  postPatch = if stdenv.isDarwin then ''
+    substituteInPlace gdb/darwin-nat.c \
+      --replace '#include "bfd/mach-o.h"' '#include "mach-o.h"'
+  '' else null;
 
-  buildInputs = [ ncurses readline gmp mpfr expat zlib python guile ]
-    ++ stdenv.lib.optional isGNU hurd
+  patches = [
+    ./debug-info-from-env.patch
+  ] ++ stdenv.lib.optionals stdenv.isDarwin [
+    ./darwin-target-match.patch
+  ];
+
+  nativeBuildInputs = [ pkgconfig texinfo perl setupDebugInfoDirs ];
+
+  buildInputs = [ ncurses readline gmp mpfr expat libipt zlib guile ]
+    ++ stdenv.lib.optional pythonSupport python3
     ++ stdenv.lib.optional doCheck dejagnu;
+
+  propagatedNativeBuildInputs = [ setupDebugInfoDirs ];
+
+  depsBuildBuild = [ buildPackages.stdenv.cc ];
 
   enableParallelBuilding = true;
 
   # darwin build fails with format hardening since v7.12
   hardeningDisable = stdenv.lib.optionals stdenv.isDarwin [ "format" ];
 
-  configureFlags = with stdenv.lib;
-    [ "--with-gmp=${gmp.dev}" "--with-mpfr=${mpfr.dev}" "--with-system-readline"
-      "--with-system-zlib" "--with-expat" "--with-libexpat-prefix=${expat.dev}"
-      "--with-separate-debug-dir=/run/current-system/sw/lib/debug"
-    ]
-    ++ optional (target != null) "--target=${target.config}"
-    ++ optional multitarget "--enable-targets=all"
-    ++ optional (elem stdenv.system platforms.cygwin) "--without-python";
+  NIX_CFLAGS_COMPILE = "-Wno-format-nonliteral";
 
-  crossAttrs = {
-    # Do not add --with-python here to avoid cross building it.
-    configureFlags = with stdenv.lib;
-      [ "--with-gmp=${gmp.crossDrv}" "--with-mpfr=${mpfr.crossDrv}" "--with-system-readline"
-        "--with-system-zlib" "--with-expat" "--with-libexpat-prefix=${expat.crossDrv}" "--without-python"
-      ]
-      ++ optional (target != null) "--target=${target.config}"
-      ++ optional multitarget "--enable-targets=all";
-  };
+  # TODO(@Ericson2314): Always pass "--target" and always prefix.
+  configurePlatforms = [ "build" "host" ] ++ stdenv.lib.optional (stdenv.targetPlatform != stdenv.hostPlatform) "target";
+
+  # GDB have to be built out of tree.
+  preConfigure = ''
+    mkdir _build
+    cd _build
+  '';
+  configureScript = "../configure";
+
+  configureFlags = with stdenv.lib; [
+    "--enable-targets=all" "--enable-64-bit-bfd"
+    "--disable-install-libbfd"
+    "--disable-shared" "--enable-static"
+    "--with-system-zlib"
+    "--with-system-readline"
+
+    "--with-gmp=${gmp.dev}"
+    "--with-mpfr=${mpfr.dev}"
+    "--with-expat" "--with-libexpat-prefix=${expat.dev}"
+    "--with-auto-load-safe-path=${builtins.concatStringsSep ":" safePaths}"
+  ] ++ stdenv.lib.optional (!pythonSupport) "--without-python";
 
   postInstall =
     '' # Remove Info files already provided by Binutils and other packages.
@@ -82,11 +102,11 @@ stdenv.mkDerivation rec {
       program was doing at the moment it crashed.
     '';
 
-    homepage = http://www.gnu.org/software/gdb/;
+    homepage = "https://www.gnu.org/software/gdb/";
 
     license = stdenv.lib.licenses.gpl3Plus;
 
     platforms = with platforms; linux ++ cygwin ++ darwin;
-    maintainers = with maintainers; [ pierron ];
+    maintainers = with maintainers; [ pierron globin lsix ];
   };
 }

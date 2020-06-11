@@ -3,7 +3,6 @@
 with lib;
 
 let
-
   xcfg = config.services.xserver;
   cfg = xcfg.desktopManager.lxqt;
 
@@ -18,67 +17,51 @@ in
       description = "Enable the LXQt desktop manager";
     };
 
+    environment.lxqt.excludePackages = mkOption {
+      default = [];
+      example = literalExample "[ pkgs.lxqt.qterminal ]";
+      type = types.listOf types.package;
+      description = "Which LXQt packages to exclude from the default environment";
+    };
+
   };
 
-
-  config = mkIf (xcfg.enable && cfg.enable) {
+  config = mkIf cfg.enable {
 
     services.xserver.desktopManager.session = singleton {
       name = "lxqt";
       bgSupport = true;
       start = ''
-        exec ${pkgs.lxqt.lxqt-common}/bin/startlxqt
+        # Upstream installs default configuration files in
+        # $prefix/share/lxqt instead of $prefix/etc/xdg, (arguably)
+        # giving distributors freedom to ship custom default
+        # configuration files more easily. In order to let the session
+        # manager find them the share subdirectory is added to the
+        # XDG_CONFIG_DIRS environment variable.
+        #
+        # For an explanation see
+        # https://github.com/lxqt/lxqt/issues/1521#issuecomment-405097453
+        #
+        export XDG_CONFIG_DIRS=$XDG_CONFIG_DIRS''${XDG_CONFIG_DIRS:+:}${config.system.path}/share
+
+        exec ${pkgs.lxqt.lxqt-session}/bin/startlxqt
       '';
     };
 
-    environment.systemPackages = [
-      pkgs.kde5.kwindowsystem # provides some QT5 plugins needed by lxqt-panel
-      pkgs.kde5.libkscreen # provides plugins for screen management software
-      pkgs.kde5.oxygen-icons5 # default icon theme
-      pkgs.libfm
-      pkgs.libfm-extra
-      pkgs.lxmenu-data
-      pkgs.lxqt.compton-conf
-      pkgs.lxqt.libfm-qt
-      pkgs.lxqt.liblxqt
-      pkgs.lxqt.libqtxdg
-      pkgs.lxqt.libsysstat
-      pkgs.lxqt.lximage-qt
-      pkgs.lxqt.lxqt-about
-      pkgs.lxqt.lxqt-admin
-      pkgs.lxqt.lxqt-common
-      pkgs.lxqt.lxqt-config
-      pkgs.lxqt.lxqt-globalkeys
-      pkgs.lxqt.lxqt-l10n
-      pkgs.lxqt.lxqt-notificationd
-      pkgs.lxqt.lxqt-openssh-askpass
-      pkgs.lxqt.lxqt-panel
-      pkgs.lxqt.lxqt-policykit
-      pkgs.lxqt.lxqt-powermanagement
-      pkgs.lxqt.lxqt-qtplugin
-      pkgs.lxqt.lxqt-runner
-      pkgs.lxqt.lxqt-session
-      pkgs.lxqt.lxqt-sudo
-      pkgs.lxqt.obconf-qt
-      pkgs.lxqt.pavucontrol-qt
-      pkgs.lxqt.pcmanfm-qt
-      pkgs.lxqt.qlipper
-      pkgs.lxqt.qps
-      pkgs.lxqt.qterminal
-      pkgs.lxqt.qtermwidget
-      pkgs.lxqt.screengrab
-      pkgs.menu-cache
-      pkgs.openbox # default window manager
-      pkgs.qt5.qtsvg # provides QT5 plugins for svg icons
-      pkgs.xscreensaver
-    ];
+    environment.systemPackages =
+      pkgs.lxqt.preRequisitePackages ++
+      pkgs.lxqt.corePackages ++
+      (pkgs.gnome3.removePackagesByName
+        pkgs.lxqt.optionalPackages
+        config.environment.lxqt.excludePackages);
 
     # Link some extra directories in /run/current-system/software/share
-    environment.pathsToLink = [
-      "/share/desktop-directories"
-      "/share/icons"
-      "/share/lxqt"
-    ];
+    environment.pathsToLink = [ "/share" ];
 
+    services.gvfs.enable = true;
+    services.gvfs.package = pkgs.gvfs;
+
+    services.upower.enable = config.powerManagement.enable;
   };
+
 }

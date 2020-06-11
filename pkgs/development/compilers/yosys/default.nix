@@ -1,50 +1,80 @@
-{ stdenv, fetchFromGitHub, fetchFromBitbucket, pkgconfig, tcl, readline, libffi, python3, bison, flex }:
+{ stdenv
+, abc-verifier
+, bison
+, fetchFromGitHub
+, flex
+, libffi
+, pkgconfig
+, protobuf
+, python3
+, readline
+, tcl
+, verilog
+, zlib
+}:
 
 stdenv.mkDerivation rec {
-  name = "yosys-${version}";
-  version = "2016.08.18";
+  pname   = "yosys";
+  version = "2020.03.24";
 
-  srcs = [
-    (fetchFromGitHub {
-      owner = "cliffordwolf";
-      repo = "yosys";
-      rev = "9b8e06bee177f53c34a9dd6dd907a822f21659be";
-      sha256 = "0x5c1bcayahn7pbgycxkxr6lkv9m0jpwfdlmyp2m9yzm2lpyw7dg";
-      name = "yosys";
-    })
-    (fetchFromBitbucket {
-      owner = "alanmi";
-      repo = "abc";
-      rev = "a2e5bc66a68a";
-      sha256 = "09yvhj53af91nc54gmy7cbp7yljfcyj68a87494r5xvdfnsj11gy";
-      name = "yosys-abc";
-    })
-  ];
-  sourceRoot = "yosys";
+  src = fetchFromGitHub {
+    owner  = "YosysHQ";
+    repo   = "yosys";
+    rev    = "c9555c9adeba886a308c60615ac794ec20d9276e";
+    sha256 = "1fh118fv06jyfmkx6zy0w2k0rjj22m0ffyll3k5giaw8zzaf0j3a";
+  };
 
-  buildInputs = [ pkgconfig tcl readline libffi python3 bison flex ];
-  preBuild = ''
-    chmod -R u+w ../yosys-abc
-    ln -s ../yosys-abc abc
-    make config-gcc
-    echo 'ABCREV := default' >> Makefile.conf
-    makeFlags="PREFIX=$out $makeFlags"
+  enableParallelBuilding = true;
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ tcl readline libffi python3 bison flex protobuf zlib ];
+
+  makeFlags = [ "ENABLE_PROTOBUF=1" "PREFIX=${placeholder "out"}"];
+
+  patchPhase = ''
+    substituteInPlace ./Makefile \
+      --replace 'CXX = clang' "" \
+      --replace 'LD = clang++' 'LD = $(CXX)' \
+      --replace 'CXX = gcc' "" \
+      --replace 'LD = gcc' 'LD = $(CXX)' \
+      --replace 'ABCMKARGS = CC="$(CXX)" CXX="$(CXX)"' 'ABCMKARGS =' \
+      --replace 'echo UNKNOWN' 'echo ${builtins.substring 0 10 src.rev}'
+    patchShebangs tests
   '';
 
-  meta = {
-    description = "Framework for RTL synthesis tools";
-    longDescription = ''
-      Yosys is a framework for RTL synthesis tools. It currently has
-      extensive Verilog-2005 support and provides a basic set of
-      synthesis algorithms for various application domains.
-      Yosys can be adapted to perform any synthesis job by combining
-      the existing passes (algorithms) using synthesis scripts and
-      adding additional passes as needed by extending the yosys C++
-      code base.
-    '';
-    homepage = http://www.clifford.at/yosys/;
-    license = stdenv.lib.licenses.isc;
-    maintainers = [ stdenv.lib.maintainers.shell ];
-    platforms = stdenv.lib.platforms.linux;
+  preBuild = let
+    shortAbcRev = builtins.substring 0 7 abc-verifier.rev;
+  in ''
+    chmod -R u+w .
+    make config-${if stdenv.cc.isClang or false then "clang" else "gcc"}
+    echo 'ABCEXTERNAL = ${abc-verifier}/bin/abc' >> Makefile.conf
+
+    # we have to do this ourselves for some reason...
+    (cd misc && ${protobuf}/bin/protoc --cpp_out ../backends/protobuf/ ./yosys.proto)
+
+    if ! grep -q "ABCREV = ${shortAbcRev}" Makefile; then
+      echo "yosys isn't compatible with the provided abc (${shortAbcRev}), failing."
+      exit 1
+    fi
+  '';
+
+  doCheck = true;
+  checkInputs = [ verilog ];
+
+  # Internally, yosys knows to use the specified hardcoded ABCEXTERNAL binary.
+  # But other tools (like mcy or symbiyosys) can't know how yosys was built, so
+  # they just assume that 'yosys-abc' is available -- but it's not installed
+  # when using ABCEXTERNAL
+  #
+  # add a symlink to fake things so that both variants work the same way.
+  postInstall = ''
+    ln -sfv ${abc-verifier}/bin/abc $out/bin/yosys-abc
+  '';
+
+  meta = with stdenv.lib; {
+    description = "Open RTL synthesis framework and tools";
+    homepage    = "http://www.clifford.at/yosys/";
+    license     = licenses.isc;
+    platforms   = platforms.all;
+    maintainers = with maintainers; [ shell thoughtpolice emily ];
   };
 }

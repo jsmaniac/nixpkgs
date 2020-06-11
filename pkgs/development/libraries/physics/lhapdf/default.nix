@@ -1,19 +1,16 @@
-{ stdenv, fetchurl, boost, python2 }:
+{ stdenv, fetchurl, python2, makeWrapper }:
 
 stdenv.mkDerivation rec {
-  name = "lhapdf-${version}";
-  version = "6.1.6";
+  pname = "lhapdf";
+  version = "6.2.3";
 
   src = fetchurl {
-    url = "http://www.hepforge.org/archive/lhapdf/LHAPDF-${version}.tar.gz";
-    sha256 = "1sgbaxv8clcfy4d96fkwfyqcd4b29i0hwv32ry4vy69j5qiki0f2";
+    url = "https://www.hepforge.org/archive/lhapdf/LHAPDF-${version}.tar.gz";
+    sha256 = "1l9dv37k4jz18wahyfm9g53nyl81v5bgqgy4dllbcmvcqpfkmrnn";
   };
 
-  buildInputs = [ boost python2 ];
-
-  patches = [ ./distutils-c++.patch ];
-
-  configureFlags = "--with-boost=${boost.dev}";
+  nativeBuildInputs = [ makeWrapper ];
+  buildInputs = [ python2 ];
 
   enableParallelBuilding = true;
 
@@ -21,10 +18,14 @@ stdenv.mkDerivation rec {
     pdf_sets = import ./pdf_sets.nix { inherit stdenv fetchurl; };
   };
 
+  postInstall = ''
+    wrapProgram $out/bin/lhapdf --prefix PYTHONPATH : "$(toPythonPath "$out")"
+  '';
+
   meta = {
     description = "A general purpose interpolator, used for evaluating Parton Distribution Functions from discretised data files";
     license     = stdenv.lib.licenses.gpl2;
-    homepage    = http://lhapdf.hepforge.org;
+    homepage    = "http://lhapdf.hepforge.org";
     platforms   = stdenv.lib.platforms.unix;
     maintainers = with stdenv.lib.maintainers; [ veprbl ];
   };

@@ -12,7 +12,7 @@ let
     nodes = [ ${concatMapStringsSep "," (s: ''"${s}"'') cfg.nodes}, ]
     prefix = "${cfg.prefix}"
     log-level = "${cfg.logLevel}"
-    watch = ${if cfg.watch then "true" else "false"}
+    watch = ${boolToString cfg.watch}
   '';
 
 in {
@@ -75,7 +75,7 @@ in {
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
       serviceConfig = {
-        ExecStart = "${cfg.package.bin}/bin/confd";
+        ExecStart = "${cfg.package}/bin/confd";
       };
     };
 

@@ -1,15 +1,15 @@
 { stdenv, fetchurl, gfortran }:
-let
-  version = "3.5.0";
-in
+
 stdenv.mkDerivation rec {
-  name = "blas-${version}";
+  pname = "blas";
+  version = "3.8.0";
+
   src = fetchurl {
-    url = "http://www.netlib.org/blas/${name}.tgz";
-    sha256 = "096a3apnh899abjymjjg8m34hncagkzp9qxw08cms98g71fpfzgg";
+    url = "http://www.netlib.org/blas/${pname}-${version}.tgz";
+    sha256 = "1s24iry5197pskml4iygasw196bdhplj0jmbsb9jhabcjqj2mpsm";
   };
 
-  buildInputs = [gfortran];
+  buildInputs = [ gfortran ];
 
   configurePhase = ''
     echo >make.inc  "SHELL = ${stdenv.shell}"
@@ -44,6 +44,22 @@ stdenv.mkDerivation rec {
     install ${dashD} -m755 libblas.so.${version} "$out/lib/libblas.so.${version}"
     ln -s libblas.so.${version} "$out/lib/libblas.so.3"
     ln -s libblas.so.${version} "$out/lib/libblas.so"
+    # Write pkgconfig alias.
+    # See also openblas/default.nix
+    mkdir $out/lib/pkgconfig
+    cat <<EOF > $out/lib/pkgconfig/blas.pc
+Name: blas
+Version: ${version}
+Description: blas provided by the BLAS package.
+Libs: -L$out/lib -lblas
+EOF
+  '';
+
+  preFixup = stdenv.lib.optionalString stdenv.isDarwin ''
+    for fn in $(find $out/lib -name "*.so*"); do
+      if [ -L "$fn" ]; then continue; fi
+      install_name_tool -id "$fn" "$fn"
+    done
   '';
 
   meta = {

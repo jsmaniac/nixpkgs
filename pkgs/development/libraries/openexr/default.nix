@@ -1,30 +1,34 @@
-{ lib, stdenv, fetchurl, autoconf, automake, libtool, pkgconfig, zlib, ilmbase }:
-
+{ lib
+, stdenv
+, buildPackages
+, fetchFromGitHub
+, zlib
+, ilmbase
+, fetchpatch 
+, cmake
+, libtool
+}:
 stdenv.mkDerivation rec {
-  name = "openexr-${lib.getVersion ilmbase}";
+  pname = "openexr";
+  version = "2.4.1";
 
-  src = fetchurl {
-    url = "http://download.savannah.nongnu.org/releases/openexr/${name}.tar.gz";
-    sha256 = "0ca2j526n4wlamrxb85y2jrgcv0gf21b3a19rr0gh4rjqkv1581n";
+  src = fetchFromGitHub {
+    owner = "AcademySoftwareFoundation";
+    repo = "openexr";
+    rev = "v${version}";
+    sha256 = "020gyl8zv83ag6gbcchmqiyx9rh2jca7j8n52zx1gk4rck7kwc01";
   };
 
   outputs = [ "bin" "dev" "out" "doc" ];
-
-  preConfigure = ''
-    ./bootstrap
-  '';
-
-  buildInputs = [ autoconf automake libtool pkgconfig ];
+  nativeBuildInputs = [ cmake libtool ];
   propagatedBuildInputs = [ ilmbase zlib ];
 
   enableParallelBuilding = true;
 
-  patches = [ ./bootstrap.patch ];
-
   meta = with stdenv.lib; {
-    homepage = http://www.openexr.com/;
+    description = "A high dynamic-range (HDR) image file format";
+    homepage = "https://www.openexr.com/";
     license = licenses.bsd3;
     platforms = platforms.all;
-    maintainers = with maintainers; [ wkennington ];
   };
 }

@@ -1,26 +1,27 @@
 { stdenv, fetchurl
-, pkgconfig, cmake
-, docbook_xml_dtd_45, docbook_xsl, libxslt
-, python, ffmpeg, mp4v2, flac, libogg, libvorbis
-, phonon, automoc4, chromaprint, id3lib, taglib
-, qt, zlib, readline
-, makeWrapper
+, pkgconfig, cmake, python, ffmpeg, phonon, automoc4
+, chromaprint, docbook_xml_dtd_45, docbook_xsl, libxslt
+, id3lib, taglib, mp4v2, flac, libogg, libvorbis
+, zlib, readline , qtbase, qttools, qtmultimedia, qtquickcontrols
+, wrapQtAppsHook
 }:
 
 stdenv.mkDerivation rec {
 
-  name = "kid3-${version}";
-  version = "3.4.2";
+  pname = "kid3";
+  version = "3.8.3";
 
   src = fetchurl {
-    url = "mirror://sourceforge/project/kid3/kid3/${version}/${name}.tar.gz";
-    sha256 = "0gka4na583015jyqva18g85q7vnkjdk0iji2jp88di3kpvqhf1sw";
+    url = "mirror://sourceforge/project/kid3/kid3/${version}/${pname}-${version}.tar.gz";
+    sha256 = "0i0c4bmsm36jj1v535kil47ig0ig70ykrzcw2f56spr25xns06ka";
   };
 
+  nativeBuildInputs = [ wrapQtAppsHook ];
   buildInputs = with stdenv.lib;
-  [ pkgconfig cmake python ffmpeg docbook_xml_dtd_45 docbook_xsl libxslt
-    phonon automoc4 chromaprint id3lib taglib mp4v2 flac libogg libvorbis
-    qt zlib readline makeWrapper ];
+  [ pkgconfig cmake python ffmpeg phonon automoc4
+    chromaprint docbook_xml_dtd_45 docbook_xsl libxslt
+    id3lib taglib mp4v2 flac libogg libvorbis zlib readline
+    qtbase qttools qtmultimedia qtquickcontrols ];
 
   cmakeFlags = [ "-DWITH_APPS=Qt;CLI" ];
   NIX_LDFLAGS = "-lm -lpthread";
@@ -29,9 +30,7 @@ stdenv.mkDerivation rec {
     export DOCBOOKDIR="${docbook_xsl}/xml/xsl/docbook/"
   '';
 
-  postInstall = ''
-    wrapProgram $out/bin/kid3-qt --prefix QT_PLUGIN_PATH : $out/lib/qt4/plugins
-  '';
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
     description = "A simple and powerful audio tag editor";
@@ -65,10 +64,9 @@ stdenv.mkDerivation rec {
       - Edit synchronized lyrics and event timing codes, import and
         export LRC files
     '';
-    homepage = http://kid3.sourceforge.net/;
+    homepage = "http://kid3.sourceforge.net/";
     license = licenses.lgpl2Plus;
     maintainers = [ maintainers.AndersonTorres ];
     platforms = platforms.linux;
   };
 }
-# TODO: Qt5 support - not so urgent!

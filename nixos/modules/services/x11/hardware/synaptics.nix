@@ -19,7 +19,7 @@ let cfg = config.services.xserver.synaptics;
       Option "TapButton3" "0"
     '';
   pkg = pkgs.xorg.xf86inputsynaptics;
-  etcFile = "X11/xorg.conf.d/50-synaptics.conf";
+  etcFile = "X11/xorg.conf.d/70-synaptics.conf";
 in {
 
   options = {
@@ -29,8 +29,7 @@ in {
       enable = mkOption {
         type = types.bool;
         default = false;
-        example = true;
-        description = "Whether to enable touchpad support.";
+        description = "Whether to enable touchpad support. Deprecated: Consider services.xserver.libinput.enable.";
       };
 
       dev = mkOption {
@@ -45,19 +44,19 @@ in {
       };
 
       accelFactor = mkOption {
-        type = types.nullOr types.string;
+        type = types.nullOr types.str;
         default = "0.001";
         description = "Cursor acceleration (how fast speed increases from minSpeed to maxSpeed).";
       };
 
       minSpeed = mkOption {
-        type = types.nullOr types.string;
+        type = types.nullOr types.str;
         default = "0.6";
         description = "Cursor speed factor for precision finger motion.";
       };
 
       maxSpeed = mkOption {
-        type = types.nullOr types.string;
+        type = types.nullOr types.str;
         default = "1.0";
         description = "Cursor speed factor for highest-speed finger motion.";
       };
@@ -102,7 +101,6 @@ in {
       tapButtons = mkOption {
         type = types.bool;
         default = true;
-        example = false;
         description = "Whether to enable tap buttons.";
       };
 
@@ -125,7 +123,6 @@ in {
       palmDetect = mkOption {
         type = types.bool;
         default = false;
-        example = true;
         description = "Whether to enable palm detection (hardware support required)";
       };
 
@@ -146,7 +143,6 @@ in {
       horizontalScroll = mkOption {
         type = types.bool;
         default = true;
-        example = false;
         description = "Whether to enable horizontal scrolling (on touchpad)";
       };
 
@@ -171,8 +167,8 @@ in {
 
     services.xserver.modules = [ pkg.out ];
 
-    environment.etc."${etcFile}".source =
-      "${pkg.out}/share/X11/xorg.conf.d/50-synaptics.conf";
+    environment.etc.${etcFile}.source =
+      "${pkg.out}/share/X11/xorg.conf.d/70-synaptics.conf";
 
     environment.systemPackages = [ pkg ];
 

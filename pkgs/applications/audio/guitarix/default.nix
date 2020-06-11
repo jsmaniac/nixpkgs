@@ -1,8 +1,8 @@
-{ stdenv, fetchurl, gettext, intltool, pkgconfig, python
-, avahi, bluez, boost, eigen, fftw, glib, glib_networking
-, glibmm, gsettings_desktop_schemas, gtkmm2, libjack2
-, ladspaH, librdf, libsndfile, lilv, lv2, serd, sord, sratom
-, webkitgtk2, wrapGAppsHook, zita-convolver, zita-resampler
+{ stdenv, fetchurl, fetchpatch, faust, gettext, intltool, pkgconfig, python2
+, avahi, bluez, boost, eigen, fftw, glib, glib-networking
+, glibmm, gsettings-desktop-schemas, gtkmm2, libjack2
+, ladspaH, libav, libsndfile, lilv, lrdf, lv2, serd, sord, sratom
+, wrapGAppsHook, zita-convolver, zita-resampler, curl, wafHook
 , optimizationSupport ? false # Enable support for native CPU extensions
 }:
 
@@ -11,35 +11,45 @@ let
 in
 
 stdenv.mkDerivation rec {
-  name = "guitarix-${version}";
-  version = "0.35.2";
+  pname = "guitarix";
+  version = "0.39.0";
 
   src = fetchurl {
     url = "mirror://sourceforge/guitarix/guitarix2-${version}.tar.xz";
-    sha256 = "1qj3adjhg511jygbjkl9k5v0gcjmg6ifc479rspfyf45m383pp3p";
+    sha256 = "1nn80m1qagfhvv69za60f0w6ck87vmk77qmqarj7fbr8avwg63s9";
   };
 
-  nativeBuildInputs = [ gettext intltool wrapGAppsHook pkgconfig python ];
-
-  buildInputs = [
-    avahi bluez boost eigen fftw glib glibmm glib_networking.out
-    gsettings_desktop_schemas gtkmm2 libjack2 ladspaH librdf
-    libsndfile lilv lv2 serd sord sratom webkitgtk2 zita-convolver
-    zita-resampler
+  patches = [
+    (fetchpatch {
+      url = "https://git.archlinux.org/svntogit/community.git/plain/trunk/guitarix-0.39.0-fix_faust_and_lv2_plugins.patch?id=8579b4dfe85e04303ad2d9771ed699f04ea7b7cf";
+      stripLen = 1;
+      sha256 = "0pgkhi4v4vrzjnig0ggmz207q4x5iyk2n6rjj8s5lv15fia7qzp4";
+    })
   ];
 
-  configureFlags = [
+  nativeBuildInputs = [ faust gettext intltool wrapGAppsHook pkgconfig python2 wafHook ];
+
+  buildInputs = [
+    avahi bluez boost eigen fftw glib glibmm glib-networking.out
+    gsettings-desktop-schemas gtkmm2 libjack2 ladspaH libav
+    libsndfile lilv lrdf lv2 serd sord sratom zita-convolver
+    zita-resampler curl
+  ];
+
+  postPatch = ''
+    # Fix build with lv2 1.18: https://github.com/brummer10/guitarix/commit/c0334c72
+    find . -type f -exec fgrep -q LV2UI_Descriptor {} \; \
+      -exec sed -i {} -e 's/const struct _\?LV2UI_Descriptor/const LV2UI_Descriptor/' \;
+  '';
+
+  wafConfigureFlags = [
     "--shared-lib"
     "--no-desktop-update"
     "--enable-nls"
-    "--no-faust" # todo: find out why --faust doesn't work
+    "--install-roboto-font"
+    "--includeresampler"
+    "--convolver-ffmpeg"
   ] ++ optional optimizationSupport "--optimization";
-
-  configurePhase = ''python waf configure --prefix=$out $configureFlags'';
-
-  buildPhase = ''python waf build'';
-
-  installPhase = ''python waf install'';
 
   meta = with stdenv.lib; {
     description = "A virtual guitar amplifier for Linux running with JACK";
@@ -65,7 +75,7 @@ stdenv.mkDerivation rec {
       clean-sounds, nice overdrive, fat distortion and a diversity of
       crazy sounds never heard before.
     '';
-    homepage = http://guitarix.sourceforge.net/;
+    homepage = "http://guitarix.sourceforge.net/";
     license = licenses.gpl3Plus;
     maintainers = with maintainers; [ astsmtl goibhniu ];
     platforms = platforms.linux;

@@ -1,20 +1,22 @@
-{ stdenv, buildOcaml, fetchzip, cmdliner, stringext }:
+{ lib, buildDunePackage, fetchurl
+, astring, cmdliner, fmt, uuidm, re, stdlib-shims
+}:
 
-buildOcaml rec {
-  name = "alcotest";
-  version = "0.4.5";
+buildDunePackage rec {
+  pname = "alcotest";
+  version = "1.0.1";
 
-  src = fetchzip {
-    url = "https://github.com/mirage/alcotest/archive/${version}.tar.gz";
-    sha256 = "1wcn9hkjf4cbnrz99w940qfjpi0lvd8v63yxwpnafkff871dwk6k";
+  src = fetchurl {
+    url = "https://github.com/mirage/alcotest/releases/download/${version}/alcotest-${version}.tbz";
+    sha256 = "1xlklxb83gamqbg8j5dzm5jk4mvcwkspxajh93p6vpw9ia1li1qc";
   };
 
-  propagatedBuildInputs = [ cmdliner stringext ];
+  propagatedBuildInputs = [ astring cmdliner fmt uuidm re stdlib-shims ];
 
-  meta = with stdenv.lib; {
-    homepage = https://github.com/mirage/alcotest;
+  meta = with lib; {
+    homepage = "https://github.com/mirage/alcotest";
     description = "A lightweight and colourful test framework";
-    license = stdenv.lib.licenses.isc;
+    license = licenses.isc;
     maintainers = [ maintainers.ericbmerritt ];
   };
 }

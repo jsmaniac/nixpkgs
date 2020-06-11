@@ -1,25 +1,43 @@
-{ stdenv, fetchurl, openssl, lzo, zlib, iproute, which, ronn }:
+{ stdenv, buildPackages, fetchFromGitHub, openssl, lzo, zlib, iproute, ronn }:
 
 stdenv.mkDerivation rec {
-  version = "1.1.12";
-  name = "zerotierone";
+  pname = "zerotierone";
+  version = "1.4.6";
 
-  src = fetchurl {
-    url = "https://github.com/zerotier/ZeroTierOne/archive/${version}.tar.gz";
-    sha256 = "0mji6bmxjvxy2mhvzfz4vpdz62n1wv6a02rapzbiad8zr2c869cm";
+  src = fetchFromGitHub {
+    owner = "zerotier";
+    repo = "ZeroTierOne";
+    rev = version;
+    sha256 = "1f8hh05wx59dc0fbzdzwq05x0gmrdfl4v103wbcyjmzsbazaw6p3";
   };
 
   preConfigure = ''
-      substituteInPlace ./osdep/LinuxEthernetTap.cpp \
-        --replace 'execlp("ip",' 'execlp("${iproute}/bin/ip",'
+      substituteInPlace ./osdep/ManagedRoute.cpp \
+        --replace '/usr/sbin/ip' '${iproute}/bin/ip'
+
+      substituteInPlace ./osdep/ManagedRoute.cpp \
+        --replace '/sbin/ip' '${iproute}/bin/ip'
 
       patchShebangs ./doc/build.sh
       substituteInPlace ./doc/build.sh \
-        --replace '/usr/bin/ronn' '${ronn}/bin/ronn' \
-        --replace 'ronn -r' '${ronn}/bin/ronn -r'
+        --replace '/usr/bin/ronn' '${buildPackages.ronn}/bin/ronn' \
+
+      substituteInPlace ./make-linux.mk \
+        --replace 'armv5' 'armv6'
   '';
 
-  buildInputs = [ openssl lzo zlib iproute which ronn ];
+
+  nativeBuildInputs = [ ronn ];
+  buildInputs = [ openssl lzo zlib iproute ];
+
+  enableParallelBuilding = true;
+
+  buildFlags = [ "all" "selftest" ];
+
+  doCheck = stdenv.hostPlatform == stdenv.buildPlatform;
+  checkPhase = ''
+    ./zerotier-selftest
+  '';
 
   installPhase = ''
     install -Dt "$out/bin/" zerotier-one
@@ -28,7 +46,7 @@ stdenv.mkDerivation rec {
 
     mkdir -p $man/share/man/man8
     for cmd in zerotier-one.8 zerotier-cli.1 zerotier-idtool.1; do
-      cat doc/$cmd | gzip -9 > $man/share/man/man8/$cmd.gz
+      cat doc/$cmd | gzip -9n > $man/share/man/man8/$cmd.gz
     done
   '';
 
@@ -36,9 +54,9 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "Create flat virtual Ethernet networks of almost unlimited size";
-    homepage = https://www.zerotier.com;
-    license = licenses.gpl3;
-    maintainers = with maintainers; [ sjmackenzie ];
-    platforms = platforms.allBut [ "i686-linux" ];
+    homepage = "https://www.zerotier.com";
+    license = licenses.bsl11;
+    maintainers = with maintainers; [ sjmackenzie zimbatm ehmry obadz danielfullmer ];
+    platforms = platforms.all;
   };
 }

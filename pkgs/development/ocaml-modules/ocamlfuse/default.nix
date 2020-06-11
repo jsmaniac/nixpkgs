@@ -1,26 +1,23 @@
-{ stdenv, fetchFromGitHub, ocaml, camlidl, fuse, findlib }:
+{ stdenv, buildDunePackage, fetchFromGitHub, camlidl, fuse }:
 
-stdenv.mkDerivation rec {
-  name = "ocamlfuse-2.7-3";
+buildDunePackage {
+  pname = "ocamlfuse";
+  version = "2.7.1_cvs6_e35e76b";
+
   src = fetchFromGitHub {
     owner = "astrada";
     repo = "ocamlfuse";
-    rev = "a085349685758668854499ce6c1fc00c83a5c23b";
-    sha256 = "1pyml2ay5wab1blwpzrv1r6lnycm000jk6aar8i9fkdnh15sa6c3";
+    rev = "e35e76bee3b06806256b5bfca108b7697267cd5c";
+    sha256 = "1v9g0wh7rnjkrjrnw50145g6ry38plyjs8fq8w0nlzwizhf3qhff";
   };
 
-  buildInputs = [ocaml findlib];
-  propagatedBuildInputs = [camlidl fuse];
-  configurePhase = '' ocaml setup.ml -configure --prefix $out '';
-  buildPhase = "ocaml setup.ml -build";
-  installPhase = "ocaml setup.ml -install";
-  createFindlibDestdir = true;
+  propagatedBuildInputs = [ camlidl fuse ];
 
   meta = {
-    homepage = "http://sourceforge.net/projects/ocamlfuse";
+    homepage = "https://sourceforge.net/projects/ocamlfuse";
+    description = "OCaml bindings for FUSE";
     license = stdenv.lib.licenses.gpl2;
-    description = "ocaml binding for fuse";
-    maintainers = with stdenv.lib.maintainers; [ bennofs ];
     platforms = stdenv.lib.platforms.linux;
+    maintainers = with stdenv.lib.maintainers; [ bennofs ];
   };
 }

@@ -1,5 +1,6 @@
-{ stdenv, fetchurl, fetchpatch, pkgconfig, freetype, expat, libxslt, dejavu_fonts
-, substituteAll }:
+{ stdenv, substituteAll, fetchurl
+, pkgconfig, freetype, expat, libxslt, gperf, dejavu_fonts
+}:
 
 /** Font configuration scheme
  - ./config-compat.patch makes fontconfig try the following root configs, in order:
@@ -16,11 +17,12 @@ let
   configVersion = "2.11"; # bump whenever fontconfig breaks compatibility with older configurations
 in
 stdenv.mkDerivation rec {
-  name = "fontconfig-2.12.1";
+  pname = "fontconfig";
+  version = "2.12.6";
 
   src = fetchurl {
-    url = "http://fontconfig.org/release/${name}.tar.bz2";
-    sha256 = "1wy7svvp7df6bjpg1m5vizb3ngd7rhb20vpclv3x3qa71khs6jdl";
+    url = "http://fontconfig.org/release/${pname}-${version}.tar.bz2";
+    sha256 = "05zh65zni11kgnhg726gjbrd55swspdvhqbcnj5a5xh8gn03036g";
   };
 
   patches = [
@@ -28,39 +30,37 @@ stdenv.mkDerivation rec {
       src = ./config-compat.patch;
       inherit configVersion;
     })
+
+    # https://gitlab.freedesktop.org/fontconfig/fontconfig/merge_requests/67
+    ./fix-joypixels.patch
   ];
 
   outputs = [ "bin" "dev" "lib" "out" ]; # $out contains all the config
 
   propagatedBuildInputs = [ freetype ];
-  buildInputs = [ pkgconfig expat ];
+  nativeBuildInputs = [ pkgconfig gperf libxslt ];
+  buildInputs = [ expat ];
 
   configureFlags = [
+    "--with-arch=${stdenv.hostPlatform.parsed.cpu.name}"
     "--with-cache-dir=/var/cache/fontconfig" # otherwise the fallback is in $out/
     "--disable-docs"
     # just <1MB; this is what you get when loading config fails for some reason
     "--with-default-fonts=${dejavu_fonts.minimal}"
+  ] ++ stdenv.lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+    "--with-arch=${stdenv.hostPlatform.parsed.cpu.name}"
   ];
-
-  # We should find a better way to access the arch reliably.
-  crossArch = stdenv.cross.arch or null;
-
-  preConfigure = ''
-    if test -n "$crossConfig"; then
-      configureFlags="$configureFlags --with-arch=$crossArch";
-    fi
-  '';
 
   enableParallelBuilding = true;
 
   doCheck = true;
 
   # Don't try to write to /var/cache/fontconfig at install time.
-  installFlags = "fc_cachedir=$(TMPDIR)/dummy RUN_FC_CACHE_TEST=false";
+  installFlags = [ "fc_cachedir=$(TMPDIR)/dummy" "RUN_FC_CACHE_TEST=false" ];
 
   postInstall = ''
     cd "$out/etc/fonts"
-    "${libxslt.bin}/bin/xsltproc" --stringparam fontDirectories "${dejavu_fonts.minimal}" \
+    xsltproc --stringparam fontDirectories "${dejavu_fonts.minimal}" \
       --stringparam fontconfigConfigVersion "${configVersion}" \
       --path $out/share/xml/fontconfig \
       ${./make-fonts-conf.xsl} $out/etc/fonts/fonts.conf \
@@ -74,10 +74,9 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A library for font customization and configuration";
-    homepage = http://fontconfig.org/;
+    homepage = "http://fontconfig.org/";
     license = licenses.bsd2; # custom but very bsd-like
     platforms = platforms.all;
     maintainers = [ maintainers.vcunat ];
   };
 }
-

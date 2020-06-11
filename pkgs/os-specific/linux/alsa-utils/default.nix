@@ -1,15 +1,12 @@
 {stdenv, fetchurl, alsaLib, gettext, ncurses, libsamplerate, pciutils, fftw}:
 
 stdenv.mkDerivation rec {
-  name = "alsa-utils-${version}";
-  version = "1.1.2";
+  pname = "alsa-utils";
+  version = "1.2.2";
 
   src = fetchurl {
-    urls = [
-      "ftp://ftp.alsa-project.org/pub/utils/${name}.tar.bz2"
-      "http://alsa.cybermirror.org/utils/${name}.tar.bz2"
-    ];
-    sha256 = "0wcha78c2sm8qqk5r3w83cvm8fp6fb1zpd35kmcm24kxhz007xks";
+    url = "mirror://alsa/utils/${pname}-${version}.tar.bz2";
+    sha256 = "1wz460by17rmxrcydn583rd4lhj6wlvqs6x1j5pdzxn5g3app024";
   };
 
   patchPhase = ''
@@ -17,22 +14,23 @@ stdenv.mkDerivation rec {
       --replace "which" "type -p" \
       --replace "lspci" "${pciutils}/bin/lspci"
   '';
-  buildInputs = [ gettext alsaLib ncurses libsamplerate fftw ];
+  nativeBuildInputs = [ gettext ];
+  buildInputs = [ alsaLib ncurses libsamplerate fftw ];
 
-  configureFlags = "--disable-xmlto --with-udev-rules-dir=$(out)/lib/udev/rules.d";
+  configureFlags = [ "--disable-xmlto" "--with-udev-rules-dir=$(out)/lib/udev/rules.d" ];
 
-  installFlags = "ASOUND_STATE_DIR=$(TMPDIR)/dummy";
+  installFlags = [ "ASOUND_STATE_DIR=$(TMPDIR)/dummy" ];
 
-  meta = {
-    homepage = http://www.alsa-project.org/;
+  meta = with stdenv.lib; {
+    homepage = "http://www.alsa-project.org/";
     description = "ALSA, the Advanced Linux Sound Architecture utils";
-
     longDescription = ''
       The Advanced Linux Sound Architecture (ALSA) provides audio and
       MIDI functionality to the Linux-based operating system.
     '';
 
-    platforms = stdenv.lib.platforms.linux;
-    maintainers = [ stdenv.lib.maintainers.AndersonTorres ];
+    license = licenses.gpl2;
+    platforms = platforms.linux;
+    maintainers = [ maintainers.AndersonTorres ];
   };
 }

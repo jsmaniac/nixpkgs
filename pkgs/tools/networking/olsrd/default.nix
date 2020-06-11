@@ -1,11 +1,12 @@
 { stdenv, fetchurl, bison, flex }:
 
 stdenv.mkDerivation rec {
-  name = "olsrd-0.6.6.1";
+  pname = "olsrd";
+  version = "0.9.6.1";
 
   src = fetchurl {
-    url = "http://www.olsr.org/releases/0.6/${name}.tar.bz2";
-    sha256 = "1fphbh9x724r83gxxrd13zv487s4svnr9jdy76h4f36xxb15pnp8";
+    url = "http://www.olsr.org/releases/0.9/${pname}-${version}.tar.bz2";
+    sha256 = "9cac290e9bff5fc7422110b9ccd972853f10962c962d2f31a63de9c6d1520612";
   };
 
   buildInputs = [ bison flex ];
@@ -17,7 +18,7 @@ stdenv.mkDerivation rec {
   meta = {
     description = "An adhoc wireless mesh routing daemon";
     license = stdenv.lib.licenses.bsd3;
-    homepage = http://olsr.org/;
+    homepage = "http://olsr.org/";
     maintainers = with stdenv.lib.maintainers; [viric];
     platforms = with stdenv.lib.platforms; linux;
   };

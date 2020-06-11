@@ -2,12 +2,12 @@
 
 stdenv.mkDerivation rec {
 
-  name = "seabios-${version}";
-  version = "1.9.3";
+  pname = "seabios";
+  version = "1.13.0";
 
   src = fetchurl {
-    url = "http://code.coreboot.org/p/seabios/downloads/get/${name}.tar.gz";
-    sha256 = "13b7n20qfc2cc8v70jvl9r51m563rss9lbk1aflirvnd9705vs0s";
+    url = "https://www.seabios.org/downloads/${pname}-${version}.tar.gz";
+    sha256 = "00z7vdahpxa37irlf8ld350dp6z9qfyfb56vbfqr319hsv13srrp";
   };
 
   buildInputs = [ iasl python ];
@@ -37,10 +37,10 @@ stdenv.mkDerivation rec {
       It can run in an emulator or it can run natively on X86 hardware with the use of coreboot.
       SeaBIOS is the default BIOS for QEMU and KVM.
     '';
-    homepage = http://www.seabios.org;
+    homepage = "http://www.seabios.org";
     license = licenses.lgpl3;
     maintainers = [ maintainers.tstrobel ];
-    platforms = platforms.linux;
+    platforms = [ "i686-linux" "x86_64-linux" ];
   };
 }
 

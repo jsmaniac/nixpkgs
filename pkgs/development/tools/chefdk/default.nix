@@ -1,20 +1,21 @@
-{ stdenv, lib, bundlerEnv, ruby, perl, autoconf }:
+{ lib, bundlerEnv, bundlerUpdateScript, ruby, perl, autoconf }:
 
 bundlerEnv {
-  name = "chefdk-0.11.2";
+  name = "chef-dk-4.7.73";
 
   inherit ruby;
-  gemfile = ./Gemfile;
-  lockfile = ./Gemfile.lock;
-  gemset = ./gemset.nix;
+  gemdir = ./.;
 
   buildInputs = [ perl autoconf ];
 
+  passthru.updateScript = bundlerUpdateScript "chefdk";
+
   meta = with lib; {
     description = "A streamlined development and deployment workflow for Chef platform";
-    homepage    = https://downloads.chef.io/chef-dk/;
+    homepage    = "https://downloads.chef.io/chef-dk/";
     license     = licenses.asl20;
-    maintainers = with maintainers; [ offline ];
+    maintainers = with maintainers; [ offline nicknovitski ];
     platforms   = platforms.unix;
+    badPlatforms = [ "aarch64-linux" ];
   };
 }

@@ -1,44 +1,43 @@
-{ stdenv, fetchurl, dpdk, libpcap, utillinux
-, pkgconfig
-, gtk2, withGtk ? false
+{ stdenv, lib, fetchurl, meson, ninja, pkgconfig
+, dpdk, libbsd, libpcap, lua5_3, numactl, utillinux
+, gtk2, which, withGtk ? false
 }:
 
 stdenv.mkDerivation rec {
-  name = "pktgen-${version}";
-  version = "3.0.13";
+  pname = "pktgen";
+  version = "19.12.0";
 
   src = fetchurl {
-    url = "http://dpdk.org/browse/apps/pktgen-dpdk/snapshot/pktgen-${version}.tar.gz";
-    sha256 = "64629b454ed8dc036d5e9bb30b3ae84a0bab0142b651c72da85ab1454e9ae0d6";
+    url = "http://dpdk.org/browse/apps/pktgen-dpdk/snapshot/${pname}-${version}.tar.xz";
+    sha256 = "1clfviz1qa4hysslcg6i29vsxwl9f6j1y7zf9wwx9br3yq08x956";
   };
 
-  nativeBuildInputs = stdenv.lib.optionals withGtk [ pkgconfig ];
+  nativeBuildInputs = [ meson ninja pkgconfig ];
 
   buildInputs =
-    [ dpdk libpcap ]
+    [ dpdk libbsd libpcap lua5_3 numactl which ]
     ++ stdenv.lib.optionals withGtk [gtk2];
 
-  RTE_SDK = "${dpdk}";
-  RTE_TARGET = "x86_64-native-linuxapp-gcc";
+  RTE_SDK = dpdk;
   GUI = stdenv.lib.optionalString withGtk "true";
 
-  NIX_CFLAGS_COMPILE = [ "-march=core2" ];
+  NIX_CFLAGS_COMPILE = "-msse3";
+
+  patches = [ ./configure.patch ];
 
   postPatch = ''
-    substituteInPlace lib/lua/src/luaconf.h --replace /usr/local $out
-    substituteInPlace lib/common/wr_lscpu.h --replace /usr/bin/lscpu ${utillinux}/bin/lscpu
+    substituteInPlace lib/common/lscpu.h --replace /usr/bin/lscpu ${utillinux}/bin/lscpu
   '';
 
-  installPhase = ''
-    install -d $out/bin
-    install -m 0755 app/app/${RTE_TARGET}/app/pktgen $out/bin
-    install -d $out/lib/lua/5.3
-    install -m 0644 Pktgen.lua $out/lib/lua/5.3
+  postInstall = ''
+    # meson installs unneeded files with conflicting generic names, such as
+    # include/cli.h and lib/liblua.so.
+    rm -rf $out/include $out/lib
   '';
 
   meta = with stdenv.lib; {
     description = "Traffic generator powered by DPDK";
-    homepage = http://dpdk.org/;
+    homepage = "http://dpdk.org/";
     license = licenses.bsdOriginal;
     platforms =  [ "x86_64-linux" ];
     maintainers = [ maintainers.abuibrahim ];

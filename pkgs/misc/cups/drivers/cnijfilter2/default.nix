@@ -1,18 +1,18 @@
-{ stdenv, lib, fetchzip, autoconf, automake, cups, glib, libxml2, libusb, libtool
+{ stdenv, lib, fetchzip, autoconf, automake, cups, glib, libxml2, libusb1, libtool
 , withDebug ? false }:
 
-stdenv.mkDerivation rec {
-  name = "cnijfilter2-${version}";
+stdenv.mkDerivation {
+  pname = "cnijfilter2";
 
-  version = "5.30";
+  version = "5.70";
 
   src = fetchzip {
-    url = "http://gdlp01.c-wss.com/gds/9/0100007129/01/cnijfilter2-source-5.30-1.tar.gz";
-    sha256 = "0gnl9arwmkblljsczspcgggx85a19vcmhmbjfyv1bq236yqixv5c";
+    url = "http://gdlp01.c-wss.com/gds/0/0100009930/01/cnijfilter2-source-5.70-1.tar.gz";
+    sha256 = "045zjsmaidn1m44ki6m1018gjzbj77gm234n5i2lshxpbzpyh0is";
   };
 
   buildInputs = [
-    cups automake autoconf glib libxml2 libusb libtool
+    cups automake autoconf glib libxml2 libusb1 libtool
   ];
 
   # lgmon3's --enable-libdir flag is used soley for specifying in which
@@ -37,8 +37,9 @@ stdenv.mkDerivation rec {
       cd lgmon3
       substituteInPlace src/Makefile.am \
         --replace /usr/include/libusb-1.0 \
-                  ${libusb.dev}/include/libusb-1.0
+                  ${libusb1.dev}/include/libusb-1.0
       ./autogen.sh --prefix=$out --enable-progpath=$out/bin \
+                   --datadir=$out/share \
                    --enable-libdir=/var/cache/cups
       make
     )

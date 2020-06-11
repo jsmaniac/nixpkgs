@@ -10,6 +10,11 @@ let
     check = x: (lib.types.package.check x) && (attrByPath ["meta" "isIbusEngine"] false x);
   };
 
+  impanel =
+    if cfg.panel != null
+    then "--panel=${cfg.panel}"
+    else "";
+
   ibusAutostart = pkgs.writeTextFile {
     name = "autostart-ibus-daemon";
     destination = "/etc/xdg/autostart/ibus-daemon.desktop";
@@ -17,11 +22,15 @@ let
       [Desktop Entry]
       Name=IBus
       Type=Application
-      Exec=${ibusPackage}/bin/ibus-daemon --daemonize --xim
+      Exec=${ibusPackage}/bin/ibus-daemon --daemonize --xim ${impanel}
     '';
   };
 in
 {
+  imports = [
+    (mkRenamedOptionModule [ "programs" "ibus" "plugins" ] [ "i18n" "inputMethod" "ibus" "engines" ])
+  ];
+
   options = {
     i18n.inputMethod.ibus = {
       engines = mkOption {
@@ -36,15 +45,29 @@ in
           in
             "Enabled IBus engines. Available engines are: ${engines}.";
       };
+      panel = mkOption {
+        type = with types; nullOr path;
+        default = null;
+        example = literalExample "''${pkgs.plasma5.plasma-desktop}/lib/libexec/kimpanel-ibus-panel";
+        description = "Replace the IBus panel with another panel.";
+      };
     };
   };
 
   config = mkIf (config.i18n.inputMethod.enabled == "ibus") {
     i18n.inputMethod.package = ibusPackage;
 
+    environment.systemPackages = [
+      ibusAutostart
+    ];
+
     # Without dconf enabled it is impossible to use IBus
-    environment.systemPackages = with pkgs; [
-      ibus-qt gnome3.dconf ibusAutostart
+    programs.dconf.enable = true;
+
+    programs.dconf.profiles.ibus = "${ibusPackage}/etc/dconf/profile/ibus";
+
+    services.dbus.packages = [
+      ibusAutostart
     ];
 
     environment.variables = {
@@ -52,5 +75,9 @@ in
       QT_IM_MODULE = "ibus";
       XMODIFIERS = "@im=ibus";
     };
+
+    xdg.portal.extraPortals = mkIf config.xdg.portal.enable [
+      ibusPackage
+    ];
   };
 }

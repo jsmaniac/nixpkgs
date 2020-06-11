@@ -1,4 +1,4 @@
-{ stdenv, lib, make, makeWrapper, which }:
+{ stdenv, make, makeWrapper, which }:
 { buildInputs ? [], ...} @ args:
 stdenv.mkDerivation (args // {
   buildInputs = [ makeWrapper make which ] ++ buildInputs;
@@ -9,7 +9,7 @@ stdenv.mkDerivation (args // {
   GNUSTEP_MAKEFILES = "${make}/share/GNUstep/Makefiles";
 
   meta = {
-    homepage = http://gnustep.org/;
+    homepage = "http://gnustep.org/";
 
     license = stdenv.lib.licenses.lgpl2Plus;
 

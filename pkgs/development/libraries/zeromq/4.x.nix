@@ -1,16 +1,23 @@
-{ stdenv, fetchurl, libuuid, pkgconfig, libsodium }:
+{ stdenv, fetchFromGitHub, cmake, asciidoc, enableDrafts ? false }:
 
 stdenv.mkDerivation rec {
-  name = "zeromq-${version}";
-  version = "4.2.0";
+  pname = "zeromq";
+  version = "4.3.2";
 
-  src = fetchurl {
-    url = "https://github.com/zeromq/libzmq/releases/download/v${version}/${name}.tar.gz";
-    sha256 = "05y1s0938x5w838z79b4f9w6bspz9anldjx9dzvk32cpxvq3pf2k";
+  src = fetchFromGitHub {
+    owner = "zeromq";
+    repo = "libzmq";
+    rev = "v${version}";
+    sha256 = "1q37z05i76ili31j6jlw8988iy6vxadlmd306f99phxfdpqa6bn9";
   };
 
-  nativeBuildInputs = [ pkgconfig ];
-  buildInputs = [ libuuid libsodium ];
+  nativeBuildInputs = [ cmake asciidoc ];
+
+  enableParallelBuilding = true;
+
+  doCheck = false; # fails all the tests (ctest)
+
+  cmakeFlags = stdenv.lib.optional enableDrafts "-DENABLE_DRAFTS=ON";
 
   meta = with stdenv.lib; {
     branch = "4";
@@ -18,6 +25,6 @@ stdenv.mkDerivation rec {
     description = "The Intelligent Transport Layer";
     license = licenses.gpl3;
     platforms = platforms.all;
-    maintainers = with maintainers; [ wkennington fpletz ];
+    maintainers = with maintainers; [ fpletz ];
   };
 }

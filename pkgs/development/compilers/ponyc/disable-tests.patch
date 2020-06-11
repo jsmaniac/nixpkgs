@@ -1,15 +1,14 @@
 diff --git a/packages/net/_test.pony b/packages/net/_test.pony
-index ce26bd7..9a98cc7 100644
+index baf29e7..b63f368 100644
 --- a/packages/net/_test.pony
 +++ b/packages/net/_test.pony
-@@ -5,9 +5,7 @@ actor Main is TestList
+@@ -5,9 +5,6 @@ actor Main is TestList
    new make() => None
-
+ 
    fun tag tests(test: PonyTest) =>
--    test(_TestBroadcast)
--    test(_TestTCPWritev)
--    test(_TestTCPExpect)
-+    None
-
- class _TestPing is UDPNotify
-   let _h: TestHelper
+-    ifdef not osx then
+-      test(_TestBroadcast)
+-    end
+     test(_TestTCPWritev)
+     test(_TestTCPExpect)
+     test(_TestTCPMute)

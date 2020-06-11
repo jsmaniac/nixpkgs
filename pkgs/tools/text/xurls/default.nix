@@ -1,35 +1,24 @@
-{ stdenv, fetchFromGitHub, go }:
+{ buildGoPackage, stdenv, fetchFromGitHub }:
 
-stdenv.mkDerivation rec {
-  version = "0.8.0";
-  name = "xurls-${version}";
+buildGoPackage rec {
+  version = "2.2.0";
+  pname = "xurls";
 
   src = fetchFromGitHub {
     owner = "mvdan";
     repo = "xurls";
     rev = "v${version}";
-    sha256 = "0j35x6hl5hiwzpi6vjw9d2sn83rrsd9w07ql9kndhkngz8n6yr98";
+    sha256 = "0w7i1yfl5q24wvmsfb3fz1zcqsdh4c6qikjnmswxbjc7wva8rngg";
   };
 
-  buildInputs = [ go ];
-
-  buildPhase = ''
-    mkdir -p src/github.com/mvdan
-    ln -s $(pwd) src/github.com/mvdan/xurls
-    export GOPATH=$(pwd)
-    cd cmd/xurls
-    go build -v
-  '';
-
-  installPhase = ''
-    mkdir -p $out/bin
-    mv xurls $out/bin
-  '';
+  goPackagePath = "mvdan.cc/xurls/v2";
+  subPackages = [ "cmd/xurls" ];
 
   meta = with stdenv.lib; {
     description = "Extract urls from text";
-    homepage = https://github.com/mvdan/xurls;
-    maintainers = [ maintainers.koral ];
+    homepage = "https://github.com/mvdan/xurls";
+    maintainers = with maintainers; [ koral ];
     platforms = platforms.unix;
+    license = licenses.bsd3;
   };
 }

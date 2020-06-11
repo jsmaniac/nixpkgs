@@ -1,20 +1,20 @@
-{stdenv, fetchFromGitHub, writeText, elixir }:
+{ stdenv, fetchFromGitHub, writeText, elixir }:
 
 let
   shell = drv: stdenv.mkDerivation {
-          name = "interactive-shell-${drv.name}";
-          buildInputs = [ drv ];
-    };
+    name = "interactive-shell-${drv.name}";
+    buildInputs = [ drv ];
+  };
 
   pkg = self: stdenv.mkDerivation rec {
-    name = "hex";
-    version = "v0.14.0";
+    pname = "hex";
+    version = "0.20.5";
 
     src = fetchFromGitHub {
-        owner = "hexpm";
-        repo = "hex";
-        rev = "${version}";
-        sha256 = "042rcwznb6cf9khn4l969axf7vhk53gy3rp23y6c8fhfp1472pai";
+      owner = "hexpm";
+      repo = "hex";
+      rev = "v${version}";
+      sha256 = "1wz6n4qrmsb4kkww6lrdbs99xzwp4dyjjmr8m4drcwn3sd2k9ba6";
     };
 
     setupHook = writeText "setupHook.sh" ''
@@ -53,6 +53,5 @@ let
     passthru = {
       env = shell self;
     };
-
 };
 in stdenv.lib.fix pkg

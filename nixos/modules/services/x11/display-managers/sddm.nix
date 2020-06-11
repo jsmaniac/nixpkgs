@@ -7,19 +7,20 @@ let
   xcfg = config.services.xserver;
   dmcfg = xcfg.displayManager;
   cfg = dmcfg.sddm;
-  xEnv = config.systemd.services."display-manager".environment;
+  xEnv = config.systemd.services.display-manager.environment;
 
-  sddm = pkgs.sddm.override { inherit (cfg) themes; };
+  inherit (pkgs) sddm;
 
   xserverWrapper = pkgs.writeScript "xserver-wrapper" ''
     #!/bin/sh
     ${concatMapStrings (n: "export ${n}=\"${getAttr n xEnv}\"\n") (attrNames xEnv)}
-    exec systemd-cat ${dmcfg.xserverBin} ${dmcfg.xserverArgs} "$@"
+    exec systemd-cat -t xserver-wrapper ${dmcfg.xserverBin} ${toString dmcfg.xserverArgs} "$@"
   '';
 
   Xsetup = pkgs.writeScript "Xsetup" ''
     #!/bin/sh
     ${cfg.setupScript}
+    ${dmcfg.setupCommands}
   '';
 
   Xstop = pkgs.writeScript "Xstop" ''
@@ -29,16 +30,16 @@ let
 
   cfgFile = pkgs.writeText "sddm.conf" ''
     [General]
-    HaltCommand=${pkgs.systemd}/bin/systemctl poweroff
-    RebootCommand=${pkgs.systemd}/bin/systemctl reboot
+    HaltCommand=/run/current-system/systemd/bin/systemctl poweroff
+    RebootCommand=/run/current-system/systemd/bin/systemctl reboot
     ${optionalString cfg.autoNumlock ''
     Numlock=on
     ''}
 
     [Theme]
     Current=${cfg.theme}
-    ThemeDir=${sddm}/share/sddm/themes
-    FacesDir=${sddm}/share/sddm/faces
+    ThemeDir=/run/current-system/sw/share/sddm/themes
+    FacesDir=/run/current-system/sw/share/sddm/faces
 
     [Users]
     MaximumUid=${toString config.ids.uids.nixbld}
@@ -49,30 +50,36 @@ let
     MinimumVT=${toString (if xcfg.tty != null then xcfg.tty else 7)}
     ServerPath=${xserverWrapper}
     XephyrPath=${pkgs.xorg.xorgserver.out}/bin/Xephyr
-    SessionCommand=${dmcfg.session.script}
-    SessionDir=${dmcfg.session.desktops}
+    SessionCommand=${dmcfg.sessionData.wrapper}
+    SessionDir=${dmcfg.sessionData.desktops}/share/xsessions
     XauthPath=${pkgs.xorg.xauth}/bin/xauth
     DisplayCommand=${Xsetup}
     DisplayStopCommand=${Xstop}
+    EnableHidpi=${if cfg.enableHidpi then "true" else "false"}
+
+    [Wayland]
+    EnableHidpi=${if cfg.enableHidpi then "true" else "false"}
+    SessionDir=${dmcfg.sessionData.desktops}/share/wayland-sessions
 
     ${optionalString cfg.autoLogin.enable ''
     [Autologin]
     User=${cfg.autoLogin.user}
-    Session=${defaultSessionName}.desktop
-    Relogin=${if cfg.autoLogin.relogin then "true" else "false"}
+    Session=${autoLoginSessionName}.desktop
+    Relogin=${boolToString cfg.autoLogin.relogin}
     ''}
 
     ${cfg.extraConfig}
   '';
 
-  defaultSessionName =
-    let
-      dm = xcfg.desktopManager.default;
-      wm = xcfg.windowManager.default;
-    in dm + optionalString (wm != "none") (" + " + wm);
+  autoLoginSessionName = dmcfg.sessionData.autologinSession;
 
 in
 {
+  imports = [
+    (mkRemovedOptionModule [ "services" "xserver" "displayManager" "sddm" "themes" ]
+      "Set the option `services.xserver.displayManager.sddm.package' instead.")
+  ];
+
   options = {
 
     services.xserver.displayManager.sddm = {
@@ -81,6 +88,17 @@ in
         default = false;
         description = ''
           Whether to enable sddm as the display manager.
+        '';
+      };
+
+      enableHidpi = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Whether to enable automatic HiDPI mode.
+          </para>
+          <para>
+          Versions up to 0.17 are broken so this only works from 0.18 onwards.
         '';
       };
 
@@ -105,14 +123,6 @@ in
         '';
       };
 
-      themes = mkOption {
-        type = types.listOf types.package;
-        default = [];
-        description = ''
-          Extra packages providing themes.
-        '';
-      };
-
       autoNumlock = mkOption {
         type = types.bool;
         default = false;
@@ -130,7 +140,8 @@ in
           xrandr --auto
         '';
         description = ''
-          A script to execute when starting the display server.
+          A script to execute when starting the display server. DEPRECATED, please
+          use <option>services.xserver.displayManager.setupCommands</option>.
         '';
       };
 
@@ -185,26 +196,31 @@ in
   config = mkIf cfg.enable {
 
     assertions = [
+      { assertion = xcfg.enable;
+        message = ''
+          SDDM requires services.xserver.enable to be true
+        '';
+      }
       { assertion = cfg.autoLogin.enable -> cfg.autoLogin.user != null;
         message = ''
           SDDM auto-login requires services.xserver.displayManager.sddm.autoLogin.user to be set
         '';
       }
-      { assertion = cfg.autoLogin.enable -> elem defaultSessionName dmcfg.session.names;
+      { assertion = cfg.autoLogin.enable -> autoLoginSessionName != null;
         message = ''
-          SDDM auto-login requires that services.xserver.desktopManager.default and
-          services.xserver.windowMananger.default are set to valid values. The current
-          default session: ${defaultSessionName} is not valid.
+          SDDM auto-login requires that services.xserver.displayManager.defaultSession is set.
         '';
       }
     ];
 
-    services.xserver.displayManager.slim.enable = false;
-
     services.xserver.displayManager.job = {
-      logsXsession = true;
+      environment = {
+        # Load themes from system environment
+        QT_PLUGIN_PATH = "/run/current-system/sw/" + pkgs.qt5.qtbase.qtPluginPrefix;
+        QML2_IMPORT_PATH = "/run/current-system/sw/" + pkgs.qt5.qtbase.qtQmlPrefix;
+      };
 
-      execCmd = "exec ${sddm}/bin/sddm";
+      execCmd = "exec /run/current-system/sw/bin/sddm";
     };
 
     security.pam.services = {
@@ -223,7 +239,7 @@ in
         password required       pam_deny.so
 
         session  required       pam_succeed_if.so audit quiet_success user = sddm
-        session  required       pam_env.so envfile=${config.system.build.pamEnvironment}
+        session  required       pam_env.so conffile=${config.system.build.pamEnvironment} readenv=0
         session  optional       ${pkgs.systemd}/lib/security/pam_systemd.so
         session  optional       pam_keyinit.so force revoke
         session  optional       pam_permit.so
@@ -242,7 +258,7 @@ in
       '';
     };
 
-    users.extraUsers.sddm = {
+    users.users.sddm = {
       createHome = true;
       home = "/var/lib/sddm";
       group = "sddm";
@@ -250,13 +266,32 @@ in
     };
 
     environment.etc."sddm.conf".source = cfgFile;
+    environment.pathsToLink = [
+      "/share/sddm"
+    ];
 
-    users.extraGroups.sddm.gid = config.ids.gids.sddm;
+    users.groups.sddm.gid = config.ids.gids.sddm;
 
-    services.dbus.packages = [ sddm.unwrapped ];
+    environment.systemPackages = [ sddm ];
+    services.dbus.packages = [ sddm ];
 
     # To enable user switching, allow sddm to allocate TTYs/displays dynamically.
     services.xserver.tty = null;
     services.xserver.display = null;
+
+    systemd.tmpfiles.rules = [
+      # Prior to Qt 5.9.2, there is a QML cache invalidation bug which sometimes
+      # strikes new Plasma 5 releases. If the QML cache is not invalidated, SDDM
+      # will segfault without explanation. We really tore our hair out for awhile
+      # before finding the bug:
+      # https://bugreports.qt.io/browse/QTBUG-62302
+      # We work around the problem by deleting the QML cache before startup.
+      # This was supposedly fixed in Qt 5.9.2 however it has been reported with
+      # 5.10 and 5.11 as well. The initial workaround was to delete the directory
+      # in the Xsetup script but that doesn't do anything.
+      # Instead we use tmpfiles.d to ensure it gets wiped.
+      # This causes a small but perceptible delay when SDDM starts.
+      "e ${config.users.users.sddm.home}/.cache - - - 0"
+    ];
   };
 }

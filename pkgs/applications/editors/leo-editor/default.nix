@@ -1,22 +1,22 @@
-{ stdenv, python3Packages, fetchFromGitHub, makeWrapper, makeDesktopItem }:
+{ lib, mkDerivation, python3, fetchFromGitHub, makeWrapper, wrapQtAppsHook, makeDesktopItem }:
 
-stdenv.mkDerivation rec {
-  name = "leo-editor-${version}";
-  version = "5.3";
+mkDerivation rec {
+  pname = "leo-editor";
+  version = "6.2.1";
 
   src = fetchFromGitHub {
     owner = "leo-editor";
     repo = "leo-editor";
     rev = version;
-    sha256 = "0whbay8ilabzpxdjaxv447y6bqbsilx161fv7wa15v3qqm2kapsp";
+    sha256 = "1s9jvxwzsl32clp78g92nq9p2byf08libr5widl1jnkv1cpkbvh9";
   };
 
   dontBuild = true;
 
-  buildInputs = [ makeWrapper python3Packages.python ];
-  propagatedBuildInputs = with python3Packages; [ pyqt5 ];
+  nativeBuildInputs = [ wrapQtAppsHook makeWrapper python3 ];
+  propagatedBuildInputs = with python3.pkgs; [ pyqt5 docutils ];
 
-  desktopItem = makeDesktopItem rec {
+  desktopItem = makeDesktopItem {
     name = "leo-editor";
     exec = "leo %U";
     icon = "leoapp32";
@@ -24,11 +24,11 @@ stdenv.mkDerivation rec {
     comment = meta.description;
     desktopName = "Leo";
     genericName = "Text Editor";
-    categories = stdenv.lib.concatStringsSep ";" [
-      "Application" "Development" "IDE" "QT"
+    categories = lib.concatStringsSep ";" [
+      "Application" "Development" "IDE"
     ];
     startupNotify = "false";
-    mimeType = stdenv.lib.concatStringsSep ";" [
+    mimeType = lib.concatStringsSep ";" [
       "text/plain" "text/asp" "text/x-c" "text/x-script.elisp" "text/x-fortran"
       "text/html" "application/inf" "text/x-java-source" "application/x-javascript"
       "application/javascript" "text/ecmascript" "application/x-ksh" "text/x-script.ksh"
@@ -50,16 +50,18 @@ stdenv.mkDerivation rec {
     mkdir -p $out/share/leo-editor
     mv * $out/share/leo-editor
 
-    makeWrapper ${python3Packages.python}/bin/python3.5m $out/bin/leo \
+    makeWrapper ${python3.interpreter} $out/bin/leo \
       --set PYTHONPATH "$PYTHONPATH:$out/share/leo-editor" \
       --add-flags "-O $out/share/leo-editor/launchLeo.py"
+
+    wrapQtApp $out/bin/leo
   '';
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     homepage = "http://leoeditor.com";
     description = "A powerful folding editor";
     longDescription = "Leo is a PIM, IDE and outliner that accelerates the work flow of programmers, authors and web designers.";
-    license = with licenses; [ mit ];
+    license = licenses.mit;
     maintainers = with maintainers; [ leonardoce ramkromberg ];
   };
 }

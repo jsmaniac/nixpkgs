@@ -1,13 +1,14 @@
 { stdenv, fetchurl }:
 
-stdenv.mkDerivation {
-  name = "rcm-1.3.0";
+stdenv.mkDerivation rec {
+  pname = "rcm";
+  version = "1.3.3";
 
   src = fetchurl {
-    url = https://thoughtbot.github.io/rcm/dist/rcm-1.3.0.tar.gz;
-    sha256 = "ddcf638b367b0361d8e063c29fd573dbe1712d1b83e8d5b3a868e4aa45ffc847";
+    url = "https://thoughtbot.github.io/rcm/dist/rcm-${version}.tar.gz";
+    sha256 = "1bqk7rrp1ckzvsvl9wghsr77m8xl3a7yc5gqdsisz492dx2j8mck";
   };
- 
+
   patches = [ ./fix-rcmlib-path.patch ];
 
   postPatch = ''
@@ -18,7 +19,7 @@ stdenv.mkDerivation {
 
   meta = with stdenv.lib; {
     description = "Management Suite for Dotfiles";
-    homepage = https://github.com/thoughtbot/rcm;
+    homepage = "https://github.com/thoughtbot/rcm";
     license = licenses.bsd3;
     maintainers = with maintainers; [ malyn ];
     platforms = with platforms; unix;

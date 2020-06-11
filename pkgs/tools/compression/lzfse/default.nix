@@ -1,14 +1,14 @@
 { stdenv, fetchFromGitHub }:
 
-stdenv.mkDerivation rec {
-  name = "lzfse-${version}";
-  version = "2016-06-21";
+stdenv.mkDerivation {
+  pname = "lzfse";
+  version = "2017-03-08";
 
   src = fetchFromGitHub {
     owner = "lzfse";
     repo = "lzfse";
-    rev = "45912281e3945a09c6ebfa8c6629f6906a99fc29";
-    sha256 = "1wbh3x874fjn548g1hw4bm7lkk60vlvy8ph0wsjkzcx8873hwj7h";
+    rev = "88e2d27";
+    sha256 = "1mfh6y6vpvxsdwmqmfbkqkwvxc0pz2dqqc72c6fk9sbsrxxaghd5";
   };
 
   makeFlags = [ "INSTALL_PREFIX=$(out)" ];
@@ -16,7 +16,7 @@ stdenv.mkDerivation rec {
   enableParallelBuilding = false; #bug
 
   meta = with stdenv.lib; {
-    homepage = https://github.com/lzfse/lzfse;
+    homepage = "https://github.com/lzfse/lzfse";
     description = "a reference C implementation of the LZFSE compressor";
     longDescription = ''
       This is a reference C implementation of the LZFSE compressor introduced in the Compression library with OS X 10.11 and iOS 9.

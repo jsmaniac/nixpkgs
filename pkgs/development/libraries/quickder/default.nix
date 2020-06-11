@@ -1,36 +1,50 @@
-{ stdenv, fetchFromGitHub, fetchurl, hexio, python, which, asn2quickder, bash }:
+{ stdenv, fetchFromGitHub, python2Packages, hexio
+, cmake, bash, arpa2cm, git, asn2quickder }:
 
 stdenv.mkDerivation rec {
   pname = "quickder";
-  name = "${pname}-${version}";
-  version = "1.0-RC1";
+  version = "1.3.0";
 
   src = fetchFromGitHub {
-    sha256 = "05gw5dqkw3l8kwwm0044zpxhcp7sxicx9wxbfyr49c91403p870w";
+    sha256 = "15lxv8vcjnsjxg7ywcac5p6mj5vf5pxq1219yap653ci4f1liqfr";
     rev = "version-${version}";
     owner = "vanrein";
     repo = "quick-der";
   };
 
-  buildInputs = [ which asn2quickder bash ];
+  nativeBuildInputs = [ cmake ];
 
-  patchPhase = ''
-    substituteInPlace Makefile \
-      --replace 'lib tool test rfc' 'lib test rfc'
-    substituteInPlace ./rfc/Makefile \
-      --replace 'ASN2QUICKDER_CMD = ' 'ASN2QUICKDER_CMD = ${asn2quickder}/bin/asn2quickder #'
-    '';
+  buildInputs = with python2Packages; [
+    arpa2cm
+    asn1ate
+    hexio
+    pyparsing
+    python
+    six
+    asn1ate
+    asn2quickder
+  ];
 
-  installFlags = "ASN2QUICKDER_DIR=${asn2quickder}/bin ASN2QUICKDER_CMD=${asn2quickder}/bin/asn2quickder";
-  installPhase = ''
-    mkdir -p $out/lib $out/man
-    make DESTDIR=$out PREFIX=/ all
-    make DESTDIR=$out PREFIX=/ install
-    '';
+  postPatch = ''
+    substituteInPlace ./CMakeLists.txt \
+      --replace "get_version_from_git" "set (Quick-DER_VERSION 1.2) #"
+    substituteInPlace ./CMakeLists.txt \
+      --replace \$\{ARPA2CM_TOOLCHAIN_DIR} "$out/share/ARPA2CM/toolchain/"
+    patchShebangs python/scripts/
+  '';
+
+  cmakeFlags = [
+    "-DNO_TESTING=ON"
+    "-DARPA2CM_TOOLCHAIN_DIR=$out/share/ARPA2CM/toolchain/"
+  ];
+
+  preConfigure = ''
+    export PREFIX=$out
+  '';
 
   meta = with stdenv.lib; {
     description = "Quick (and Easy) DER, a Library for parsing ASN.1";
-    homepage = https://github.com/vanrein/quick-der;
+    homepage = "https://github.com/vanrein/quick-der";
     license = licenses.bsd2;
     platforms = platforms.linux;
     maintainers = with maintainers; [ leenaars ];

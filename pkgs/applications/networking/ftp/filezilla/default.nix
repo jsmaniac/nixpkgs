@@ -1,34 +1,74 @@
-{ stdenv, fetchurl, dbus, gnutls, wxGTK30, libidn, tinyxml, gettext
-, pkgconfig, xdg_utils, gtk2, sqlite, pugixml, libfilezilla, nettle }:
+{ stdenv
+, fetchurl
+, dbus
+, gettext
+, gnutls
+, libfilezilla
+, libidn
+, nettle
+, pkgconfig
+, pugixml
+, sqlite
+, tinyxml
+, wxGTK30
+, xdg_utils
+}:
 
-let version = "3.22.2.2"; in
-stdenv.mkDerivation {
-  name = "filezilla-${version}";
+let
+  # we can drop this when wxgtk is built with gtk3 by default
+  # see: https://github.com/NixOS/nixpkgs/pull/73145
+  wxgtk' = wxGTK30.override { compat26 = false; withGtk2 = false; };
+
+in
+stdenv.mkDerivation rec {
+  pname = "filezilla";
+  version = "3.48.1";
 
   src = fetchurl {
-    url = "mirror://sourceforge/project/filezilla/FileZilla_Client/${version}/FileZilla_${version}_src.tar.bz2";
-    sha256 = "1h02k13x88f04gkf433cxx1xvbr7kkl2aygb4i6581gzhzjifwdv";
+    url = "https://download.filezilla-project.org/client/FileZilla_${version}_src.tar.bz2";
+    sha256 = "0pgg2gp4x5qmxwin2qhf6skw0z52y29p75g41kjyh1lhzxvxizxb";
   };
+
+  # https://www.linuxquestions.org/questions/slackware-14/trouble-building-filezilla-3-47-2-1-current-4175671182/#post6099769
+  postPatch = ''
+    sed -i src/interface/Mainfrm.h \
+      -e '/^#define/a #include <list>'
+  '';
 
   configureFlags = [
     "--disable-manualupdatecheck"
+    "--disable-autoupdatecheck"
   ];
 
   nativeBuildInputs = [ pkgconfig ];
+
   buildInputs = [
-    dbus gnutls wxGTK30 libidn tinyxml gettext xdg_utils gtk2 sqlite
-    pugixml libfilezilla nettle ];
+    dbus
+    gettext
+    gnutls
+    libfilezilla
+    libidn
+    nettle
+    pugixml
+    sqlite
+    tinyxml
+    wxgtk'
+    wxgtk'.gtk
+    xdg_utils
+  ];
+
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
-    homepage = http://filezilla-project.org/;
+    homepage = "https://filezilla-project.org/";
     description = "Graphical FTP, FTPS and SFTP client";
-    license = licenses.gpl2;
     longDescription = ''
       FileZilla Client is a free, open source FTP client. It supports
       FTP, SFTP, and FTPS (FTP over SSL/TLS). The client is available
-      under many platforms, binaries for Windows, Linux and Mac OS X are
+      under many platforms, binaries for Windows, Linux and macOS are
       provided.
     '';
+    license = licenses.gpl2;
     platforms = platforms.linux;
     maintainers = with maintainers; [ pSub ];
   };

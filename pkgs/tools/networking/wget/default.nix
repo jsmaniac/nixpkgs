@@ -1,16 +1,21 @@
-{ stdenv, fetchurl, gettext, libidn, pkgconfig
-, perl, perlPackages, LWP, python3
-, libiconv, libpsl ? null, openssl ? null }:
+{ stdenv, fetchurl, gettext, pkgconfig, perlPackages
+, libidn2, zlib, pcre, libuuid, libiconv, libintl
+, python3, lzip
+, libpsl ? null
+, openssl ? null }:
 
 stdenv.mkDerivation rec {
-  name = "wget-1.18";
+  pname = "wget";
+  version = "1.20.3";
 
   src = fetchurl {
-    url = "mirror://gnu/wget/${name}.tar.xz";
-    sha256 = "1hcwx8ww3sxzdskkx3l7q70a7wd6569yrnjkw9pw013cf9smpddm";
+    url = "mirror://gnu/wget/${pname}-${version}.tar.lz";
+    sha256 = "1frajd86ds8vz2hprq30wq8ya89z9dcxnwm8nwk12bbc47l7qq39";
   };
 
-  patches = [ ./remove-runtime-dep-on-openssl-headers.patch ];
+  patches = [
+    ./remove-runtime-dep-on-openssl-headers.patch
+  ];
 
   preConfigure = ''
     patchShebangs doc
@@ -21,18 +26,18 @@ stdenv.mkDerivation rec {
     do
       sed -i "$i" -e's/localhost/127.0.0.1/g'
     done
-  '' + stdenv.lib.optionalString stdenv.isDarwin ''
-    export LIBS="-liconv -lintl"
   '';
 
-  nativeBuildInputs = [ gettext pkgconfig perl ];
-  buildInputs = [ libidn libiconv libpsl ]
-    ++ stdenv.lib.optionals doCheck [ perlPackages.IOSocketSSL LWP python3 ]
+  nativeBuildInputs = [ gettext pkgconfig perlPackages.perl lzip libiconv libintl ];
+  buildInputs = [ libidn2 zlib pcre libuuid ]
+    ++ stdenv.lib.optionals doCheck [ perlPackages.IOSocketSSL perlPackages.LWP python3 ]
     ++ stdenv.lib.optional (openssl != null) openssl
-    ++ stdenv.lib.optional stdenv.isDarwin perl;
+    ++ stdenv.lib.optional (libpsl != null) libpsl
+    ++ stdenv.lib.optional stdenv.isDarwin perlPackages.perl;
 
-  configureFlags =
-    if openssl != null then "--with-ssl=openssl" else "--without-ssl";
+  configureFlags = [
+    (stdenv.lib.withFeatureAs (openssl != null) "ssl" "openssl")
+  ];
 
   doCheck = false;
 
@@ -48,7 +53,7 @@ stdenv.mkDerivation rec {
 
     license = licenses.gpl3Plus;
 
-    homepage = http://www.gnu.org/software/wget/;
+    homepage = "https://www.gnu.org/software/wget/";
 
     maintainers = with maintainers; [ fpletz ];
     platforms = platforms.all;

@@ -1,26 +1,32 @@
-{ stdenv, fetchgit, xorg
-, autoconf, automake, cvs, libtool, nasm, pixman, xkeyboard_config
-, fontDirectories, libgcrypt, gnutls, pam, flex, bison, gettext
-, cmake, libjpeg_turbo, fltk, nettle, libiconv, libtasn1
-}:
+{ stdenv, fetchFromGitHub
+, xorg, xkeyboard_config, zlib
+, libjpeg_turbo, pixman, fltk
+, fontDirectories
+, cmake, gettext, libtool
+, libGLU
+, gnutls, pam, nettle
+, xterm, openssh, perl
+, makeWrapper}:
 
 with stdenv.lib;
 
 stdenv.mkDerivation rec {
-  version = "1.7.0";
-  name = "tigervnc-${version}";
+  version = "1.10.1";
+  pname = "tigervnc";
 
-  src = fetchgit {
-    url = "https://github.com/TigerVNC/tigervnc/";
-    sha256 = "1b6n2gq6078x8dwz471a68jrkgpcxmbiivmlsakr42vrndm7niz3";
-    rev = "e25272fc74ef09987ccaa33b9bf1736397c76fdf";
+  src = fetchFromGitHub {
+    owner = "TigerVNC";
+    repo = "tigervnc";
+    rev = "v1.10.1";
+    sha256 = "001n189d2f3psn7nxgl8188ml6f7jbk26cxn2835y3mnlk5lmhgr";
   };
 
   inherit fontDirectories;
 
-  patchPhase = ''
-    sed -i -e 's,$(includedir)/pixman-1,${if stdenv ? cross then pixman.crossDrv else pixman}/include/pixman-1,' unix/xserver/hw/vnc/Makefile.am
-    sed -i -e '/^\$cmd \.= " -pn";/a$cmd .= " -xkbdir ${if stdenv ? cross then xkeyboard_config.crossDrv else xkeyboard_config}/etc/X11/xkb";' unix/vncserver
+  patches = [ ./u_xorg-server-1.20.7-ddxInputThreadInit.patch ];
+
+  postPatch = ''
+    sed -i -e '/^\$cmd \.= " -pn";/a$cmd .= " -xkbdir ${xkeyboard_config}/etc/X11/xkb";' unix/vncserver
     fontPath=
     for i in $fontDirectories; do
       for j in $(find $i -name fonts.dir); do
@@ -28,61 +34,69 @@ stdenv.mkDerivation rec {
       done
     done
     sed -i -e '/^\$cmd \.= " -pn";/a$cmd .= " -fp '"$fontPath"'";' unix/vncserver
+    substituteInPlace vncviewer/vncviewer.cxx \
+       --replace '"/usr/bin/ssh' '"${openssh}/bin/ssh'
   '';
 
   dontUseCmakeBuildDir = true;
 
   postBuild = ''
-    export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -Wno-error=int-to-pointer-cast"
+    export NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
     export CXXFLAGS="$CXXFLAGS -fpermissive"
     # Build Xvnc
     tar xf ${xorg.xorgserver.src}
     cp -R xorg*/* unix/xserver
     pushd unix/xserver
+    version=$(echo ${xorg.xorgserver.name} | sed 's/.*-\([0-9]\+\).\([0-9]\+\).*/\1\2/g')
+    patch -p1 < ${src}/unix/xserver$version.patch
     autoreconf -vfi
-    ./configure $configureFlags --disable-devel-docs --disable-docs --disable-xinerama --disable-xvfb --disable-xnest \
-        --disable-xorg --disable-dmx --disable-dri --disable-dri2 --disable-glx \
+    ./configure $configureFlags  --disable-devel-docs --disable-docs \
+        --disable-xorg --disable-xnest --disable-xvfb --disable-dmx \
+        --disable-xwin --disable-xephyr --disable-kdrive --with-pic \
+        --disable-xorgcfg --disable-xprint --disable-static \
+        --enable-composite --disable-xtrap --enable-xcsecurity \
+        --disable-{a,c,m}fb \
+        --disable-xwayland \
+        --disable-config-dbus --disable-config-udev --disable-config-hal \
+        --disable-xevie \
+        --disable-dri --disable-dri2 --disable-dri3 --enable-glx \
+        --enable-install-libxf86config \
         --prefix="$out" --disable-unit-tests \
         --with-xkb-path=${xkeyboard_config}/share/X11/xkb \
         --with-xkb-bin-directory=${xorg.xkbcomp}/bin \
         --with-xkb-output=$out/share/X11/xkb/compiled
-    make TIGERVNC_SRCDIR=`pwd`/../..
+    make TIGERVNC_SRC=$src TIGERVNC_BUILDDIR=`pwd`/../.. -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
     popd
   '';
-  
+
   postInstall = ''
-    pushd unix/xserver
-    make TIGERVNC_SRCDIR=`pwd`/../.. install
+    pushd unix/xserver/hw/vnc
+    make TIGERVNC_SRC=$src TIGERVNC_BUILDDIR=`pwd`/../../../.. install
     popd
     rm -f $out/lib/xorg/protocol.txt
+
+    wrapProgram $out/bin/vncserver \
+      --prefix PATH : ${stdenv.lib.makeBinPath (with xorg; [ xterm twm xsetroot xauth ]) }
   '';
 
-  crossAttrs = {
-    buildInputs = (map (x : x.crossDrv) (buildInputs ++ [
-      xorg.fixesproto xorg.damageproto xorg.xcmiscproto xorg.bigreqsproto xorg.randrproto xorg.renderproto
-      xorg.fontsproto xorg.videoproto xorg.compositeproto xorg.scrnsaverproto xorg.resourceproto
-      xorg.libxkbfile xorg.libXfont xorg.libpciaccess xorg.xineramaproto
-    ]));
-  };
+  buildInputs = with xorg; [
+    libjpeg_turbo fltk pixman
+    gnutls pam nettle perl
+    xorgproto
+    utilmacros libXtst libXext libX11 libXext libICE libXi libSM libXft
+    libxkbfile libXfont2 libpciaccess
+    libGLU
+  ] ++ xorg.xorgserver.buildInputs;
 
-  buildInputs =
-    [ xorg.libX11 xorg.libXext gettext xorg.libICE xorg.libXtst xorg.libXi xorg.libSM xorg.libXft
-      nasm libgcrypt gnutls pam pixman libjpeg_turbo fltk xorg.xineramaproto
-      xorg.libXinerama xorg.libXcursor nettle libiconv libtasn1
-    ];
+  nativeBuildInputs = with xorg; [ cmake zlib gettext libtool utilmacros fontutil makeWrapper ]
+    ++ xorg.xorgserver.nativeBuildInputs;
 
-  nativeBuildInputs =
-    [ autoconf automake cvs xorg.utilmacros xorg.fontutil libtool flex bison
-      cmake gettext
-    ]
-      ++ xorg.xorgserver.nativeBuildInputs;
-
-  propagatedNativeBuildInputs = xorg.xorgserver.propagatedNativeBuildInputs;
+  propagatedBuildInputs = xorg.xorgserver.propagatedBuildInputs;
 
   enableParallelBuilding = true;
 
   meta = {
-    homepage = http://www.tigervnc.org/;
+    homepage = "https://tigervnc.org/";
     license = stdenv.lib.licenses.gpl2Plus;
     description = "Fork of tightVNC, made in cooperation with VirtualGL";
     maintainers = with stdenv.lib.maintainers; [viric];

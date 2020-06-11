@@ -1,17 +1,23 @@
-{ stdenv, fetchurl, cracklib, python }:
+{ stdenv, lib, fetchFromGitHub, autoreconfHook, perl, cracklib, python3 }:
 
 stdenv.mkDerivation rec {
-  name = "libpwquality-${version}";
-  version = "1.3.0";
+  pname = "libpwquality";
+  version = "1.4.2";
 
-  src = fetchurl {
-    url = "https://fedorahosted.org/releases/l/i/libpwquality/${name}.tar.bz2";
-    sha256 = "0aidriag6h0syfm33nzdfdsqgrnsgihwjv3a5lgkqch3w68fmlkl";
+  src = fetchFromGitHub {
+    owner = "libpwquality";
+    repo = "libpwquality";
+    rev = "${pname}-${version}";
+    sha256 = "0n4pjhm7wfivk0wizggaxq4y4mcxic876wcarjabkp5z9k14y36h";
   };
 
-  buildInputs = [ cracklib python ];
+  nativeBuildInputs = [ autoreconfHook perl ];
+  buildInputs = [ cracklib python3 ];
 
-  meta = {
-    platforms = stdenv.lib.platforms.linux;
+  meta = with lib; {
+    description = "Password quality checking and random password generation library";
+    homepage = "https://github.com/libpwquality/libpwquality";
+    license = licenses.bsd3;
+    platforms = platforms.unix;
   };
 }

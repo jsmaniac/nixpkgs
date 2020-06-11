@@ -1,29 +1,62 @@
-{ stdenv, lib, pkgconfig, lxc, buildGoPackage, fetchFromGitHub }:
+{ stdenv, hwdata, pkgconfig, lxc, buildGoPackage, fetchurl
+, makeWrapper, acl, rsync, gnutar, xz, btrfs-progs, gzip, dnsmasq
+, squashfsTools, iproute, iptables, ebtables, libcap, libco-canonical, dqlite
+, raft-canonical, sqlite-replication, udev
+, writeShellScriptBin, apparmor-profiles, apparmor-parser
+, criu
+, bash
+, installShellFiles
+}:
 
 buildGoPackage rec {
-  name = "lxd-${version}";
-  version = "2.0.2";
-  rev = "lxd-${version}";
+  pname = "lxd";
+  version = "4.2";
 
   goPackagePath = "github.com/lxc/lxd";
 
-  src = fetchFromGitHub {
-    inherit rev;
-    owner = "lxc";
-    repo = "lxd";
-    sha256 = "1rs9g1snjymg6pjz5bj77zk5wbs0w8xmrfxzqs32w6zr1dxhf9hs";
+  src = fetchurl {
+    url = "https://github.com/lxc/lxd/releases/download/${pname}-${version}/${pname}-${version}.tar.gz";
+    sha256 = "0pv84ywnigrp94kh54fz689i15yv01lhrnkxpk8dg9wypxara9m4";
   };
 
-  goDeps = ./deps.nix;
+  postPatch = ''
+    substituteInPlace shared/usbid/load.go \
+      --replace "/usr/share/misc/usb.ids" "${hwdata}/share/hwdata/usb.ids"
+  '';
 
-  nativeBuildInputs = [ pkgconfig ];
-  buildInputs = [ lxc ];
+  preBuild = ''
+    # unpack vendor
+    pushd go/src/github.com/lxc/lxd
+    rm _dist/src/github.com/lxc/lxd
+    cp -r _dist/src/* ../../..
+    popd
+  '';
+
+  buildFlags = [ "-tags libsqlite3" ];
+
+  postInstall = ''
+    # test binaries, code generation
+    rm $out/bin/{deps,macaroon-identity,generate}
+
+    wrapProgram $out/bin/lxd --prefix PATH : ${stdenv.lib.makeBinPath [
+      acl rsync gnutar xz btrfs-progs gzip dnsmasq squashfsTools iproute iptables ebtables bash criu
+      (writeShellScriptBin "apparmor_parser" ''
+        exec '${apparmor-parser}/bin/apparmor_parser' -I '${apparmor-profiles}/etc/apparmor.d' "$@"
+      '')
+    ]}
+
+    installShellCompletion --bash go/src/github.com/lxc/lxd/scripts/bash/lxd-client
+  '';
+
+  nativeBuildInputs = [ installShellFiles pkgconfig makeWrapper ];
+  buildInputs = [ lxc acl libcap libco-canonical.dev dqlite.dev
+                  raft-canonical.dev sqlite-replication udev.dev ];
 
   meta = with stdenv.lib; {
     description = "Daemon based on liblxc offering a REST API to manage containers";
-    homepage = https://github.com/lxc/lxd;
+    homepage = "https://linuxcontainers.org/lxd/";
     license = licenses.asl20;
-    maintainers = with maintainers; [ globin fpletz ];
+    maintainers = with maintainers; [ fpletz wucke13 ];
     platforms = platforms.linux;
   };
 }

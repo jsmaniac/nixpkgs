@@ -1,22 +1,38 @@
-{
-  stdenv, fetchurl, python2Packages, openssl,
-
+{ lib
+, python3
+, openssl
   # Many Salt modules require various Python modules to be installed,
   # passing them in this array enables Salt to find them.
-  extraInputs ? []
+, extraInputs ? []
 }:
+let
 
-python2Packages.buildPythonApplication rec {
-  name = "salt-${version}";
-  version = "2016.3.3";
-
-  src = fetchurl {
-    url = "mirror://pypi/s/salt/${name}.tar.gz";
-    sha256 = "1djjglnh6203y8dirziz5w6zh2lgszxp8ivi86nb7fgijj2h61jr";
+  py = python3.override {
+    packageOverrides = self: super: {
+      # Can be unpinned once https://github.com/saltstack/salt/issues/56007 is resolved
+      msgpack = super.msgpack.overridePythonAttrs (
+        oldAttrs: rec {
+          version = "0.6.2";
+          src = oldAttrs.src.override {
+            inherit version;
+            sha256 = "0c0q3vx0x137567msgs5dnizghnr059qi5kfqigxbz26jf2jyg7a";
+          };
+        }
+      );
+    };
   };
 
-  propagatedBuildInputs = with python2Packages; [
-    futures
+in
+py.pkgs.buildPythonApplication rec {
+  pname = "salt";
+  version = "3000.3";
+
+  src = py.pkgs.fetchPypi {
+    inherit pname version;
+    sha256 = "19yfjhidx93rl9s03lvrfz7kp0xxigyv4d3zb9792zb9bsc4kjpw";
+  };
+
+  propagatedBuildInputs = with py.pkgs; [
     jinja2
     markupsafe
     msgpack
@@ -24,7 +40,7 @@ python2Packages.buildPythonApplication rec {
     pyyaml
     pyzmq
     requests
-    tornado
+    tornado_4
   ] ++ extraInputs;
 
   patches = [ ./fix-libcrypto-loading.patch ];
@@ -39,8 +55,8 @@ python2Packages.buildPythonApplication rec {
   # as is it rather long.
   doCheck = false;
 
-  meta = with stdenv.lib; {
-    homepage = https://saltstack.com/;
+  meta = with lib; {
+    homepage = "https://saltstack.com/";
     description = "Portable, distributed, remote execution and configuration management system";
     maintainers = with maintainers; [ aneeshusa ];
     license = licenses.asl20;

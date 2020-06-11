@@ -1,26 +1,38 @@
-{ stdenv, fetchFromGitHub, autoreconfHook, moka-icon-theme }:
+{ stdenv, fetchFromGitHub, autoreconfHook, gtk3, gnome3, moka-icon-theme, gnome-icon-theme, hicolor-icon-theme }:
 
 stdenv.mkDerivation rec {
-  name = "${package-name}-${version}";
-  package-name = "arc-icon-theme";
-  version = "2016-07-07";
+  pname = "arc-icon-theme";
+  version = "2016-11-22";
 
   src = fetchFromGitHub {
     owner = "horst3180";
-    repo = package-name;
-    rev = "664c05e723ac2971feb123d7baca3d298248e7f9";
-    sha256 = "10vicnrv2v7y4capvllaz9x3nzjkjj9fs1dspjjjg6if3gcif7m4";
+    repo = pname;
+    rev = "55a575386a412544c3ed2b5617a61f842ee4ec15";
+    sha256 = "1ch3hp08qri93510hypzz6m2x4xgg2h15wvnhjwh1x1s1b7jvxjd";
   };
 
-  nativeBuildInputs = [ autoreconfHook ];
+  nativeBuildInputs = [
+    autoreconfHook
+    gtk3
+  ];
 
-  buildInputs = [ moka-icon-theme ];
+  propagatedBuildInputs = [
+    moka-icon-theme
+    gnome3.adwaita-icon-theme
+    gnome-icon-theme
+    hicolor-icon-theme
+  ];
+
+  dontDropIconThemeCache = true;
+
+  postFixup = "gtk-update-icon-cache $out/share/icons/Arc";
 
   meta = with stdenv.lib; {
     description = "Arc icon theme";
-    homepage = https://github.com/horst3180/arc-icon-theme;
-    license = with licenses; [ gpl3 ];
-    platforms = platforms.all;
+    homepage = "https://github.com/horst3180/arc-icon-theme";
+    license = licenses.gpl3;
+    # moka-icon-theme dependency is restricted to linux
+    platforms = platforms.linux;
     maintainers = with maintainers; [ romildo ];
   };
 }

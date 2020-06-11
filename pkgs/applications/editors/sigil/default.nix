@@ -1,15 +1,15 @@
-{ stdenv, fetchFromGitHub, cmake, pkgconfig, makeWrapper
+{ stdenv, mkDerivation, fetchFromGitHub, cmake, pkgconfig, makeWrapper
 , boost, xercesc
 , qtbase, qttools, qtwebkit, qtxmlpatterns
 , python3, python3Packages
 }:
 
-stdenv.mkDerivation rec {
-  name = "sigil-${version}";
-  version = "0.9.6";
+mkDerivation rec {
+  pname = "sigil";
+  version = "0.9.14";
 
   src = fetchFromGitHub {
-    sha256 = "0hihd5f3avpdvxwp5j80qdg74zbw7p20y6j9q8cw7wd0bak58h9c";
+    sha256 = "0fmfbfpnmhclbbv9cbr1xnv97si6ls7331kk3ix114iqkngqwgl1";
     rev = version;
     repo = "Sigil";
     owner = "Sigil-Ebook";
@@ -17,27 +17,27 @@ stdenv.mkDerivation rec {
 
   pythonPath = with python3Packages; [ lxml ];
 
-  propagatedBuildInputs = with python3Packages; [ lxml ];
+  nativeBuildInputs = [ cmake pkgconfig makeWrapper ];
 
   buildInputs = [
-    cmake pkgconfig
     boost xercesc qtbase qttools qtwebkit qtxmlpatterns
-    python3 python3Packages.lxml makeWrapper
-  ];
+    python3Packages.lxml ];
+
+  dontWrapQtApps = true;
 
   preFixup = ''
     wrapProgram "$out/bin/sigil" \
-       --prefix PYTHONPATH : $PYTHONPATH:$(toPythonPath ${python3Packages.lxml})
+       --prefix PYTHONPATH : $PYTHONPATH \
+       ''${qtWrapperArgs[@]}
   '';
 
   enableParallelBuilding = true;
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "Free, open source, multi-platform ebook (ePub) editor";
-    homepage = https://github.com/Sigil-Ebook/Sigil/;
-    license = stdenv.lib.licenses.gpl3;
-    inherit version;
-    maintainers = with stdenv.lib.maintainers; [ ramkromberg ];
-    platforms = with stdenv.lib.platforms; linux;
+    homepage = "https://github.com/Sigil-Ebook/Sigil/";
+    license = licenses.gpl3;
+    # currently unmaintained
+    platforms = platforms.linux;
   };
 }

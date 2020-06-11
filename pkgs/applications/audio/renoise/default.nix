@@ -1,36 +1,36 @@
-{ stdenv, lib, requireFile, demo, fetchurl, libX11, libXext, libXcursor, libXrandr, libjack2, alsaLib, ... }:
+{ stdenv, fetchurl, libX11, libXext, libXcursor, libXrandr, libjack2, alsaLib
+, mpg123, releasePath ? null }:
+
+with stdenv.lib;
+
+# To use the full release version:
+# 1) Sign into https://backstage.renoise.com and download the release version to some stable location.
+# 2) Override the releasePath attribute to point to the location of the newly downloaded bundle.
+# Note: Renoise creates an individual build for each license which screws somewhat with the
+# use of functions like requireFile as the hash will be different for every user.
+let
+  urlVersion = replaceStrings [ "." ] [ "_" ];
+in
 
 stdenv.mkDerivation rec {
-  name = "renoise";
-
-  buildInputs = [ libX11 libXext libXcursor libXrandr alsaLib libjack2 ];
+  pname = "renoise";
+  version = "3.2.1";
 
   src =
-    if stdenv.system == "x86_64-linux" then
-        if demo then
-        fetchurl {
-            url = "http://files.renoise.com/demo/Renoise_3_0_1_Demo_x86_64.tar.bz2";
-            sha256 = "1q7f94wz2dbz659kpp53a3n1qyndsk0pkb29lxdff4pc3ddqwykg";
-        }
+    if stdenv.hostPlatform.system == "x86_64-linux" then
+        if releasePath == null then
+		    fetchurl {
+		      urls = [
+		          "https://files.renoise.com/demo/Renoise_${urlVersion version}_Demo_Linux.tar.gz"
+		          "https://web.archive.org/web/https://files.renoise.com/demo/Renoise_${urlVersion version}_Demo_Linux.tar.gz"
+		      ];
+		      sha256 = "0dhcidgnjzd4abw0xw1waj9mazp03nbvjcr2xx09l8gnfrkvny46";
+		    }
         else
-        requireFile {
-            url = "http://backstage.renoise.com/frontend/app/index.html#/login";
-            name = "rns_3_0_1_linux_x86_64.tar.gz";
-            sha256 = "1yb5w5jrg9dk9fg5rfvfk6p0rxn4r4i32vxp2l9lzhbs02pv15wd";
-        }
-    else if stdenv.system == "i686-linux" then
-        if demo then
-        fetchurl {
-            url = "http://files.renoise.com/demo/Renoise_3_0_1_Demo_x86.tar.bz2";
-            sha256 = "0dgqvib4xh2yhgh2wajj11wsb6xiiwgfkhyz32g8vnyaij5q8f58";
-        }
-        else
-        requireFile {
-            url = "http://backstage.renoise.com/frontend/app/index.html#/login";
-            name = "rns_3_0_1_reg_x86.tar.gz";
-            sha256 = "1swax2jz0gswdpzz8alwjfd8rhigc2yfspj7p8wvdvylqrf7n8q7";
-        }
-    else throw "platform is not suppored by Renoise";
+        	releasePath
+    else throw "Platform is not supported by Renoise";
+
+  buildInputs = [ alsaLib libjack2 libX11 libXcursor libXext libXrandr ];
 
   installPhase = ''
     cp -r Resources $out
@@ -49,13 +49,20 @@ stdenv.mkDerivation rec {
 
     mkdir $out/bin
     ln -s $out/renoise $out/bin/renoise
+  '';
 
-    patchelf --set-interpreter $(cat $NIX_CC/nix-support/dynamic-linker) --set-rpath $out/lib $out/renoise
+  postFixup = ''
+    patchelf \
+      --set-interpreter $(cat $NIX_CC/nix-support/dynamic-linker) \
+      --set-rpath ${mpg123}/lib:$out/lib \
+      $out/renoise
   '';
 
   meta = {
     description = "Modern tracker-based DAW";
-    homepage = http://www.renoise.com/;
-    license = stdenv.lib.licenses.unfree;
+    homepage = "https://www.renoise.com/";
+    license = licenses.unfree;
+    maintainers = [];
+    platforms = [ "x86_64-linux" ];
   };
 }

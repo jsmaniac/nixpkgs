@@ -1,29 +1,48 @@
-{ stdenv, fetchurl, makeWrapper, jre }:
+{ stdenv, fetchurl, makeWrapper, jre_headless, gawk }:
+
 stdenv.mkDerivation rec {
-  name = "nexus-${version}";
-  version = "2.12.0-01";
+  pname = "nexus";
+  version = "3.22.0-02";
 
   src = fetchurl {
-    url = "https://sonatype-download.global.ssl.fastly.net/nexus/oss/nexus-${version}-bundle.tar.gz";
-    sha256 = "1k3z7kwcmr1pxaxfnak99fq5s8br9zbqbfpyw1afi86ykkph4g5z";
+    url = "https://sonatype-download.global.ssl.fastly.net/nexus/3/nexus-${version}-unix.tar.gz";
+    sha256 = "12433fgva03gsgi37xqgkdnbglgq4b66lmzk5cyxfg22szl4xvwz";
   };
 
-  sourceRoot = name;
+  preferLocalBuild = true;
 
-  buildInputs = [ makeWrapper ];
+  sourceRoot = "${pname}-${version}";
 
-  installPhase = 
-    ''
-      mkdir -p $out
-      cp -rfv * $out
-      rm -fv $out/bin/nexus.bat
-    '';
+  nativeBuildInputs = [ makeWrapper ];
+
+  patches = [ ./nexus-bin.patch ./nexus-vm-opts.patch ];
+
+  postPatch = ''
+    substituteInPlace bin/nexus.vmoptions \
+      --replace etc/karaf $out/etc/karaf \
+      --replace =. =$out
+  '';
+
+  installPhase = ''
+    runHook preInstall
+
+    mkdir -p $out
+    cp -rfv * .install4j $out
+    rm -fv $out/bin/nexus.bat
+
+    wrapProgram $out/bin/nexus \
+      --set JAVA_HOME ${jre_headless} \
+      --set ALTERNATIVE_NAME "nexus" \
+      --prefix PATH "${stdenv.lib.makeBinPath [ gawk ]}"
+
+    runHook postInstall
+  '';
 
   meta = with stdenv.lib; {
     description = "Repository manager for binary software components";
-    homepage = http://www.sonatype.org/nexus;
+    homepage = "http://www.sonatype.org/nexus";
     license = licenses.epl10;
     platforms = platforms.all;
-    maintainers = [ maintainers.aespinosa ];
+    maintainers = with maintainers; [ aespinosa ironpinguin zaninime ];
   };
 }

@@ -1,6 +1,9 @@
-#!/bin/sh -e
+#!/usr/bin/env bash
+set -eu -o pipefail
 
-rm -f node-env.nix
-node2nix -i node-packages.json -o node-packages-v4.nix -c composition-v4.nix
-# node2nix doesn't explicitely support node v6 so far
-node2nix -5 -i node-packages.json -o node-packages-v6.nix -c composition-v6.nix
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+node2nix=$(nix-build ../../.. --no-out-link -A nodePackages.node2nix)
+
+cd ${DIR}
+rm -f ./node-env.nix
+${node2nix}/bin/node2nix -i node-packages.json -o node-packages.nix -c composition.nix

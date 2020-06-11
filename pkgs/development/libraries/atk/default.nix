@@ -1,28 +1,44 @@
-{ stdenv, fetchurl, pkgconfig, perl, glib, libintlOrEmpty, gobjectIntrospection }:
+{ stdenv, fetchurl, meson, ninja, gettext, pkgconfig, glib
+, fixDarwinDylibNames, gobject-introspection, gnome3
+}:
 
 let
-  ver_maj = "2.20";
-  ver_min = "0";
+  pname = "atk";
+  version = "2.36.0";
 in
+
 stdenv.mkDerivation rec {
-  name = "atk-${ver_maj}.${ver_min}";
+  name = "${pname}-${version}";
 
   src = fetchurl {
-    url = "mirror://gnome/sources/atk/${ver_maj}/${name}.tar.xz";
-    sha256 = "493a50f6c4a025f588d380a551ec277e070b28a82e63ef8e3c06b3ee7c1238f0";
+    url = "mirror://gnome/sources/${pname}/${stdenv.lib.versions.majorMinor version}/${name}.tar.xz";
+    sha256 = "1217cmmykjgkkim0zr1lv5j13733m4w5vipmy4ivw0ll6rz28xpv";
   };
-
-  enableParallelBuilding = true;
 
   outputs = [ "out" "dev" ];
 
-  buildInputs = libintlOrEmpty;
+  buildInputs = stdenv.lib.optional stdenv.isDarwin fixDarwinDylibNames;
 
-  nativeBuildInputs = [ pkgconfig perl ];
+  nativeBuildInputs = [ meson ninja pkgconfig gettext gobject-introspection glib ];
 
-  propagatedBuildInputs = [ glib gobjectIntrospection /*ToDo: why propagate*/ ];
+  propagatedBuildInputs = [
+    # Required by atk.pc
+    glib
+  ];
 
-  #doCheck = true; # no checks in there (2.10.0)
+  patches = [
+    # meson builds an incorrect .pc file
+    # glib should be Requires not Requires.private
+    ./fix_pc.patch
+  ];
+
+  doCheck = true;
+
+  passthru = {
+    updateScript = gnome3.updateScript {
+      packageName = pname;
+    };
+  };
 
   meta = {
     description = "Accessibility toolkit";
@@ -35,11 +51,11 @@ stdenv.mkDerivation rec {
       control running applications.
     '';
 
-    homepage = http://library.gnome.org/devel/atk/;
+    homepage = "http://library.gnome.org/devel/atk/";
 
     license = stdenv.lib.licenses.lgpl2Plus;
 
-    maintainers = with stdenv.lib.maintainers; [ raskin urkud ];
+    maintainers = with stdenv.lib.maintainers; [ raskin ];
     platforms = stdenv.lib.platforms.linux ++ stdenv.lib.platforms.darwin;
   };
 

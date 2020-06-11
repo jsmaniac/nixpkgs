@@ -17,10 +17,11 @@ stdenv.mkDerivation rec {
     mkdir -p $out/lib
   '';
 
-  buildInputs = [ pkgconfig glib ncurses ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ glib ncurses ];
 
   meta = with stdenv.lib; {
-    homepage = http://libvterm.sourceforge.net/;
+    homepage = "http://libvterm.sourceforge.net/";
     description = "Terminal emulator library to mimic both vt100 and rxvt";
     license = licenses.gpl2Plus;
     platforms = platforms.linux;

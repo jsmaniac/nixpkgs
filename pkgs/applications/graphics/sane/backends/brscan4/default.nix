@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, callPackage, patchelf, makeWrapper, coreutils, libusb }:
+{ stdenv, fetchurl, callPackage, patchelf, makeWrapper, coreutils, libusb-compat-0_1 }:
 
 let
   myPatchElf = file: with stdenv.lib; ''
@@ -10,11 +10,19 @@ let
   udevRules = callPackage ./udev_rules_type1.nix {};
 
 in stdenv.mkDerivation rec {
-  name = "brscan4-0.4.3-3";
-  src = fetchurl {
-    url = "http://download.brother.com/welcome/dlf006645/${name}.amd64.deb";
-    sha256 = "1nccyjl0b195pn6ya4q0zijb075q8r31v9z9a0hfzipfyvcj57n2";
-  };
+  name = "brscan4-0.4.8-1";
+  src = 
+    if stdenv.hostPlatform.system == "i686-linux" then
+      fetchurl {
+        url = "http://download.brother.com/welcome/dlf006646/${name}.i386.deb";
+        sha256 = "15hrf1gpm36lniqi6yf47dvdqjinm644xb752c6rcv8n06wb79ag";
+      }
+    else if stdenv.hostPlatform.system == "x86_64-linux" then
+      fetchurl {
+        url = "https://download.brother.com/welcome/dlf006645/${name}.amd64.deb";
+        sha256 = "0pyprjl0capg403yp6pp07gd6msx9kn7bzjcdswdbn28fyxrk5l4";
+      }
+    else throw "${name} is not supported on ${stdenv.hostPlatform.system} (only i686-linux and x86_64 linux are supported)";
 
   unpackPhase = ''
     ar x $src
@@ -22,13 +30,13 @@ in stdenv.mkDerivation rec {
   '';
 
   nativeBuildInputs = [ makeWrapper patchelf coreutils udevRules ];
-  buildInputs = [ libusb ];
+  buildInputs = [ libusb-compat-0_1 ];
   dontBuild = true;
 
   patchPhase = ''
     ${myPatchElf "opt/brother/scanner/brscan4/brsaneconfig4"}
 
-    RPATH=${libusb.out}/lib
+    RPATH=${libusb-compat-0_1.out}/lib
     for a in usr/lib64/sane/*.so*; do
       if ! test -L $a; then
         patchelf --set-rpath $RPATH $a
@@ -36,12 +44,12 @@ in stdenv.mkDerivation rec {
     done
   '';
 
-  installPhase = ''
+  installPhase = with stdenv.lib; ''
     PATH_TO_BRSCAN4="opt/brother/scanner/brscan4"
     mkdir -p $out/$PATH_TO_BRSCAN4
     cp -rp $PATH_TO_BRSCAN4/* $out/$PATH_TO_BRSCAN4
     mkdir -p $out/lib/sane
-    cp -rp usr/lib64/sane/* $out/lib/sane
+    cp -rp usr/lib${optionalString stdenv.is64bit "64"}/sane/* $out/lib/sane
 
     # Symbolic links were absolute. Fix them so that they point to $out.
     pushd "$out/lib/sane" > /dev/null
@@ -78,7 +86,7 @@ in stdenv.mkDerivation rec {
 
   meta = {
     description = "Brother brscan4 sane backend driver";
-    homepage = http://www.brother.com;
+    homepage = "http://www.brother.com";
     platforms = stdenv.lib.platforms.linux;
     license = stdenv.lib.licenses.unfree;
     maintainers = with stdenv.lib.maintainers; [ jraygauthier ];

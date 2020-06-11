@@ -1,39 +1,31 @@
-{ stdenv, buildOcaml, fetchFromGitHub, findlib, ocamlbuild, ocaml_oasis
-, ppx_tools, ppx_sexp_conv, result, x509, nocrypto, cstruct, ounit
-, lwt     ? null}:
+{ lib, fetchurl, buildDunePackage, ppx_sexp_conv, ppx_cstruct, cstruct
+, cstruct-sexp, sexplib, mirage-crypto, mirage-crypto-pk, mirage-crypto-rng
+, x509, domain-name, fmt, cstruct-unix, ounit2, ocaml_lwt, ptime
+, hacl_x25519, fiat-p256, hkdf, logs, alcotest }:
 
-with stdenv.lib;
+buildDunePackage rec {
+  minimumOCamlVersion = "4.07";
 
-let withLwt = lwt != null; in
+  version = "0.12.0";
+  pname = "tls";
 
-buildOcaml rec {
-  version = "0.7.1";
-  name = "tls";
-
-  minimunSupportedOcamlVersion = "4.02";
-
-  src = fetchFromGitHub {
-    owner  = "mirleft";
-    repo   = "ocaml-tls";
-    rev    = "${version}";
-    sha256 = "19q2hzxiasz9pzczgb63kikg0mc9mw98dfvch5falf2rincycj24";
+  src = fetchurl {
+    url = "https://github.com/mirleft/ocaml-tls/releases/download/v${version}/tls-v${version}.tbz";
+    sha256 = "0fy38qmy7rcld1b4qzz4ycl1fr0v1wa7qd24125lpd6hly86fn57";
   };
 
-  buildInputs = [ ocamlbuild findlib ocaml_oasis ppx_sexp_conv ounit ];
-  propagatedBuildInputs = [ cstruct nocrypto result x509 ] ++
-                          optional withLwt lwt;
-
-  configureFlags = [ "--disable-mirage" "--enable-tests" ] ++
-                   optional withLwt ["--enable-lwt"];
-
-  configurePhase = "./configure --prefix $out $configureFlags";
+  useDune2 = true;
 
   doCheck = true;
-  checkTarget = "test";
-  createFindlibDestdir = true;
+  checkInputs = [ cstruct-unix ounit2 alcotest ];
 
-  meta = with stdenv.lib; {
-    homepage = https://github.com/mirleft/ocaml-tls;
+  propagatedBuildInputs = [ ppx_sexp_conv ppx_cstruct cstruct cstruct-sexp
+                            sexplib mirage-crypto mirage-crypto-pk mirage-crypto-rng
+                            x509 domain-name fmt ocaml_lwt ptime hacl_x25519 fiat-p256
+                            hkdf logs ];
+
+  meta = with lib; {
+    homepage = "https://github.com/mirleft/ocaml-tls";
     description = "TLS in pure OCaml";
     license = licenses.bsd2;
     maintainers = with maintainers; [ sternenseemann ];

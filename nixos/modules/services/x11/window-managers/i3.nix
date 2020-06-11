@@ -36,6 +36,21 @@ in
         i3 package to use.
       '';
     };
+
+    extraPackages = mkOption {
+      type = with types; listOf package;
+      default = with pkgs; [ dmenu i3status i3lock ];
+      example = literalExample ''
+        with pkgs; [
+          dmenu
+          i3status
+          i3lock
+        ]
+      '';
+      description = ''
+        Extra packages to be installed system wide.
+      '';
+    };
   };
 
   config = mkIf cfg.enable {
@@ -45,12 +60,15 @@ in
         ${cfg.extraSessionCommands}
 
         ${cfg.package}/bin/i3 ${optionalString (cfg.configFile != null)
-          "-c \"${cfg.configFile}\""
+          "-c /etc/i3/config"
         } &
         waitPID=$!
       '';
     }];
-    environment.systemPackages = [ cfg.package ];
+    environment.systemPackages = [ cfg.package ] ++ cfg.extraPackages;
+    environment.etc."i3/config" = mkIf (cfg.configFile != null) {
+      source = cfg.configFile;
+    };
   };
 
   imports = [

@@ -1,12 +1,12 @@
+{ lib }:
 # Operations on attribute sets.
 
-with {
+let
   inherit (builtins) head tail length;
-  inherit (import ./trivial.nix) or;
-  inherit (import ./default.nix) fold;
-  inherit (import ./strings.nix) concatStringsSep;
-  inherit (import ./lists.nix) concatMap concatLists all deepSeqList;
-};
+  inherit (lib.trivial) and;
+  inherit (lib.strings) concatStringsSep sanitizeDerivationName;
+  inherit (lib.lists) fold concatMap concatLists;
+in
 
 rec {
   inherit (builtins) attrNames listToAttrs hasAttr isAttrs getAttr;
@@ -60,7 +60,7 @@ rec {
       [ { name = head attrPath; value = setAttrByPath (tail attrPath) value; } ];
 
 
-  /* Like `getAttrPath' without a default value. If it doesn't find the
+  /* Like `attrByPath' without a default value. If it doesn't find the
      path it will throw.
 
      Example:
@@ -94,6 +94,15 @@ rec {
   attrValues = builtins.attrValues or (attrs: attrVals (attrNames attrs) attrs);
 
 
+  /* Given a set of attribute names, return the set of the corresponding
+     attributes from the given set.
+
+     Example:
+       getAttrs [ "a" "b" ] { a = 1; b = 2; c = 3; }
+       => { a = 1; b = 2; }
+  */
+  getAttrs = names: attrs: genAttrs names (name: attrs.${name});
+
   /* Collect each attribute named `attr' from a list of attribute
      sets.  Sets that don't contain the named attribute are ignored.
 
@@ -116,7 +125,7 @@ rec {
     listToAttrs (concatMap (name: let v = set.${name}; in if pred name v then [(nameValuePair name v)] else []) (attrNames set));
 
 
-  /* Filter an attribute set recursivelly by removing all attributes for
+  /* Filter an attribute set recursively by removing all attributes for
      which the given predicate return false.
 
      Example:
@@ -145,7 +154,7 @@ rec {
   foldAttrs = op: nul: list_of_attrs:
     fold (n: a:
         fold (name: o:
-          o // (listToAttrs [{inherit name; value = op n.${name} (a.${name} or nul); }])
+          o // { ${name} = op n.${name} (a.${name} or nul); }
         ) a (attrNames n)
     ) {} list_of_attrs;
 
@@ -195,8 +204,9 @@ rec {
           { x = "foo"; y = "bar"; }
        => { x = "x-foo"; y = "y-bar"; }
   */
-  mapAttrs = f: set:
-    listToAttrs (map (attr: { name = attr; value = f attr set.${attr}; }) (attrNames set));
+  mapAttrs = builtins.mapAttrs or
+    (f: set:
+      listToAttrs (map (attr: { name = attr; value = f attr set.${attr}; }) (attrNames set)));
 
 
   /* Like `mapAttrs', but allows the name of each attribute to be
@@ -300,7 +310,7 @@ rec {
       path' = builtins.storePath path;
       res =
         { type = "derivation";
-          name = builtins.unsafeDiscardStringContext (builtins.substring 33 (-1) (baseNameOf path'));
+          name = sanitizeDerivationName (builtins.substring 33 (-1) (baseNameOf path'));
           outPath = path';
           outputs = [ "out" ];
           out = res;
@@ -334,7 +344,7 @@ rec {
       value = f name (catAttrs name sets);
     }) names);
 
-  /* Implentation note: Common names  appear multiple times in the list of
+  /* Implementation note: Common names  appear multiple times in the list of
      names, hopefully this does not affect the system because the maximal
      laziness avoid computing twice the same expression and listToAttrs does
      not care about duplicated attribute names.
@@ -344,7 +354,7 @@ rec {
        => { a = ["x" "y"]; b = ["z"] }
   */
   zipAttrsWith = f: sets: zipAttrsWithNames (concatMap attrNames sets) f sets;
-  /* Like `zipAttrsWith' with `(name: values: value)' as the function.
+  /* Like `zipAttrsWith' with `(name: values: values)' as the function.
 
     Example:
       zipAttrs [{a = "x";} {a = "y"; b = "z";}]
@@ -353,7 +363,7 @@ rec {
   zipAttrs = zipAttrsWith (name: values: values);
 
   /* Does the same as the update operator '//' except that attributes are
-     merged until the given pedicate is verified.  The predicate should
+     merged until the given predicate is verified.  The predicate should
      accept 3 arguments which are the path to reach the attribute, a part of
      the first attribute set and a part of the second attribute set.  When
      the predicate is verified, the value of the first attribute set is
@@ -383,15 +393,16 @@ rec {
   recursiveUpdateUntil = pred: lhs: rhs:
     let f = attrPath:
       zipAttrsWith (n: values:
+        let here = attrPath ++ [n]; in
         if tail values == []
-        || pred attrPath (head (tail values)) (head values) then
+        || pred here (head (tail values)) (head values) then
           head values
         else
-          f (attrPath ++ [n]) values
+          f here values
       );
     in f [] [rhs lhs];
 
-  /* A recursive variant of the update operator ‘//’.  The recusion
+  /* A recursive variant of the update operator ‘//’.  The recursion
      stops when one of the attribute values is not an attribute set,
      in which case the right hand side value takes precedence over the
      left hand side value.
@@ -417,18 +428,15 @@ rec {
 
   /* Returns true if the pattern is contained in the set. False otherwise.
 
-     FIXME(zimbatm): this example doesn't work !!!
-
      Example:
-       sys = mkSystem { }
-       matchAttrs { cpu = { bits = 64; }; } sys
+       matchAttrs { cpu = {}; } { cpu = { bits = 64; }; }
        => true
    */
-  matchAttrs = pattern: attrs:
-    fold or false (attrValues (zipAttrsWithNames (attrNames pattern) (n: values:
+  matchAttrs = pattern: attrs: assert isAttrs pattern;
+    fold and true (attrValues (zipAttrsWithNames (attrNames pattern) (n: values:
       let pat = head values; val = head (tail values); in
       if length values == 1 then false
-      else if isAttrs pat then isAttrs val && matchAttrs head values
+      else if isAttrs pat then isAttrs val && matchAttrs pat val
       else pat == val
     ) [pattern attrs]));
 
@@ -436,12 +444,15 @@ rec {
     useful for deep-overriding.
 
     Example:
-      x = { a = { b = 4; c = 3; }; }
-      overrideExisting x { a = { b = 6; d = 2; }; }
-      => { a = { b = 6; d = 2; }; }
+      overrideExisting {} { a = 1; }
+      => {}
+      overrideExisting { b = 2; } { a = 1; }
+      => { b = 2; }
+      overrideExisting { a = 3; b = 2; } { a = 1; }
+      => { a = 1; b = 2; }
   */
   overrideExisting = old: new:
-    old // listToAttrs (map (attr: nameValuePair attr (attrByPath [attr] old.${attr} new)) (attrNames old));
+    mapAttrs (name: value: new.${name} or value) old;
 
   /* Get a package output.
      If no output is found, fallback to `.out` and then to the default.
@@ -461,6 +472,20 @@ rec {
 
   /* Pick the outputs of packages to place in buildInputs */
   chooseDevOutputs = drvs: builtins.map getDev drvs;
+
+  /* Make various Nix tools consider the contents of the resulting
+     attribute set when looking for what to build, find, etc.
+
+     This function only affects a single attribute set; it does not
+     apply itself recursively for nested attribute sets.
+   */
+  recurseIntoAttrs =
+    attrs: attrs // { recurseForDerivations = true; };
+
+  /* Undo the effect of recurseIntoAttrs.
+   */
+  dontRecurseIntoAttrs =
+    attrs: attrs // { recurseForDerivations = false; };
 
   /*** deprecated stuff ***/
 

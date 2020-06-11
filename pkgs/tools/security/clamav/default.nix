@@ -1,13 +1,15 @@
-{ stdenv, fetchurl, zlib, bzip2, libiconv, libxml2, openssl, ncurses, curl
-, libmilter, pcre }:
+{ stdenv, fetchurl, pkgconfig
+, zlib, bzip2, libiconv, libxml2, openssl, ncurses, curl, libmilter, pcre2
+, libmspack, systemd
+}:
 
 stdenv.mkDerivation rec {
-  name = "clamav-${version}";
-  version = "0.99.2";
+  pname = "clamav";
+  version = "0.102.3";
 
   src = fetchurl {
-    url = "https://www.clamav.net/downloads/production/${name}.tar.gz";
-    sha256 = "0yh2q318bnmf2152g2h1yvzgqbswn0wvbzb8p4kf7v057shxcyqn";
+    url = "https://www.clamav.net/downloads/production/${pname}-${version}.tar.gz";
+    sha256 = "14q6vi178ih60yz4ja33b6181va1dcj8fyscnmxfx2crav250c7d";
   };
 
   # don't install sample config files into the absolute sysconfdir folder
@@ -15,20 +17,22 @@ stdenv.mkDerivation rec {
     substituteInPlace Makefile.in --replace ' etc ' ' '
   '';
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    zlib bzip2 libxml2 openssl ncurses curl libiconv libmilter pcre
+    zlib bzip2 libxml2 openssl ncurses curl libiconv libmilter pcre2 libmspack
+    systemd
   ];
 
   configureFlags = [
+    "--libdir=$(out)/lib"
     "--sysconfdir=/etc/clamav"
+    "--with-systemdsystemunitdir=$(out)/lib/systemd"
+    "--disable-llvm" # enabling breaks the build at the moment
     "--with-zlib=${zlib.dev}"
-    "--with-libbz2-prefix=${bzip2.dev}"
-    "--with-iconv-dir=${libiconv}"
     "--with-xml=${libxml2.dev}"
     "--with-openssl=${openssl.dev}"
-    "--with-libncurses-prefix=${ncurses.dev}"
     "--with-libcurl=${curl.dev}"
-    "--with-pcre=${pcre.dev}"
+    "--with-system-libmspack"
     "--enable-milter"
   ];
 
@@ -38,10 +42,10 @@ stdenv.mkDerivation rec {
   '';
 
   meta = with stdenv.lib; {
-    homepage = http://www.clamav.net;
+    homepage = "https://www.clamav.net";
     description = "Antivirus engine designed for detecting Trojans, viruses, malware and other malicious threats";
     license = licenses.gpl2;
-    maintainers = with maintainers; [ phreedom robberer qknight ];
+    maintainers = with maintainers; [ phreedom robberer qknight fpletz globin ];
     platforms = platforms.linux;
   };
 }

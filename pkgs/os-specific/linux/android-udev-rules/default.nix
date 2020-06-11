@@ -5,14 +5,14 @@
 #   services.udev.packages = [ pkgs.android-udev-rules ];
 
 stdenv.mkDerivation rec {
-  name = "android-udev-rules-${version}";
-  version = "20161014";
+  pname = "android-udev-rules";
+  version = "20200410";
 
   src = fetchFromGitHub {
     owner = "M0Rf30";
     repo = "android-udev-rules";
     rev = version;
-    sha256 = "0xc7wslxf7xsvfbd83wsw4nikmpq1zfd607y2p2r3j1vkw1yak08";
+    sha256 = "1ik9a0k9gkaw5a80m25pxx5yfiwq34ffb7iqhwicz4lwz5wsw8d3";
   };
 
   installPhase = ''

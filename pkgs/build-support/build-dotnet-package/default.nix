@@ -19,8 +19,8 @@ attrsOrig @
     attrs = {
       name = "${baseName}-${version}";
 
+      nativeBuildInputs = [ pkgconfig ];
       buildInputs = [
-        pkgconfig
         mono
         dotnetbuildhelpers
         makeWrapper
@@ -29,9 +29,9 @@ attrsOrig @
       configurePhase = ''
         runHook preConfigure
 
-        [ -z "$dontPlacateNuget" ] && placate-nuget.sh
-        [ -z "$dontPlacatePaket" ] && placate-paket.sh
-        [ -z "$dontPatchFSharpTargets" ] && patch-fsharp-targets.sh
+        [ -z "''${dontPlacateNuget-}" ] && placate-nuget.sh
+        [ -z "''${dontPlacatePaket-}" ] && placate-paket.sh
+        [ -z "''${dontPatchFSharpTargets-}" ] && patch-fsharp-targets.sh
 
         runHook postConfigure
       '';
@@ -69,7 +69,7 @@ attrsOrig @
 
         cp -rv ${arrayToShell outputFiles} "''${outputFilesArray[@]}" "$target"
 
-        if [ -z "$dontRemoveDuplicatedDlls" ]
+        if [ -z "''${dontRemoveDuplicatedDlls-}" ]
         then
           pushd "$out"
           remove-duplicated-dlls.sh
@@ -102,8 +102,9 @@ attrsOrig @
             mkdir -p "$out"/bin
             commandName="$(basename -s .exe "$(echo "$exe" | tr "[A-Z]" "[a-z]")")"
             makeWrapper \
-              "${mono}/bin/mono \"$exe\"" \
+              "${mono}/bin/mono" \
               "$out"/bin/"$commandName" \
+              --add-flags "\"$exe\"" \
               ''${makeWrapperArgs}
           done
         done

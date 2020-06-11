@@ -1,22 +1,35 @@
-{ stdenv, fetchgit, cmake, zlib, boost,
-  openal, glm, freetype, mesa, glew, SDL2,
-  dejavu_fonts, inkscape, optipng, imagemagick }:
+{ stdenv, fetchFromGitHub, cmake, zlib, boost
+, openal, glm, freetype, libGLU, SDL2, epoxy
+, dejavu_fonts, inkscape, optipng, imagemagick
+, withCrashReporter ? !stdenv.isDarwin
+,   qtbase ? null
+,   wrapQtAppsHook ? null
+,   curl ? null
+,   gdb  ? null
+}:
 
-stdenv.mkDerivation rec {
-  name = "arx-libertatis-${version}";
-  version = "2016-07-27";
+with stdenv.lib;
 
-  src = fetchgit {
-    url = "https://github.com/arx/ArxLibertatis";
-    rev = "e3aa6353f90886e7e9db2f4350ad9a232dd01c1e";
-    sha256 = "1hkkf0z607z8wxdikxq1ji120b3w7pxixq9qapdj1p54dzgbhgza";
+stdenv.mkDerivation {
+  pname = "arx-libertatis";
+  version = "2019-07-22";
+
+  src = fetchFromGitHub {
+    owner = "arx";
+    repo = "ArxLibertatis";
+    rev = "db77aa26bb8612f711b65e72b1cd8cf6481700c7";
+    sha256 = "0c88djyzjna17wjcvkgsfx3011m1rba5xdzdldy1hjmafpqgb4jj";
   };
 
+  nativeBuildInputs = [
+    cmake inkscape imagemagick optipng
+  ] ++ optionals withCrashReporter [ wrapQtAppsHook ];
+
   buildInputs = [
-    cmake zlib boost openal glm
-    freetype mesa glew SDL2 inkscape
-    optipng imagemagick
-  ];
+    zlib boost openal glm
+    freetype libGLU SDL2 epoxy
+  ] ++ optionals withCrashReporter [ qtbase curl ]
+    ++ optionals stdenv.isLinux    [ gdb ];
 
   cmakeFlags = [
     "-DDATA_DIR_PREFIXES=$out/share"
@@ -25,20 +38,23 @@ stdenv.mkDerivation rec {
   ];
 
   enableParallelBuilding = true;
+  dontWrapQtApps = true;
 
   postInstall = ''
     ln -sf \
       ${dejavu_fonts}/share/fonts/truetype/DejaVuSansMono.ttf \
       $out/share/games/arx/misc/dejavusansmono.ttf
+  '' + optionalString withCrashReporter ''
+    wrapQtApp "$out/libexec/arxcrashreporter"
   '';
-  
-  meta = with stdenv.lib; {
+
+  meta = {
     description = ''
       A cross-platform, open source port of Arx Fatalis, a 2002
       first-person role-playing game / dungeon crawler
       developed by Arkane Studios.
     '';
-    homepage = "http://arx-libertatis.org/";
+    homepage = "https://arx-libertatis.org/";
     license = licenses.gpl3;
     maintainers = with maintainers; [ rnhmjoj ];
     platforms = platforms.linux;

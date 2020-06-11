@@ -13,8 +13,9 @@ stdenv.mkDerivation rec {
     sha256 = "0v6ylm49f1b44zwq1y1gqxp2csyqblplr24ajllc2q3r0sc9m1ys";
    };
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    pkgconfig libX11 libxcb cairo gtk2 pango python27 python3
+    libX11 libxcb cairo gtk2 pango python27 python3
   ];
 
   makeFlags = [ "PREFIX=\${out}" ];
@@ -25,7 +26,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A simple flexible popup dialog to run on X";
-    homepage = https://github.com/emgram769/lighthouse;
+    homepage = "https://github.com/emgram769/lighthouse";
     license = licenses.mit;
     maintainers = with maintainers; [ ramkromberg ];
     platforms = platforms.linux;

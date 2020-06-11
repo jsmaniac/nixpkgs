@@ -1,8 +1,8 @@
-import ./make-test.nix ({ pkgs, ... }:
+import ./make-test-python.nix ({ ... }:
 {
   name = "ecryptfs";
 
-  machine = { config, pkgs, ... }: {
+  machine = { pkgs, ... }: {
     imports = [ ./common/user-account.nix ];
     boot.kernelModules = [ "ecryptfs" ];
     security.pam.enableEcryptfs = true;
@@ -10,72 +10,76 @@ import ./make-test.nix ({ pkgs, ... }:
   };
 
   testScript = ''
-    $machine->waitForUnit("default.target");
+    def login_as_alice():
+        machine.wait_until_tty_matches(1, "login: ")
+        machine.send_chars("alice\n")
+        machine.wait_until_tty_matches(1, "Password: ")
+        machine.send_chars("foobar\n")
+        machine.wait_until_tty_matches(1, "alice\@machine")
 
-    # Set alice up with a password and a home
-    $machine->succeed("(echo foobar; echo foobar) | passwd alice");
-    $machine->succeed("chown -R alice.users ~alice");
 
-    # Migrate alice's home
-    my $out = $machine->succeed("echo foobar | ecryptfs-migrate-home -u alice");
-    $machine->log("ecryptfs-migrate-home said: $out");
+    def logout():
+        machine.send_chars("logout\n")
+        machine.wait_until_tty_matches(1, "login: ")
 
-    # Log alice in (ecryptfs passwhrase is wrapped during first login)
-    $machine->sleep(2); # urgh: wait for username prompt
-    $machine->sendChars("alice\n");
-    $machine->sleep(1);
-    $machine->sendChars("foobar\n");
-    $machine->sleep(2);
-    $machine->sendChars("logout\n");
-    $machine->sleep(2);
 
-    # Why do I need to do this??
-    $machine->succeed("su alice -c ecryptfs-umount-private || true");
-    $machine->sleep(1);
-    $machine->fail("mount | grep ecryptfs"); # check that encrypted home is not mounted
+    machine.wait_for_unit("default.target")
 
-    # Show contents of the user keyring
-    my $out = $machine->succeed("su - alice -c 'keyctl list \@u'");
-    $machine->log("keyctl unlink said: " . $out);
+    with subtest("Set alice up with a password and a home"):
+        machine.succeed("(echo foobar; echo foobar) | passwd alice")
+        machine.succeed("chown -R alice.users ~alice")
 
-    # Log alice again
-    $machine->sendChars("alice\n");
-    $machine->sleep(1);
-    $machine->sendChars("foobar\n");
-    $machine->sleep(2);
+    with subtest("Migrate alice's home"):
+        out = machine.succeed("echo foobar | ecryptfs-migrate-home -u alice")
+        machine.log(f"ecryptfs-migrate-home said: {out}")
 
-    # Create some files in encrypted home
-    $machine->succeed("su alice -c 'touch ~alice/a'");
-    $machine->succeed("su alice -c 'echo c > ~alice/b'");
-
-    # Logout
-    $machine->sendChars("logout\n");
-    $machine->sleep(2);
+    with subtest("Log alice in (ecryptfs passwhrase is wrapped during first login)"):
+        login_as_alice()
+        machine.send_chars("logout\n")
+        machine.wait_until_tty_matches(1, "login: ")
 
     # Why do I need to do this??
-    $machine->succeed("su alice -c ecryptfs-umount-private || true");
-    $machine->sleep(1);
+    machine.succeed("su alice -c ecryptfs-umount-private || true")
+    machine.sleep(1)
 
-    # Check that the filesystem is not accessible
-    $machine->fail("mount | grep ecryptfs");
-    $machine->succeed("su alice -c 'test \! -f ~alice/a'");
-    $machine->succeed("su alice -c 'test \! -f ~alice/b'");
+    with subtest("check that encrypted home is not mounted"):
+        machine.fail("mount | grep ecryptfs")
 
-    # Log alice once more
-    $machine->sendChars("alice\n");
-    $machine->sleep(1);
-    $machine->sendChars("foobar\n");
-    $machine->sleep(2);
+    with subtest("Show contents of the user keyring"):
+        out = machine.succeed("su - alice -c 'keyctl list \@u'")
+        machine.log(f"keyctl unlink said: {out}")
 
-    # Check that the files are there
-    $machine->sleep(1);
-    $machine->succeed("su alice -c 'test -f ~alice/a'");
-    $machine->succeed("su alice -c 'test -f ~alice/b'");
-    $machine->succeed(qq%test "\$(cat ~alice/b)" = "c"%);
+    with subtest("Log alice again"):
+        login_as_alice()
 
-    # Catch https://github.com/NixOS/nixpkgs/issues/16766
-    $machine->succeed("su alice -c 'ls -lh ~alice/'");
+    with subtest("Create some files in encrypted home"):
+        machine.succeed("su alice -c 'touch ~alice/a'")
+        machine.succeed("su alice -c 'echo c > ~alice/b'")
 
-    $machine->sendChars("logout\n");
+    with subtest("Logout"):
+        logout()
+
+    # Why do I need to do this??
+    machine.succeed("su alice -c ecryptfs-umount-private || true")
+    machine.sleep(1)
+
+    with subtest("Check that the filesystem is not accessible"):
+        machine.fail("mount | grep ecryptfs")
+        machine.succeed("su alice -c 'test \! -f ~alice/a'")
+        machine.succeed("su alice -c 'test \! -f ~alice/b'")
+
+    with subtest("Log alice once more"):
+        login_as_alice()
+
+    with subtest("Check that the files are there"):
+        machine.sleep(1)
+        machine.succeed("su alice -c 'test -f ~alice/a'")
+        machine.succeed("su alice -c 'test -f ~alice/b'")
+        machine.succeed('test "$(cat ~alice/b)" = "c"')
+
+    with subtest("Catch https://github.com/NixOS/nixpkgs/issues/16766"):
+        machine.succeed("su alice -c 'ls -lh ~alice/'")
+
+    logout()
   '';
 })

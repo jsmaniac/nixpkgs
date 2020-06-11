@@ -1,27 +1,24 @@
-{ stdenv, fetchFromGitHub, zlib }:
+{ stdenv, fetchurl, zlib }:
 
 stdenv.mkDerivation rec {
-  name    = "bwa-${version}";
-  version = "0.7.15";
+  pname = "bwa";
+  version = "0.7.17";
 
-  src = fetchFromGitHub {
-    owner  = "lh3";
-    repo   = "bwa";
-    rev    = "v${version}";
-    sha256 = "1aasdr3lik42gafi9lds7xw0wgv8ijjll1g32d7jm04pp235c7nl";
+  src = fetchurl {
+    url = "mirror://sourceforge/bio-bwa/${pname}-${version}.tar.bz2";
+    sha256 = "1zfhv2zg9v1icdlq4p9ssc8k01mca5d1bd87w71py2swfi74s6yy";
   };
 
   buildInputs = [ zlib ];
 
   installPhase = ''
-    mkdir -p $out/bin
-    cp bwa $out/bin
+    install -vD bwa $out/bin/bwa
   '';
 
   meta = with stdenv.lib; {
     description = "A software package for mapping low-divergent sequences against a large reference genome, such as the human genome";
     license     = licenses.gpl3;
-    homepage    = http://bio-bwa.sourceforge.net/;
+    homepage    = "http://bio-bwa.sourceforge.net/";
     maintainers = with maintainers; [ luispedro ];
     platforms = [ "x86_64-linux" ];
   };

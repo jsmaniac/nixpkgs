@@ -1,47 +1,36 @@
-{ stdenv, fetchurl, pkgconfig, zlib, freetype, cairo, lua5, texlive, ghostscript
-, libjpeg, qtbase
-, makeQtWrapper
+{ stdenv, fetchurl, makeWrapper, pkgconfig, zlib, freetype, cairo, lua5, texlive, ghostscript
+, libjpeg, libpng, qtbase, mkDerivation
 }:
 
-stdenv.mkDerivation rec {
-  name = "ipe-7.1.10";
+mkDerivation rec {
+  name = "ipe-7.2.13";
 
   src = fetchurl {
-    url = "https://dl.bintray.com/otfried/generic/ipe/7.1/${name}-src.tar.gz";
-    sha256 = "0kwk8l2jasb4fdixaca08g661d0sdmx2jkk3ch7pxh0f4xkdxkkz";
+    url = "https://dl.bintray.com/otfried/generic/ipe/7.2/${name}-src.tar.gz";
+    sha256 = "1a6a88r7j5z01z6k1z72a8g3n6lxdjjxxkdrzrfdd6df2gbs6g5g";
   };
 
-  # changes taken from Gentoo portage
-  preConfigure = ''
-    cd src
-    sed -i \
-      -e 's/fpic/fPIC/' \
-      -e 's/moc-qt4/moc/' \
-      config.mak || die
-    sed -i -e 's/install -s/install/' common.mak || die
-  '';
+  sourceRoot = "${name}/src";
 
-  IPEPREFIX="$$out";
+  IPEPREFIX=placeholder "out";
   URWFONTDIR="${texlive}/texmf-dist/fonts/type1/urw/";
   LUA_PACKAGE = "lua";
 
   buildInputs = [
-    libjpeg pkgconfig zlib qtbase freetype cairo lua5 texlive ghostscript
+    libjpeg libpng zlib qtbase freetype cairo lua5 texlive ghostscript
   ];
 
-  nativeBuildInputs = [ makeQtWrapper ];
+  nativeBuildInputs = [ pkgconfig ];
 
-  postFixup = ''
-    for prog in $out/bin/*; do
-      wrapQtProgram "$prog" --prefix PATH : "${texlive}/bin"
-    done
-  '';
+  qtWrapperArgs = [ ''--prefix PATH : ${texlive}/bin''  ];
+
+  enableParallelBuilding = true;
 
   #TODO: make .desktop entry
 
   meta = {
     description = "An editor for drawing figures";
-    homepage = http://ipe.otfried.org;
+    homepage = "http://ipe.otfried.org";
     license = stdenv.lib.licenses.gpl3Plus;
     longDescription = ''
       Ipe is an extensible drawing editor for creating figures in PDF and Postscript format.

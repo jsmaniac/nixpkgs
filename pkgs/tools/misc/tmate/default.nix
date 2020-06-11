@@ -1,27 +1,28 @@
-{ stdenv, fetchFromGitHub, autoconf, automake, libtool, pkgconfig, zlib, openssl, libevent, ncurses, cmake, ruby, libmsgpack, libssh }:
+{ stdenv, fetchFromGitHub, autoreconfHook, cmake, libtool, pkgconfig
+, zlib, openssl, libevent, ncurses, ruby, msgpack, libssh }:
 
 stdenv.mkDerivation rec {
-  name = "tmate-${version}";
-  version = "2.2.0";
+  pname = "tmate";
+  version = "2.4.0";
 
   src = fetchFromGitHub {
-    owner  = "nviennot";
+    owner  = "tmate-io";
     repo   = "tmate";
     rev    = version;
-    sha256 = "1w3a7na0yj1y0x24qckc7s2y9xfak5iv6vyqrd0iibn3b7dxarli";
+    sha256 = "0x5c31yq7ansmiy20a0qf59wagba9v3pq97mlkxrqxn4n1gcc6vi";
   };
 
-  buildInputs = [ autoconf automake pkgconfig libtool zlib openssl libevent ncurses cmake ruby libmsgpack libssh ];
+  dontUseCmakeConfigure = true;
 
-  dontUseCmakeConfigure=true;
+  buildInputs = [ libtool zlib openssl libevent ncurses ruby msgpack libssh ];
+  nativeBuildInputs = [ autoreconfHook cmake pkgconfig ];
+  enableParallelBuilding = true;
 
-  preConfigure = "./autogen.sh";
-
-  meta = {
-    homepage = http://tmate.io/;
+  meta = with stdenv.lib; {
+    homepage    = "https://tmate.io/";
     description = "Instant Terminal Sharing";
-    license = stdenv.lib.licenses.mit;
-    platforms = stdenv.lib.platforms.unix;
-    maintainers = with stdenv.lib.maintainers; [ DamienCassou ];
+    license     = licenses.mit;
+    platforms   = platforms.unix;
+    maintainers = with maintainers; [ ];
   };
 }

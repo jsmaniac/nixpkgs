@@ -1,21 +1,66 @@
-{ stdenv, fetchurl, pkgconfig, libsoup, glib }:
+{ stdenv
+, fetchurl
+, meson
+, ninja
+, pkgconfig
+, gobject-introspection
+, vala
+, gtk-doc
+, docbook_xsl
+, docbook_xml_dtd_412
+, libsoup
+, gtk3
+, glib
+, gnome3
+}:
 
-stdenv.mkDerivation {
-  name = "gssdp-0.14.11";
+stdenv.mkDerivation rec {
+  pname = "gssdp";
+  version = "1.2.2";
+
+  outputs = [ "out" "bin" "dev" "devdoc" ];
 
   src = fetchurl {
-    url = mirror://gnome/sources/gssdp/0.14/gssdp-0.14.11.tar.xz;
-    sha256 = "0njkqr2y7c6linnw4wkc4y2vq5dfkpryqcinbzn0pzhr46psxxbv";
+    url = "mirror://gnome/sources/gssdp/${stdenv.lib.versions.majorMinor version}/${pname}-${version}.tar.xz";
+    sha256 = "195hi10vrsvh6i927mm6rm1ld5sxah3h5sr3bsjm90vb8lxrxfya";
   };
 
-  nativeBuildInputs = [ pkgconfig ];
-  buildInputs = [ libsoup ];
-  propagatedBuildInputs = [ glib ];
+  nativeBuildInputs = [
+    meson
+    ninja
+    pkgconfig
+    gobject-introspection
+    vala
+    gtk-doc
+    docbook_xsl
+    docbook_xml_dtd_412
+  ];
 
-  meta = {
+  buildInputs = [
+    libsoup
+    gtk3
+  ];
+
+  propagatedBuildInputs = [
+    glib
+  ];
+
+  mesonFlags = [
+    "-Dgtk_doc=true"
+  ];
+
+  doCheck = true;
+
+  passthru = {
+    updateScript = gnome3.updateScript {
+      packageName = pname;
+    };
+  };
+
+  meta = with stdenv.lib; {
     description = "GObject-based API for handling resource discovery and announcement over SSDP";
-    homepage = http://www.gupnp.org/;
-    license = stdenv.lib.licenses.lgpl2;
-    platforms = stdenv.lib.platforms.all;
+    homepage = "http://www.gupnp.org/";
+    license = licenses.lgpl2Plus;
+    platforms = platforms.all;
   };
 }

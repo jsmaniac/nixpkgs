@@ -2,8 +2,8 @@
 , asciidoc, docbook_xml_dtd_45, docbook_xsl, libxslt, makeWrapper, xmlto
 , pythonPackages }:
 
-stdenv.mkDerivation rec {
-  name = "git-bz-${version}";
+stdenv.mkDerivation {
+  pname = "git-bz";
   version = "3.2015-09-08";
 
   src = fetchgit {
@@ -27,6 +27,7 @@ stdenv.mkDerivation rec {
 
   postInstall = ''
     wrapProgram $out/bin/git-bz \
+      --prefix PYTHONPATH : "$(toPythonPath "${pythonPackages.pycrypto}")" \
       --prefix PYTHONPATH : "$(toPythonPath "${pythonPackages.pysqlite}")"
   '';
 
@@ -46,9 +47,8 @@ stdenv.mkDerivation rec {
       Chromium on Linux.
     '';
     license = licenses.gpl2Plus;
-    homepage = http://git.fishsoup.net/cgit/git-bz/;
+    homepage = "http://git.fishsoup.net/cgit/git-bz/";
 
-    maintainers = with maintainers; [ nckx ];
     platforms = platforms.linux;
   };
 }

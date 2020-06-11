@@ -1,34 +1,43 @@
-{ stdenv, fetchurl, pkgconfig, gstreamer, gst-plugins-base
-, python, gobjectIntrospection, json_glib
+{ stdenv
+, fetchurl
+, pkgconfig
+, gstreamer
+, gst-plugins-base
+, python3
+, gobject-introspection
+, json-glib
 }:
 
 stdenv.mkDerivation rec {
-  name = "gst-validate-1.10.1";
-
-  meta = {
-    description = "Integration testing infrastructure for the GStreamer framework";
-    homepage = "http://gstreamer.freedesktop.org";
-    license = stdenv.lib.licenses.lgpl2Plus;
-    platforms = stdenv.lib.platforms.unix;
-  };
+  pname = "gst-validate";
+  version = "1.16.2";
 
   src = fetchurl {
-    url = "${meta.homepage}/src/gst-validate/${name}.tar.xz";
-    sha256 = "0x9z0kizi44swsrx8mdc6xlmn9dksdfifchp5h6liibp7qd6gbh7";
+    url = "${meta.homepage}/src/${pname}/${pname}-${version}.tar.xz";
+    sha256 = "1jpfrzg3yc6kp66bgq3jy14xsj3x71mk2zh0k16yf0326awwqqa8";
   };
 
   outputs = [ "out" "dev" ];
 
   nativeBuildInputs = [
-    pkgconfig gobjectIntrospection
+    pkgconfig
+    gobject-introspection
   ];
 
   buildInputs = [
-    python json_glib
+    python3
+    json-glib
   ];
 
-  propagatedBuildInputs = [ gstreamer gst-plugins-base ];
+  propagatedBuildInputs = [
+    gstreamer
+    gst-plugins-base
+  ];
 
-  enableParallelBuilding = true;
+  meta = with stdenv.lib; {
+    description = "Integration testing infrastructure for the GStreamer framework";
+    homepage = "https://gstreamer.freedesktop.org";
+    license = licenses.lgpl2Plus;
+    platforms = platforms.unix;
+  };
 }
-

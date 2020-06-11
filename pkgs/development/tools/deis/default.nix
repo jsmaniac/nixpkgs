@@ -1,16 +1,16 @@
 { stdenv, buildGoPackage, fetchFromGitHub }:
 
 buildGoPackage rec {
-  name = "deis-${version}";
-  version = "1.13.3";
+  pname = "deis";
+  version = "1.13.4";
   rev = "v${version}";
 
   goPackagePath = "github.com/deis/deis";
   subPackages = [ "client" ];
 
   postInstall = ''
-    if [ -f "$bin/bin/client" ]; then
-      mv "$bin/bin/client" "$bin/bin/deis"
+    if [ -f "$out/bin/client" ]; then
+      mv "$out/bin/client" "$out/bin/deis"
     fi
   '';
 
@@ -18,7 +18,7 @@ buildGoPackage rec {
     inherit rev;
     owner = "deis";
     repo = "deis";
-    sha256 = "15q44jyjms8fdmly0z4sn4ymf1dx6cmdavgixjixdj2wbjw0yi2p";
+    sha256 = "0hndzvlgpfm83c4i1c88byv8j9clagswa79nny8wrw33dx90dym1";
   };
 
   preBuild = ''
@@ -26,12 +26,11 @@ buildGoPackage rec {
   '';
 
   meta = with stdenv.lib; {
-    homepage = https://deis.io;
+    homepage = "https://deis.io";
     description = "A command line utility used to interact with the Deis open source PaaS.";
     license = licenses.asl20;
-    platforms = platforms.linux;
+    platforms = platforms.unix;
     maintainers = with maintainers; [
-      jgeerds
     ];
   };
 }

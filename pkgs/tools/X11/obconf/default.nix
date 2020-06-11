@@ -1,8 +1,8 @@
 { stdenv, fetchurl, pkgconfig, gtk2, libglade, openbox,
-  imlib2, libstartup_notification, makeWrapper }:
+  imlib2, libstartup_notification, makeWrapper, libSM }:
 
 stdenv.mkDerivation rec {
-  name = "obconf-${version}";
+  pname = "obconf";
   version = "2.0.4";
 
   src = fetchurl {
@@ -10,8 +10,10 @@ stdenv.mkDerivation rec {
     sha256 = "1fanjdmd8727kk74x5404vi8v7s4kpq48l583d12fsi4xvsfb8vi";
   };
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    pkgconfig gtk2 libglade openbox imlib2 libstartup_notification makeWrapper
+    gtk2 libglade libSM openbox imlib2 libstartup_notification
+    makeWrapper
   ];
 
   postInstall = ''

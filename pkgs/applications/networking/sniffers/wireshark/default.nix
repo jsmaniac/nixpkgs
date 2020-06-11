@@ -1,77 +1,119 @@
-{ stdenv, fetchurl, pkgconfig, perl, flex, bison, libpcap, libnl, c-ares
-, gnutls, libgcrypt, geoip, openssl, lua5, makeDesktopItem, python, libcap, glib
-, zlib
-, withGtk ? false, gtk2 ? null, pango ? null, cairo ? null, gdk_pixbuf ? null
-, withQt ? false, qt4 ? null
+{ stdenv, fetchurl, pkgconfig, pcre, perl, flex, bison, gettext, libpcap, libnl, c-ares
+, gnutls, libgcrypt, libgpgerror, geoip, openssl, lua5, python3, libcap, glib
+, libssh, nghttp2, zlib, cmake, fetchpatch, makeWrapper
+, withQt ? true, qt5 ? null
 , ApplicationServices, SystemConfiguration, gmp
 }:
 
-assert withGtk -> !withQt && gtk2 != null;
-assert withQt -> !withGtk && qt4 != null;
+assert withQt  -> qt5  != null;
 
 with stdenv.lib;
 
 let
-  version = "2.2.2";
-  variant = if withGtk then "gtk" else if withQt then "qt" else "cli";
-in
+  version = "3.2.4";
+  variant = if withQt then "qt" else "cli";
+  pcap = libpcap.override { withBluez = stdenv.isLinux; };
 
-stdenv.mkDerivation {
-  name = "wireshark-${variant}-${version}";
+in stdenv.mkDerivation {
+  pname = "wireshark-${variant}";
+  inherit version;
+  outputs = [ "out" "dev" ];
 
   src = fetchurl {
-    url = "http://www.wireshark.org/download/src/all-versions/wireshark-${version}.tar.bz2";
-    sha256 = "1csm035ayfzn1xzzsmzcjk2ixx39d70aykr4nh0a88chk9gfzb7r";
+    url = "https://www.wireshark.org/download/src/all-versions/wireshark-${version}.tar.xz";
+    sha256 = "1amqgn94g6h6cfnsccm2zb4c73pfv1qmzi1i6h1hnbcyhhg4czfi";
   };
+
+  cmakeFlags = [
+    "-DBUILD_wireshark=${if withQt then "ON" else "OFF"}"
+    "-DENABLE_APPLICATION_BUNDLE=${if withQt && stdenv.isDarwin then "ON" else "OFF"}"
+    # Fix `extcap` and `plugins` paths. See https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=16444
+    "-DCMAKE_INSTALL_LIBDIR=lib"
+  ];
+
+  nativeBuildInputs = [
+    bison cmake flex pkgconfig
+  ] ++ optional withQt qt5.wrapQtAppsHook;
 
   buildInputs = [
-    bison flex perl pkgconfig libpcap lua5 openssl libgcrypt gnutls
-    geoip c-ares python glib zlib
-  ] ++ optional withQt qt4
-    ++ (optionals withGtk [gtk2 pango cairo gdk_pixbuf])
-    ++ optionals stdenv.isLinux [ libcap libnl ]
-    ++ optionals stdenv.isDarwin [ SystemConfiguration ApplicationServices gmp ];
+    gettext pcre perl pcap lua5 libssh nghttp2 openssl libgcrypt
+    libgpgerror gnutls geoip c-ares python3 glib zlib makeWrapper
+  ] ++ optionals withQt  (with qt5; [ qtbase qtmultimedia qtsvg qttools ])
+    ++ optionals stdenv.isLinux  [ libcap libnl ]
+    ++ optionals stdenv.isDarwin [ SystemConfiguration ApplicationServices gmp ]
+    ++ optionals (withQt && stdenv.isDarwin) (with qt5; [ qtmacextras ]);
 
-  patches = [ ./wireshark-lookup-dumpcap-in-path.patch ];
+  patches = [ ./wireshark-lookup-dumpcap-in-path.patch ]
+    # https://code.wireshark.org/review/#/c/23728/
+    ++ stdenv.lib.optional stdenv.hostPlatform.isMusl (fetchpatch {
+      name = "fix-timeout.patch";
+      url = "https://code.wireshark.org/review/gitweb?p=wireshark.git;a=commitdiff_plain;h=8b5b843fcbc3e03e0fc45f3caf8cf5fc477e8613;hp=94af9724d140fd132896b650d10c4d060788e4f0";
+      sha256 = "1g2dm7lwsnanwp68b9xr9swspx7hfj4v3z44sz3yrfmynygk8zlv";
+    });
 
-  configureFlags = "--disable-usr-local --disable-silent-rules --with-ssl"
-    + (if withGtk then
-         " --with-gtk2 --without-gtk3 --without-qt"
-       else if withQt then
-         " --without-gtk2 --without-gtk3 --with-qt"
-       else " --disable-wireshark");
-
-  desktopItem = makeDesktopItem {
-    name = "Wireshark";
-    exec = "wireshark";
-    icon = "wireshark";
-    comment = "Powerful network protocol analysis suite";
-    desktopName = "Wireshark";
-    genericName = "Network packet analyzer";
-    categories = "Network;System";
-  };
-
-  postInstall = optionalString (withQt || withGtk) ''
-    mkdir -p "$out"/share/applications/
-    mkdir -p "$out"/share/icons/
-    cp "$desktopItem/share/applications/"* "$out/share/applications/"
-    cp image/wsicon.svg "$out"/share/icons/wireshark.svg
+  postPatch = ''
+    sed -i -e '1i cmake_policy(SET CMP0025 NEW)' CMakeLists.txt
   '';
+
+  preBuild = ''
+    export LD_LIBRARY_PATH="$PWD/run"
+  '';
+
+  postInstall = ''
+    # to remove "cycle detected in the references"
+    mkdir -p $dev/lib/wireshark
+    mv $out/lib/wireshark/cmake $dev/lib/wireshark
+  '' + (if stdenv.isDarwin && withQt then ''
+    mkdir -p $out/Applications
+    mv $out/bin/Wireshark.app $out/Applications/Wireshark.app
+
+    for f in $(find $out/Applications/Wireshark.app/Contents/PlugIns -name "*.so"); do
+        for dylib in $(otool -L $f | awk '/^\t*lib/ {print $1}'); do
+            install_name_tool -change "$dylib" "$out/lib/$dylib" "$f"
+        done
+    done
+
+    wrapQtApp $out/Applications/Wireshark.app/Contents/MacOS/Wireshark
+  '' else optionalString withQt ''
+    install -Dm644 -t $out/share/applications ../wireshark.desktop
+
+    substituteInPlace $out/share/applications/*.desktop \
+        --replace "Exec=wireshark" "Exec=$out/bin/wireshark"
+
+    install -Dm644 ../image/wsicon.svg $out/share/icons/wireshark.svg
+    mkdir $dev/include/{epan/{wmem,ftypes,dfilter},wsutil,wiretap} -pv
+
+    cp config.h $dev/include/
+    cp ../ws_*.h $dev/include
+    cp ../epan/*.h $dev/include/epan/
+    cp ../epan/wmem/*.h $dev/include/epan/wmem/
+    cp ../epan/ftypes/*.h $dev/include/epan/ftypes/
+    cp ../epan/dfilter/*.h $dev/include/epan/dfilter/
+    cp ../wsutil/*.h $dev/include/wsutil/
+    cp ../wiretap/*.h $dev/include/wiretap
+  '');
 
   enableParallelBuilding = true;
 
-  meta = {
-    homepage = http://www.wireshark.org/;
+  dontFixCmake = true;
+
+  shellHook = ''
+    # to be able to run the resulting binary
+    export WIRESHARK_RUN_FROM_BUILD_DIRECTORY=1
+  '';
+
+  meta = with stdenv.lib; {
+    homepage = "https://www.wireshark.org/";
     description = "Powerful network protocol analyzer";
-    license = stdenv.lib.licenses.gpl2;
+    license = licenses.gpl2;
 
     longDescription = ''
       Wireshark (formerly known as "Ethereal") is a powerful network
       protocol analyzer developed by an international team of networking
-      experts. It runs on UNIX, OS X and Windows.
+      experts. It runs on UNIX, macOS and Windows.
     '';
 
-    platforms = stdenv.lib.platforms.unix;
-    maintainers = with stdenv.lib.maintainers; [ bjornfor fpletz ];
+    platforms = platforms.linux ++ platforms.darwin;
+    maintainers = with maintainers; [ bjornfor fpletz ];
   };
 }

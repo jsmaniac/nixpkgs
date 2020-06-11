@@ -1,27 +1,42 @@
-{stdenv, fetchurl, openssl, perl}:
+{ stdenv, fetchurl, openssl, perl, which, dns-root-data }:
 
 stdenv.mkDerivation rec {
-  name = "ldns-1.6.17";
+  pname = "ldns";
+  version = "1.7.1";
 
   src = fetchurl {
-    url = "http://www.nlnetlabs.nl/downloads/ldns/${name}.tar.gz";
-    sha256 = "1kf8pkwhcssvgzhh6ha1pjjiziwvwmfaali7kaafh6118mcy124b";
+    url = "https://www.nlnetlabs.nl/downloads/ldns/${pname}-${version}.tar.gz";
+    sha256 = "0ac242n7996fswq1a3nlh1bbbhrsdwsq4mx7xq8ffq6aplb4rj4a";
   };
-
-  outputs = [ "out" "dev" ];
-
-  patches = [ ./perl-5.22-compat.patch ];
 
   postPatch = ''
     patchShebangs doc/doxyparse.pl
   '';
 
+  outputs = [ "out" "dev" "man" "examples" ];
+
   nativeBuildInputs = [ perl ];
   buildInputs = [ openssl ];
 
-  configureFlags = [ "--with-ssl=${openssl.dev}" "--with-drill" ];
+  configureFlags = [
+    "--with-ssl=${openssl.dev}"
+    "--with-trust-anchor=${dns-root-data}/root.key"
+    "--with-drill"
+    "--disable-gost"
+    "--with-examples"
+  ] ++ stdenv.lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+    "ac_cv_func_malloc_0_nonnull=yes"
+    "ac_cv_func_realloc_0_nonnull=yes"
+  ];
+
+  checkInputs = [ which ];
+  doCheck = false; # fails. missing some files
 
   postInstall = ''
+    # Only 'drill' stays in $out
+    # the rest are examples:
+    moveToOutput "bin/ldns*" "$examples"
+    # with exception of ldns-config, which goes to $dev:
     moveToOutput "bin/ldns-config" "$dev"
   '';
 
@@ -29,7 +44,7 @@ stdenv.mkDerivation rec {
     description = "Library with the aim of simplifying DNS programming in C";
     license = licenses.bsd3;
     homepage = "http://www.nlnetlabs.nl/projects/ldns/";
-    platforms = platforms.linux;
-    maintainers = with maintainers; [ jgeerds ];
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ dtzWill ];
   };
 }

@@ -1,42 +1,57 @@
-{ fetchurl, stdenv, sqlite, pkgconfig, autoreconfHook
-, xapian, glib, gmime, texinfo , emacs, guile
-, gtk3, webkitgtk24x, libsoup, icu }:
+{ stdenv, fetchFromGitHub, sqlite, pkgconfig, autoreconfHook, pmccabe
+, xapian, glib, gmime3, texinfo , emacs, guile
+, gtk3, webkitgtk, libsoup, icu
+, withMug ? false
+, batchSize ? null }:
 
 stdenv.mkDerivation rec {
-  version = "0.9.16";
-  name = "mu-${version}";
+  pname = "mu";
+  version = "1.4.9";
 
-  src = fetchurl {
-    url = "https://github.com/djcb/mu/archive/v${version}.tar.gz";
-    sha256 = "0p7hqri1r1x6750x138cc29mh81kdav2dcim26y58s8an206h25g";
+  src = fetchFromGitHub {
+    owner  = "djcb";
+    repo   = "mu";
+    rev    = version;
+    sha256 = "1l8c72f3yd2vypc11frsmjnkr87h1q4gb6k3armpypwv6a6zl8z4";
   };
 
+  postPatch = stdenv.lib.optionalString (batchSize != null) ''
+    sed -i lib/mu-store.cc --regexp-extended \
+      -e 's@(constexpr auto BatchSize).*@\1 = ${toString batchSize};@'
+  '';
+
   buildInputs = [
-    sqlite pkgconfig xapian glib gmime texinfo emacs guile libsoup icu
-    autoreconfHook
-    gtk3 webkitgtk24x ];
+    sqlite xapian glib gmime3 texinfo emacs libsoup icu
+  ]
+    # Workaround for https://github.com/djcb/mu/issues/1641
+    ++ stdenv.lib.optional (!stdenv.isDarwin) guile
+    ++ stdenv.lib.optionals withMug [ gtk3 webkitgtk ];
+
+  nativeBuildInputs = [ pkgconfig autoreconfHook pmccabe ];
+
+  enableParallelBuilding = true;
 
   preBuild = ''
     # Fix mu4e-builddir (set it to $out)
     substituteInPlace mu4e/mu4e-meta.el.in \
       --replace "@abs_top_builddir@" "$out"
-
-    # We install msg2pdf to bin/msg2pdf, fix its location in elisp
-    substituteInPlace mu4e/mu4e-actions.el \
-      --replace "/toys/msg2pdf/msg2pdf" "/bin/msg2pdf"
   '';
 
-  # Install mug and msg2pdf
-  postInstall = ''
-    cp -v toys/msg2pdf/msg2pdf $out/bin/
-    cp -v toys/mug/mug $out/bin/
+  # Install mug
+  postInstall = stdenv.lib.optionalString withMug ''
+    for f in mug ; do
+      install -m755 toys/$f/$f $out/bin/$f
+    done
   '';
+
+  doCheck = true;
 
   meta = with stdenv.lib; {
     description = "A collection of utilties for indexing and searching Maildirs";
     license = licenses.gpl3Plus;
-    homepage = "http://www.djcbsoftware.nl/code/mu/";
+    homepage = "https://www.djcbsoftware.nl/code/mu/";
+    changelog = "https://github.com/djcb/mu/releases/tag/${version}";
+    maintainers = with maintainers; [ antono peterhoeg ];
     platforms = platforms.mesaPlatforms;
-    maintainers = with maintainers; [ antono the-kenny ];
   };
 }

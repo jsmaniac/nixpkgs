@@ -55,6 +55,7 @@ in
       sockets.u9fs = {
         description = "U9fs Listening Socket";
         wantedBy = [ "sockets.target" ];
+        after = [ "network.target" ];
         inherit (cfg) listenStreams;
         socketConfig.Accept = "yes";
       };
@@ -67,6 +68,7 @@ in
             StandardInput = "socket";
             StandardError = "journal";
             User = cfg.user;
+            AmbientCapabilities = "cap_setuid cap_setgid";
           };
       };
     };

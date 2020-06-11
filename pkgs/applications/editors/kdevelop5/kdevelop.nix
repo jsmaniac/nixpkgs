@@ -1,45 +1,61 @@
-{ stdenv, fetchurl, cmake, gettext, pkgconfig, extra-cmake-modules, makeQtWrapper
-, qtquickcontrols, qtwebkit, qttools
+
+{ mkDerivation, lib, fetchurl, cmake, gettext, pkgconfig, extra-cmake-modules
+, qtquickcontrols, qtwebkit, qttools, kde-cli-tools, qtbase
 , kconfig, kdeclarative, kdoctools, kiconthemes, ki18n, kitemmodels, kitemviews
 , kjobwidgets, kcmutils, kio, knewstuff, knotifyconfig, kparts, ktexteditor
-, threadweaver, kxmlgui, kwindowsystem, grantlee
-, plasma-framework, krunner, kdevplatform, kdevelop-pg-qt, shared_mime_info
-, libksysguard, llvmPackages, makeWrapper
+, threadweaver, kxmlgui, kwindowsystem, grantlee, kcrash, karchive, kguiaddons
+, plasma-framework, krunner, kdevelop-pg-qt, shared-mime-info, libkomparediff2
+, libksysguard, konsole, llvmPackages, makeWrapper, kpurpose, boost
 }:
 
-let
+mkDerivation rec {
   pname = "kdevelop";
-  version = "5.0.2";
-  dirVersion = "5.0.2";
-
-in
-stdenv.mkDerivation rec {
-  name = "${pname}-${version}";
+  version = "5.5.1";
 
   src = fetchurl {
-    url = "mirror://kde/stable/${pname}/${dirVersion}/src/${name}.tar.xz";
-    sha256 = "9b017901167723230dee8b565cdc7b0e61762415ffcc0a32708f04f7ab668666";
+    url = "mirror://kde/stable/${pname}/${version}/src/${pname}-${version}.tar.xz";
+    sha256 = "18hxwkdbfw0qs3p19jv6d8wwwdzb9m087891i8w2bzkn21fd5pmy";
   };
 
   nativeBuildInputs = [
-    cmake gettext pkgconfig extra-cmake-modules makeWrapper makeQtWrapper
+    cmake gettext pkgconfig extra-cmake-modules makeWrapper
   ];
 
   buildInputs = [
-    qtquickcontrols qtwebkit
-    kconfig kdeclarative kdoctools kiconthemes ki18n kitemmodels kitemviews
-    kjobwidgets kcmutils kio knewstuff knotifyconfig kparts ktexteditor
-    threadweaver kxmlgui kwindowsystem grantlee plasma-framework krunner
-    kdevplatform kdevelop-pg-qt shared_mime_info libksysguard
+    kdevelop-pg-qt
     llvmPackages.llvm llvmPackages.clang-unwrapped
   ];
 
+  propagatedBuildInputs = [
+    qtquickcontrols qtwebkit boost libkomparediff2
+    kconfig kdeclarative kdoctools kiconthemes ki18n kitemmodels kitemviews
+    kjobwidgets kcmutils kio knewstuff knotifyconfig kparts ktexteditor
+    threadweaver kxmlgui kwindowsystem grantlee plasma-framework krunner
+    shared-mime-info libksysguard konsole kcrash karchive kguiaddons kpurpose
+  ];
+
+  # https://cgit.kde.org/kdevelop.git/commit/?id=716372ae2e8dff9c51e94d33443536786e4bd85b
+  # required as nixos seems to be unable to find CLANG_BUILTIN_DIR
+  cmakeFlags = [
+    "-DCLANG_BUILTIN_DIR=${llvmPackages.clang-unwrapped}/lib/clang/${lib.getVersion llvmPackages.clang}/include"
+  ];
+
+  dontWrapQtApps = true;
+
   postInstall = ''
-    wrapQtProgram "$out/bin/kdevelop"
-    wrapProgram "$out/bin/kdevelop!" --prefix PATH ":" "${qttools}/bin"
+    # The kdevelop! script (shell environment) needs qdbus and kioclient5 in PATH.
+    wrapProgram "$out/bin/kdevelop!" \
+      --prefix PATH ":" "${lib.makeBinPath [ qttools kde-cli-tools ]}"
+
+    wrapQtApp "$out/bin/kdevelop"
+
+    # Fix the (now wrapped) kdevelop! to find things in right places:
+    # - Fixup the one use where KDEV_BASEDIR is assumed to contain kdevelop.
+    kdev_fixup_sed+=";s|\\\$KDEV_BASEDIR/kdevelop|$out/bin/kdevelop|"
+    sed -E -i "$kdev_fixup_sed" "$out/bin/.kdevelop!-wrapped"
   '';
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     maintainers = [ maintainers.ambrop72 ];
     platforms = platforms.linux;
     description = "KDE official IDE";
@@ -51,7 +67,7 @@ stdenv.mkDerivation rec {
         programing languages. It is based on KDevPlatform, KDE and Qt
         libraries and is under development since 1998.
       '';
-    homepage = https://www.kdevelop.org;
-    license = with stdenv.lib.licenses; [ gpl2Plus lgpl2Plus ];
+    homepage = "https://www.kdevelop.org";
+    license = with licenses; [ gpl2Plus lgpl2Plus ];
   };
 }

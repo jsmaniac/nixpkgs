@@ -1,31 +1,37 @@
-{ stdenv, fetchFromGitHub }:
+{ stdenv, fetchFromGitHub, gtk3, gnome-icon-theme, hicolor-icon-theme }:
 
 stdenv.mkDerivation rec {
-  version = "2016-10-05";
-
-  package-name = "numix-icon-theme";
-
-  name = "${package-name}-${version}";
+  pname = "numix-icon-theme";
+  version = "20.03.20";
 
   src = fetchFromGitHub {
     owner = "numixproject";
-    repo = package-name;
-    rev = "e03eb71454c176a98733eafa268ff79995f8159d";
-    sha256 = "1f8prwq9zvzfk0ncwzbrwkpjggc8nadny81dqv1cr0014jc85bxi";
+    repo = pname;
+    rev = version;
+    sha256 = "092f8k38xf9yz898nrangm0ia211d41z8kx0v6njfqfgpiad1s7q";
   };
 
-  dontBuild = true;
+  nativeBuildInputs = [ gtk3 ];
+
+  propagatedBuildInputs = [ gnome-icon-theme hicolor-icon-theme ];
+
+  dontDropIconThemeCache = true;
 
   installPhase = ''
-    install -dm 755 $out/share/icons
-    cp -dr --no-preserve='ownership' Numix{,-Light} $out/share/icons/
+    mkdir -p $out/share/icons
+    cp -a Numix{,-Light} $out/share/icons/
+
+    for theme in $out/share/icons/*; do
+      gtk-update-icon-cache $theme
+    done
   '';
 
   meta = with stdenv.lib; {
     description = "Numix icon theme";
-    homepage = https://numixproject.org;
+    homepage = "https://numixproject.github.io";
     license = licenses.gpl3;
-    platforms = platforms.all;
-    maintainers = with maintainers; [ romildo jgeerds ];
+    # darwin cannot deal with file names differing only in case
+    platforms = platforms.linux;
+    maintainers = with maintainers; [ romildo ];
   };
 }

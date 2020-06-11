@@ -1,9 +1,9 @@
 { stdenv, fetchurl, perl, gperf, bison, groff
-, pkgconfig, libXft, fontconfig, pcre
-, libtomcrypt, libtommath, lz4, zlib }:
+, pkgconfig, libXft, pcre
+, libtomcrypt, libtommath, lz4 }:
 
 stdenv.mkDerivation rec {
-  name = "bitkeeper-${version}";
+  pname = "bitkeeper";
   version = "7.3.1ce";
 
   src = fetchurl {
@@ -15,8 +15,9 @@ stdenv.mkDerivation rec {
 
   enableParallelBuilding = true;
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    perl gperf bison groff libXft pkgconfig
+    perl gperf bison groff libXft
     pcre libtomcrypt libtommath lz4
   ];
 
@@ -46,9 +47,10 @@ stdenv.mkDerivation rec {
       BitKeeper is a fast, enterprise-ready, distributed SCM that
       scales up to very large projects and down to tiny ones.
     '';
-    homepage    = https://www.bitkeeper.org/;
+    homepage    = "https://www.bitkeeper.org/";
     license     = stdenv.lib.licenses.asl20;
     platforms   = stdenv.lib.platforms.linux;
     maintainers = with stdenv.lib.maintainers; [ wscott thoughtpolice ];
+    broken      = true; # seems to fail on recent glibc versions
   };
 }

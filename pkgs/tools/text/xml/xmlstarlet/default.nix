@@ -8,7 +8,8 @@ stdenv.mkDerivation rec {
     sha256 = "1jp737nvfcf6wyb54fla868yrr39kcbijijmjpyk4lrpyg23in0m";
   };
 
-  buildInputs = [ pkgconfig libxml2 libxslt ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ libxml2 libxslt ];
 
   preConfigure =
     ''
@@ -25,7 +26,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "A command line tool for manipulating and querying XML data";
-    homepage = http://xmlstar.sourceforge.net/;
+    homepage = "http://xmlstar.sourceforge.net/";
     license = stdenv.lib.licenses.mit;
     platforms = stdenv.lib.platforms.unix;
   };

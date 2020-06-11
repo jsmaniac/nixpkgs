@@ -39,8 +39,6 @@ let
         bindsTo = deps;
         after = deps;
         before = [ "network.target" ];
-        # Receive restart event after resume
-        partOf = [ "post-resume.target" ];
 
         path = [ pkgs.coreutils ];
 
@@ -82,7 +80,8 @@ in
           configFile = {
   
             path = mkOption {
-              type = types.path;
+              type = types.nullOr types.path;
+              default = null;
               example = literalExample "/etc/wpa_supplicant.conf";
               description = ''
                 External <literal>wpa_supplicant.conf</literal> configuration file.
@@ -131,7 +130,7 @@ in
           extraCmdArgs = mkOption {
             type = types.str;
             default = "";
-            example = "-e/var/run/wpa_supplicant/entropy.bin";
+            example = "-e/run/wpa_supplicant/entropy.bin";
             description =
               "Command line arguments to add when executing <literal>wpa_supplicant</literal>.";
           };
@@ -163,7 +162,7 @@ in
   
             socketDir = mkOption {
               type = types.str;
-              default = "/var/run/wpa_supplicant";
+              default = "/run/wpa_supplicant";
               description = "Directory of sockets for controlling wpa_supplicant.";
             };
   
@@ -180,18 +179,19 @@ in
 
       default = { };
 
-      example = {
-        "wlan0 wlan1" = {
-          configFile = "/etc/wpa_supplicant";
-          userControlled.group = "network";
-          extraConf = ''
-            ap_scan=1
-            p2p_disabled=1
-          '';
-          extraCmdArgs = "-u -W";
-          bridge = "br0";
-        };
-      };
+      example = literalExample ''
+        { "wlan0 wlan1" = {
+            configFile.path = "/etc/wpa_supplicant.conf";
+            userControlled.group = "network";
+            extraConf = '''
+              ap_scan=1
+              p2p_disabled=1
+            ''';
+            extraCmdArgs = "-u -W";
+            bridge = "br0";
+          };
+        }
+      '';
 
       description = ''
         Interfaces for which to start <command>wpa_supplicant</command>.

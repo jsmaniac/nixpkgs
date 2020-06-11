@@ -1,56 +1,70 @@
-{ stdenv, fetchFromGitHub, autoreconfHook, docbook_xsl, gtk_doc, icu
-, libxslt, pkgconfig, python }:
+{ stdenv
+, fetchurl
+, autoreconfHook
+, docbook_xsl
+, docbook_xml_dtd_43
+, gtk-doc
+, lzip
+, libidn2
+, libunistring
+, libxslt
+, pkgconfig
+, python3
+, valgrind
+, publicsuffix-list
+}:
 
-let
+stdenv.mkDerivation rec {
+  pname = "libpsl";
+  version = "0.21.0";
 
-  listVersion = "2016-06-30";
-  listSources = fetchFromGitHub {
-    sha256 = "1fx7g36dcckckz860f0ady8lsg3m6a5c9pgb39a3dn28xfvd21jw";
-    rev = "aa87d27940595ed4a61e726c7dd06860d87fabb6";
-    repo = "list";
-    owner = "publicsuffix";
+  src = fetchurl {
+    url = "https://github.com/rockdaboot/${pname}/releases/download/${pname}-${version}/${pname}-${version}.tar.lz";
+    sha256 = "183hadbira0d2zvv8272lspy31dgm9x26z35c61s5axcd5wd9g9i";
   };
 
-  libVersion = "0.15.0";
+  nativeBuildInputs = [
+    autoreconfHook
+    docbook_xsl
+    docbook_xml_dtd_43
+    gtk-doc
+    lzip
+    pkgconfig
+    python3
+    valgrind
+    libxslt
+  ];
 
-in stdenv.mkDerivation rec {
-  name = "libpsl-${version}";
-  version = "${libVersion}-list-${listVersion}";
+  buildInputs = [
+    libidn2
+    libunistring
+    libxslt
+  ];
 
-  src = fetchFromGitHub {
-    sha256 = "1n8vg8pslpgin84ygb0s0nqfljml32l5bv5fyc8ysnpbdsj6gxkb";
-    rev = "libpsl-${libVersion}";
-    repo = "libpsl";
-    owner = "rockdaboot";
-  };
-
-  buildInputs = [ icu libxslt ];
-  nativeBuildInputs = [ autoreconfHook docbook_xsl gtk_doc pkgconfig python ];
+  propagatedBuildInputs = [
+    publicsuffix-list
+  ];
 
   postPatch = ''
-    substituteInPlace src/psl.c --replace bits/stat.h sys/stat.h
     patchShebangs src/psl-make-dafsa
   '';
 
   preAutoreconf = ''
-    mkdir m4
     gtkdocize
   '';
 
-  preConfigure = ''
-    # The libpsl check phase requires the list's test scripts (tests/) as well
-    cp -Rv "${listSources}"/* list
-  '';
   configureFlags = [
-    "--disable-builtin"
-    "--disable-static"
-    "--enable-gtk-doc"
+    # "--enable-gtk-doc"
     "--enable-man"
+    "--enable-valgrind-tests"
+    "--with-psl-distfile=${publicsuffix-list}/share/publicsuffix/public_suffix_list.dat"
+    "--with-psl-file=${publicsuffix-list}/share/publicsuffix/public_suffix_list.dat"
+    "--with-psl-testfile=${publicsuffix-list}/share/publicsuffix/test_psl.txt"
   ];
 
   enableParallelBuilding = true;
 
-  doCheck = true;
+  doCheck = !stdenv.isDarwin;
 
   meta = with stdenv.lib; {
     description = "C library for the Publix Suffix List";
@@ -61,9 +75,10 @@ in stdenv.mkDerivation rec {
       "supercookies" and "super domain" certificates, for highlighting parts of
       the domain in a user interface or sorting domain lists by site.
     '';
-    homepage = http://rockdaboot.github.io/libpsl/;
+    homepage = "https://rockdaboot.github.io/libpsl/";
+    changelog = "https://raw.githubusercontent.com/rockdaboot/${pname}/${pname}-${version}/NEWS";
     license = licenses.mit;
-    platforms = with platforms; linux ++ darwin;
-    maintainers = with maintainers; [ nckx ];
+    platforms = platforms.unix;
+    maintainers = [ maintainers.c0bw3b ];
   };
 }

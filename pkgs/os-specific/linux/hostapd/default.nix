@@ -1,25 +1,32 @@
-{ stdenv, fetchurl, fetchpatch, pkgconfig, libnl, openssl, sqlite ? null }:
+{ stdenv, fetchurl, pkgconfig, libnl, openssl, sqlite ? null }:
 
-with stdenv.lib;
 stdenv.mkDerivation rec {
-  name = "hostapd-${version}";
-  version = "2.5";
+  pname = "hostapd";
+  version = "2.9";
 
   src = fetchurl {
-    url = "http://hostap.epitest.fi/releases/${name}.tar.gz";
-    sha256 = "0jn77r39ysshkzihv5rjbdajqazci59v2yab4rn05my09najs9wf";
+    url = "https://w1.fi/releases/${pname}-${version}.tar.gz";
+    sha256 = "1mrbvg4v7vm7mknf0n29mf88k3s4a4qj6r4d51wq8hmjj1m7s7c8";
   };
-
-  patches = [
-    (fetchpatch {
-      url = "https://raw.githubusercontent.com/voidlinux/void-packages/a7bcbc258ba9884bccde831c0ae2069cade99e41/srcpkgs/wpa_supplicant/patches/patch-src_crypto_tls_openssl_c";
-      sha256 = "1ifa2i54a7ijsha197dyldal3m4q5i05ih2sk15f5a5ybb6x7vmp";
-      addPrefixes = true;
-    })
-  ];
 
   nativeBuildInputs = [ pkgconfig ];
   buildInputs = [ libnl openssl sqlite ];
+
+  patches = [
+    (fetchurl {
+      # Note: fetchurl seems to be unhappy with openwrt git
+      # server's URLs containing semicolons. Using the github mirror instead.
+      url = "https://raw.githubusercontent.com/openwrt/openwrt/master/package/network/services/hostapd/patches/300-noscan.patch";
+      sha256 = "04wg4yjc19wmwk6gia067z99gzzk9jacnwxh5wyia7k5wg71yj5k";
+    })
+    (fetchurl {
+      name = "CVE-2019-16275.patch";
+      url = "https://w1.fi/security/2019-7/0001-AP-Silently-ignore-management-frame-from-unexpected-.patch";
+      sha256 = "15xjyy7crb557wxpx898b5lnyblxghlij0xby5lmj9hpwwss34dz";
+    })
+  ];
+
+  outputs = [ "out" "man" ];
 
   extraConfig = ''
     CONFIG_DRIVER_WIRED=y
@@ -48,7 +55,8 @@ stdenv.mkDerivation rec {
     CONFIG_INTERNETWORKING=y
     CONFIG_HS20=y
     CONFIG_ACS=y
-  '' + optionalString (sqlite != null) ''
+    CONFIG_GETRANDOM=y
+  '' + stdenv.lib.optionalString (sqlite != null) ''
     CONFIG_SQLITE=y
   '';
 
@@ -62,13 +70,17 @@ stdenv.mkDerivation rec {
   '';
 
   preInstall = "mkdir -p $out/bin";
+  postInstall = ''
+    install -vD hostapd.8 -t $man/share/man/man8
+    install -vD hostapd_cli.1 -t $man/share/man/man1
+  '';
 
-  meta = {
-    homepage = http://hostap.epitest.fi;
-    repositories.git = git://w1.fi/hostap.git;
+  meta = with stdenv.lib; {
+    homepage = "https://hostap.epitest.fi";
+    repositories.git = "git://w1.fi/hostap.git";
     description = "A user space daemon for access point and authentication servers";
     license = licenses.gpl2;
-    maintainers = with maintainers; [ phreedom wkennington ];
+    maintainers = with maintainers; [ phreedom ninjatrappeur ];
     platforms = platforms.linux;
   };
 }

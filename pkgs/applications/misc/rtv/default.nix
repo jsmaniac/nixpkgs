@@ -1,29 +1,46 @@
-{ stdenv, fetchFromGitHub, pkgs, lib, python, pythonPackages }:
+{ stdenv, fetchFromGitHub, python3Packages }:
 
-pythonPackages.buildPythonApplication rec {
-  version = "1.10.0";
-  name = "rtv-${version}";
+with python3Packages;
+buildPythonApplication rec {
+  version = "1.27.0";
+  pname = "rtv";
 
   src = fetchFromGitHub {
     owner = "michael-lazar";
     repo = "rtv";
     rev = "v${version}";
-    sha256 = "1gm5jyqqssf69lfx0svhzsb9m0dffm6zsf9jqnwh6gjihfz25a45";
+    sha256 = "1hw7xy2kjxq7y3wcibcz4l7zj8icvigialqr17l362xry0y17y5j";
   };
 
-  propagatedBuildInputs = with pythonPackages; [
-    tornado
-    requests2
-    six
-    praw
-    kitchen
-    praw
-  ] ++ lib.optional (!pythonPackages.isPy3k) futures;
+  # Tests try to access network
+  doCheck = false;
 
-  meta = with lib; {
-    homepage = https://github.com/michael-lazar/rtv;
+  checkPhase = ''
+    py.test
+  '';
+
+  checkInputs = [
+    coverage
+    coveralls
+    docopt
+    mock
+    pylint
+    pytest
+    vcrpy
+  ];
+
+  propagatedBuildInputs = [
+    beautifulsoup4
+    decorator
+    kitchen
+    requests
+    six
+  ];
+
+  meta = with stdenv.lib; {
+    homepage = "https://github.com/michael-lazar/rtv";
     description = "Browse Reddit from your Terminal";
     license = licenses.mit;
-    maintainers = with maintainers; [ matthiasbeyer jgeerds wedens ];
+    maintainers = with maintainers; [ matthiasbeyer wedens ];
   };
 }

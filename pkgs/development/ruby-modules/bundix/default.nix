@@ -1,30 +1,30 @@
-{ buildRubyGem, lib, bundler, ruby, nix, nix-prefetch-git }:
+{ buildRubyGem, fetchFromGitHub, makeWrapper, lib, bundler, nix,
+  nix-prefetch-git }:
 
 buildRubyGem rec {
-  inherit ruby;
+  inherit (bundler) ruby;
 
   name = "${gemName}-${version}";
   gemName = "bundix";
-  version = "2.0.8";
+  version = "2.5.0";
 
-  sha256 = "0ikpf2g01izadjpdnc4k2rb9v4g11f1jk2y5alxc7n7rxjkwdc66";
+  src = fetchFromGitHub {
+    owner = "nix-community";
+    repo = "bundix";
+    rev = version;
+    sha256 = "05y8sy6v9km1dwvpjzkjxpfzv95g6yzac1b5blac2f1r2kw167p8";
+  };
 
-  buildInputs = [bundler];
+  buildInputs = [ ruby bundler ];
+  nativeBuildInputs = [ makeWrapper ];
 
-  postInstall = ''
-    substituteInPlace $GEM_HOME/gems/${gemName}-${version}/lib/bundix.rb \
-      --replace \
-        "'nix-instantiate'" \
-        "'${nix.out}/bin/nix-instantiate'" \
-      --replace \
-        "'nix-hash'" \
-        "'${nix.out}/bin/nix-hash'" \
-      --replace \
-        "'nix-prefetch-url'" \
-        "'${nix.out}/bin/nix-prefetch-url'" \
-      --replace \
-        "'nix-prefetch-git'" \
-        "'${nix-prefetch-git}/bin/nix-prefetch-git'"
+  preFixup = ''
+    wrapProgram $out/bin/bundix \
+                --prefix PATH : "${nix.out}/bin" \
+                --prefix PATH : "${nix-prefetch-git.out}/bin" \
+                --prefix PATH : "${bundler.out}/bin" \
+                --set GEM_HOME "${bundler}/${bundler.ruby.gemPath}" \
+                --set GEM_PATH "${bundler}/${bundler.ruby.gemPath}"
   '';
 
   meta = {
@@ -38,7 +38,7 @@ buildRubyGem rec {
     '';
     homepage = "https://github.com/manveru/bundix";
     license = "MIT";
-    maintainers = with lib.maintainers; [ manveru zimbatm ];
+    maintainers = with lib.maintainers; [ manveru qyliss zimbatm ];
     platforms = lib.platforms.all;
   };
 }

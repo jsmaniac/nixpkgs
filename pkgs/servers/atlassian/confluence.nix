@@ -1,15 +1,19 @@
-{ stdenv, fetchurl }:
+{ stdenvNoCC, lib, fetchurl, mysql_jdbc ? null
+, enableSSO ? false
+, crowdProperties ? null
+, withMysql ? true
+}:
 
-stdenv.mkDerivation rec {
-  name = "atlassian-confluence-${version}";
-  version = "6.0.1";
+assert withMysql -> (mysql_jdbc != null);
+
+stdenvNoCC.mkDerivation rec {
+  pname = "atlassian-confluence";
+  version = "7.5.1";
 
   src = fetchurl {
-    url = "https://www.atlassian.com/software/confluence/downloads/binary/${name}.tar.gz";
-    sha256 = "15af05h0h92z4zw546s7wwglvl0argzrj9w588gb96j5dni9lka4";
+    url = "https://product-downloads.atlassian.com/software/confluence/downloads/${pname}-${version}.tar.gz";
+    sha256 = "0lxvff0sn1kxsm599lq72hw11qnwjn2da3mz1h8mqz0rn2adhg07";
   };
-
-  phases = [ "unpackPhase" "buildPhase" "installPhase" ];
 
   buildPhase = ''
     echo "confluence.home=/run/confluence/home" > confluence/WEB-INF/classes/confluence-init.properties
@@ -19,6 +23,16 @@ stdenv.mkDerivation rec {
     rm -r logs; ln -sf /run/confluence/logs/ .
     rm -r work; ln -sf /run/confluence/work/ .
     rm -r temp; ln -sf /run/confluence/temp/ .
+  '' + lib.optionalString enableSSO ''
+    substituteInPlace confluence/WEB-INF/classes/seraph-config.xml \
+      --replace com.atlassian.confluence.user.ConfluenceAuthenticator\
+                com.atlassian.confluence.user.ConfluenceCrowdSSOAuthenticator
+  '' + lib.optionalString (crowdProperties != null) ''
+    cat <<EOF > confluence/WEB-INF/classes/crowd.properties
+    ${crowdProperties}
+    EOF
+  '' + lib.optionalString withMysql ''
+    cp -v ${mysql_jdbc}/share/java/*jar confluence/WEB-INF/lib/
   '';
 
   installPhase = ''
@@ -26,10 +40,10 @@ stdenv.mkDerivation rec {
     patchShebangs $out/bin
   '';
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "Team collaboration software written in Java and mainly used in corporate environments";
-    homepage = https://www.atlassian.com/software/confluence;
+    homepage = "https://www.atlassian.com/software/confluence";
     license = licenses.unfree;
-    maintainers = with maintainers; [ fpletz globin ];
+    maintainers = with maintainers; [ fpletz globin willibutz ciil ];
   };
 }

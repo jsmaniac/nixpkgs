@@ -2,7 +2,7 @@
 , fetchFromGitHub
 , cmake
 , jsoncpp
-, libjson_rpc_cpp
+, libjson-rpc-cpp
 , curl
 , boost
 , leveldb
@@ -13,11 +13,11 @@
 , miniupnpc
 , libmicrohttpd
 , gmp
-, mesa
+, libGLU, libGL
 , extraCmakeFlags ? []
 }:
 stdenv.mkDerivation rec {
-  name = "cpp-ethereum-${version}";
+  pname = "cpp-ethereum";
   version = "1.3.0";
 
   src = fetchFromGitHub {
@@ -58,7 +58,7 @@ stdenv.mkDerivation rec {
   buildInputs = [
     cmake
     jsoncpp
-    libjson_rpc_cpp
+    libjson-rpc-cpp
     curl
     boost
     leveldb
@@ -69,16 +69,17 @@ stdenv.mkDerivation rec {
     miniupnpc
     libmicrohttpd
     gmp
-    mesa
+    libGLU libGL
   ];
 
   dontStrip = true;
 
   meta = with stdenv.lib; {
-    decription = "Ethereum C++ client";
-    homepage = https://github.com/ethereum/cpp-ethereum;
+    description = "Ethereum C++ client";
+    homepage = "https://github.com/ethereum/cpp-ethereum";
     license = licenses.gpl3;
     maintainers = with maintainers; [ artuuge ];
     platforms = platforms.linux;
+    broken = true; # 2018-04-10
   };
 }

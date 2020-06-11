@@ -1,4 +1,4 @@
-{ stdenv, fetchFromGitHub }:
+{ stdenv, fetchFromGitHub, xsel }:
 
 stdenv.mkDerivation rec {
 
@@ -8,13 +8,12 @@ stdenv.mkDerivation rec {
     owner = "mptre";
     repo = "yank";
     rev = "v${meta.version}";
-    sha256 = "0iv3ilyjcq6cd429qkg8mfpwagkb30617z0kdjlhk2s74chyaghm";
+    sha256 = "1izygx7f1z35li74i2cwca0p28c3v8fbr7w72dwpiqdaiwywa8xc";
     inherit name;
   };
 
-  installPhase = ''
-    make PREFIX=$out install
-  '';
+  installFlags = [ "PREFIX=$(out)" ];
+  makeFlags = [ "YANKCMD=${xsel}/bin/xsel" ];
 
   meta = with stdenv.lib; {
     homepage = "https://github.com/mptre/yank";
@@ -28,7 +27,7 @@ stdenv.mkDerivation rec {
     '';
     downloadPage = "https://github.com/mptre/yank/releases";
     license = licenses.mit;
-    version = "0.7.0";
+    version = "1.2.0";
     maintainers = [ maintainers.dochang ];
     platforms = platforms.unix;
   };

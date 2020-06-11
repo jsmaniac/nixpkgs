@@ -29,9 +29,9 @@ in stdenv.mkDerivation ({
 
       Optical media emulated by CDemu can be mounted within Linux. Automounting is also allowed.
     '';
-    homepage = http://cdemu.sourceforge.net/;
+    homepage = "http://cdemu.sourceforge.net/";
     license = licenses.gpl2Plus;
     platforms = platforms.linux;
-    maintainers = [ "Rok Mandeljc <mrok AT users DOT sourceforge DOT net>" ];
+    maintainers = with stdenv.lib.maintainers; [ bendlas ];
   };
 } // drvParams)

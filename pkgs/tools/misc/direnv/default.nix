@@ -1,24 +1,32 @@
-{ stdenv, fetchFromGitHub, go, bash }:
+{ stdenv, fetchFromGitHub, buildGoModule, bash }:
 
-stdenv.mkDerivation rec {
-  name = "direnv-${version}";
-  version = "2.9.0";
+buildGoModule rec {
+  pname = "direnv";
+  version = "2.21.3";
+
+  vendorSha256 = null;
 
   src = fetchFromGitHub {
     owner = "direnv";
     repo = "direnv";
     rev = "v${version}";
-    sha256 = "1zi4i2ds8xkbhfcpi52hca4lcwan9gf93bdmd2vwdsry16kn3f6k";
+    sha256 = "1adi6ld9g4zgz0f6q0kkzrywclqrmikyp7yh22zm9lfdvd5hs8wp";
   };
 
-  buildInputs = [ go ];
+  # we have no bash at the moment for windows
+  BASH_PATH =
+    stdenv.lib.optionalString (!stdenv.hostPlatform.isWindows)
+    "${bash}/bin/bash";
 
+  # replace the build phase to use the GNUMakefile instead
   buildPhase = ''
-    make BASH_PATH=${bash}/bin/bash
+    make BASH_PATH=$BASH_PATH
   '';
 
   installPhase = ''
     make install DESTDIR=$out
+    mkdir -p $out/share/fish/vendor_conf.d
+    echo "eval ($out/bin/direnv hook fish)" > $out/share/fish/vendor_conf.d/direnv.fish
   '';
 
   meta = with stdenv.lib; {
@@ -34,9 +42,8 @@ stdenv.mkDerivation rec {
       In short, this little tool allows you to have project-specific
       environment variables.
     '';
-    homepage = http://direnv.net;
+    homepage = "https://direnv.net";
     license = licenses.mit;
     maintainers = with maintainers; [ zimbatm ];
-    inherit (go.meta) platforms;
   };
 }

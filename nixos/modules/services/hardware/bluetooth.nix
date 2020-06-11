@@ -1,67 +1,98 @@
 { config, lib, pkgs, ... }:
 
 with lib;
+
 let
-    bluez-bluetooth = if config.services.xserver.desktopManager.kde4.enable then pkgs.bluez else pkgs.bluez5;
+  cfg = config.hardware.bluetooth;
+  bluez-bluetooth = cfg.package;
 
-    configBluez = {
-        description = "Bluetooth Service";
-        serviceConfig = {
-          Type = "dbus";
-          BusName = "org.bluez";
-          ExecStart = "${getBin bluez-bluetooth}/bin/bluetoothd -n";
-        };
-        wantedBy = [ "bluetooth.target" ];
-    };
-
-    configBluez5 =  {
-        description = "Bluetooth Service";
-        serviceConfig = {
-          Type = "dbus";
-          BusName = "org.bluez";
-          ExecStart = "${getBin bluez-bluetooth}/bin/bluetoothd -n";
-          NotifyAccess="main";
-          CapabilityBoundingSet="CAP_NET_ADMIN CAP_NET_BIND_SERVICE";
-          LimitNPROC=1;
-        };
-        wantedBy = [ "bluetooth.target" ];
-    };
-
-    obexConfig = {
-        description = "Bluetooth OBEX service";
-        serviceConfig = {
-          Type = "dbus";
-          BusName = "org.bluez.obex";
-          ExecStart = "${getBin bluez-bluetooth}/bin/obexd";
-        };
-    };
-
-    bluezConfig = if config.services.xserver.desktopManager.kde4.enable then configBluez else configBluez5;
-in
-
-{
+in {
 
   ###### interface
 
   options = {
 
-    hardware.bluetooth.enable = mkOption {
-      type = types.bool;
-      default = false;
-      description = "Whether to enable support for Bluetooth.";
+    hardware.bluetooth = {
+      enable = mkEnableOption "support for Bluetooth";
+
+      powerOnBoot = mkOption {
+        type    = types.bool;
+        default = true;
+        description = "Whether to power up the default Bluetooth controller on boot.";
+      };
+
+      package = mkOption {
+        type = types.package;
+        default = pkgs.bluez;
+        defaultText = "pkgs.bluez";
+        example = "pkgs.bluezFull";
+        description = ''
+          Which BlueZ package to use.
+
+          <note><para>
+            Use the <literal>pkgs.bluezFull</literal> package to enable all
+            bluez plugins.
+          </para></note>
+        '';
+      };
+
+      config = mkOption {
+        type = with types; attrsOf (attrsOf (oneOf [ bool int str ]));
+        example = {
+          General = {
+            ControllerMode = "bredr";
+          };
+        };
+        description = "Set configuration for system-wide bluetooth (/etc/bluetooth/main.conf).";
+      };
+
+      extraConfig = mkOption {
+        type = with types; nullOr lines;
+        default = null;
+        example = ''
+          [General]
+          ControllerMode = bredr
+        '';
+        description = ''
+          Set additional configuration for system-wide bluetooth (/etc/bluetooth/main.conf).
+        '';
+      };
     };
 
   };
 
   ###### implementation
-  
-  config = mkIf config.hardware.bluetooth.enable {
 
-    environment.systemPackages = [ bluez-bluetooth pkgs.openobex pkgs.obexftp ];
+  config = mkIf cfg.enable {
+    warnings = optional (cfg.extraConfig != null) "hardware.bluetooth.`extraConfig` is deprecated, please use hardware.bluetooth.`config`.";
+
+    hardware.bluetooth.config = {
+      Policy = {
+        AutoEnable = mkDefault cfg.powerOnBoot;
+      };
+    };
+
+    environment.systemPackages = [ bluez-bluetooth ];
+
+    environment.etc."bluetooth/main.conf"= {
+      source = pkgs.writeText "main.conf"
+        (generators.toINI { } cfg.config + optionalString (cfg.extraConfig != null) cfg.extraConfig);
+    };
+
     services.udev.packages = [ bluez-bluetooth ];
     services.dbus.packages = [ bluez-bluetooth ];
-    systemd.services."dbus-org.bluez" = bluezConfig;
-    systemd.services."dbus-org.bluez.obex" = obexConfig;
+    systemd.packages       = [ bluez-bluetooth ];
+
+    systemd.services = {
+      bluetooth = {
+        wantedBy = [ "bluetooth.target" ];
+        aliases  = [ "dbus-org.bluez.service" ];
+      };
+    };
+
+    systemd.user.services = {
+      obex.aliases = [ "dbus-org.bluez.obex.service" ];
+    };
 
   };
 

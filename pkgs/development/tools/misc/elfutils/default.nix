@@ -1,16 +1,16 @@
-{ lib, stdenv, fetchurl, m4, zlib, bzip2, bison, flex, gettext, xz }:
+{ lib, stdenv, fetchurl, m4, zlib, bzip2, bison, flex, gettext, xz, setupDebugInfoDirs }:
 
 # TODO: Look at the hardcoded paths to kernel, modules etc.
 stdenv.mkDerivation rec {
-  name = "elfutils-${version}";
-  version = "0.165";
+  pname = "elfutils";
+  version = "0.176";
 
   src = fetchurl {
-    url = "http://fedorahosted.org/releases/e/l/elfutils/${version}/${name}.tar.bz2";
-    sha256 = "0wp91hlh9n0ismikljf63558rzdwim8w1s271grsbaic35vr5z57";
+    url = "https://sourceware.org/elfutils/ftp/${version}/${pname}-${version}.tar.bz2";
+    sha256 = "08qhrl4g6qqr4ga46jhh78y56a47p3msa5b2x1qhzbxhf71lfmzb";
   };
 
-  patches = [ ./glibc-2.21.patch ];
+  patches = [ ./debug-info-from-env.patch ];
 
   hardeningDisable = [ "format" ];
 
@@ -19,6 +19,8 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [ m4 bison flex gettext bzip2 ];
   buildInputs = [ zlib bzip2 xz ];
 
+  propagatedNativeBuildInputs = [ setupDebugInfoDirs ];
+
   configureFlags =
     [ "--program-prefix=eu-" # prevent collisions with binutils
       "--enable-deterministic-archives"
@@ -26,49 +28,11 @@ stdenv.mkDerivation rec {
 
   enableParallelBuilding = true;
 
-  crossAttrs = {
-
-    /* Having bzip2 will harm, because anything using elfutils
-       as buildInput cross-building, will not be able to run 'bzip2' */
-    propagatedBuildInputs = [ zlib.crossDrv ];
-
-    # This program does not cross-build fine. So I only cross-build some parts
-    # I need for the linux perf tool.
-    # On the awful cross-building:
-    # http://comments.gmane.org/gmane.comp.sysutils.elfutils.devel/2005
-    #
-    # I wrote this testing for the nanonote.
-    buildPhase = ''
-      pushd libebl
-      make
-      popd
-      pushd libelf
-      make
-      popd
-      pushd libdwfl
-      make
-      popd
-      pushd libdw
-      make
-      popd
-    '';
-
-    installPhase = ''
-      pushd libelf
-      make install
-      popd
-      pushd libdwfl
-      make install
-      popd
-      pushd libdw
-      make install
-      popd
-      cp version.h $out/include
-    '';
-  };
+  doCheck = false; # fails 3 out of 174 tests
+  doInstallCheck = false; # fails 70 out of 174 tests
 
   meta = {
-    homepage = https://fedorahosted.org/elfutils/;
+    homepage = "https://sourceware.org/elfutils/";
     description = "A set of utilities to handle ELF objects";
     platforms = lib.platforms.linux;
     license = lib.licenses.gpl3;

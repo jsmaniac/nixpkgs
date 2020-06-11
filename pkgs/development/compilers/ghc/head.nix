@@ -1,80 +1,247 @@
-{ stdenv, fetchgit, bootPkgs, perl, gmp, ncurses, libiconv, binutils, coreutils
-, autoconf, automake, happy, alex, crossSystem, selfPkgs, cross ? null
+{ stdenv, pkgsBuildTarget, targetPackages
+
+# build-tools
+, bootPkgs
+, autoconf, autoreconfHook, automake, coreutils, fetchgit, perl, python3, m4, sphinx
+, bash
+
+, libiconv ? null, ncurses
+
+, # GHC can be built with system libffi or a bundled one.
+  libffi ? null
+
+, enableDwarf ? !stdenv.targetPlatform.isDarwin &&
+                !stdenv.targetPlatform.isWindows
+, elfutils # for DWARF support
+
+, useLLVM ? !stdenv.targetPlatform.isx86 || stdenv.targetPlatform.isiOS
+, # LLVM is conceptually a run-time-only depedendency, but for
+  # non-x86, we need LLVM to bootstrap later stages, so it becomes a
+  # build-time dependency too.
+  buildLlvmPackages, llvmPackages
+
+, # If enabled, GHC will be built with the GPL-free but slower integer-simple
+  # library instead of the faster but GPLed integer-gmp library.
+  enableIntegerSimple ? !(stdenv.lib.any (stdenv.lib.meta.platformMatch stdenv.hostPlatform) gmp.meta.platforms)
+, gmp
+
+, # If enabled, use -fPIC when compiling static libs.
+  enableRelocatedStaticLibs ? stdenv.targetPlatform != stdenv.hostPlatform
+
+, # Whether to build dynamic libs for the standard library (on the target
+  # platform). Static libs are always built.
+  enableShared ? !stdenv.targetPlatform.isWindows && !stdenv.targetPlatform.useiOSPrebuilt
+
+, # Whether to build terminfo.
+  enableTerminfo ? !stdenv.targetPlatform.isWindows
+
+, version ? "8.11.20200505"
+, # What flavour to build. An empty string indicates no
+  # specific flavour and falls back to ghc default values.
+  ghcFlavour ? stdenv.lib.optionalString (stdenv.targetPlatform != stdenv.hostPlatform)
+    (if useLLVM then "perf-cross" else "perf-cross-ncg")
+
+, # Whether to disable the large address space allocator
+  # necessary fix for iOS: https://www.reddit.com/r/haskell/comments/4ttdz1/building_an_osxi386_to_iosarm64_cross_compiler/d5qvd67/
+  disableLargeAddressSpace ? stdenv.targetPlatform.isDarwin && stdenv.targetPlatform.isAarch64
 }:
 
+assert !enableIntegerSimple -> gmp != null;
+
 let
+  inherit (stdenv) buildPlatform hostPlatform targetPlatform;
+
   inherit (bootPkgs) ghc;
 
-  commonBuildInputs = [ ghc perl autoconf automake happy alex ];
+  # TODO(@Ericson2314) Make unconditional
+  targetPrefix = stdenv.lib.optionalString
+    (targetPlatform != hostPlatform)
+    "${targetPlatform.config}-";
 
-  version = "8.1.20161115";
-
-  commonPreConfigure =  ''
-    sed -i -e 's|-isysroot /Developer/SDKs/MacOSX10.5.sdk||' configure
-  '' + stdenv.lib.optionalString (!stdenv.isDarwin) ''
-    export NIX_LDFLAGS="$NIX_LDFLAGS -rpath $out/lib/ghc-${version}"
-  '' + stdenv.lib.optionalString stdenv.isDarwin ''
-    export NIX_LDFLAGS+=" -no_dtrace_dof"
+  buildMK = ''
+    BuildFlavour = ${ghcFlavour}
+    ifneq \"\$(BuildFlavour)\" \"\"
+    include mk/flavours/\$(BuildFlavour).mk
+    endif
+    DYNAMIC_GHC_PROGRAMS = ${if enableShared then "YES" else "NO"}
+    INTEGER_LIBRARY = ${if enableIntegerSimple then "integer-simple" else "integer-gmp"}
+  '' + stdenv.lib.optionalString (targetPlatform != hostPlatform) ''
+    Stage1Only = ${if targetPlatform.system == hostPlatform.system then "NO" else "YES"}
+    CrossCompilePrefix = ${targetPrefix}
+    HADDOCK_DOCS = NO
+    BUILD_SPHINX_HTML = NO
+    BUILD_SPHINX_PDF = NO
+  '' + stdenv.lib.optionalString enableRelocatedStaticLibs ''
+    GhcLibHcOpts += -fPIC
+    GhcRtsHcOpts += -fPIC
+  '' + stdenv.lib.optionalString targetPlatform.useAndroidPrebuilt ''
+    EXTRA_CC_OPTS += -std=gnu99
   '';
-in stdenv.mkDerivation (rec {
+
+  # Splicer will pull out correct variations
+  libDeps = platform: stdenv.lib.optional enableTerminfo ncurses
+    ++ [libffi]
+    ++ stdenv.lib.optional (!enableIntegerSimple) gmp
+    ++ stdenv.lib.optional (platform.libc != "glibc" && !targetPlatform.isWindows) libiconv
+    ++ stdenv.lib.optional enableDwarf elfutils;
+
+  toolsForTarget = [
+    pkgsBuildTarget.targetPackages.stdenv.cc
+  ] ++ stdenv.lib.optional useLLVM buildLlvmPackages.llvm;
+
+  targetCC = builtins.head toolsForTarget;
+
+  # ld.gold is disabled for musl libc due to https://sourceware.org/bugzilla/show_bug.cgi?id=23856
+  # see #84670 and #49071 for more background.
+  useLdGold = targetPlatform.isLinux && !(targetPlatform.useLLVM or false) && !targetPlatform.isMusl;
+
+in
+stdenv.mkDerivation (rec {
   inherit version;
-  name = "ghc-${version}";
-  rev = "017d11e0a36866b05ace32ece1af11adf652a619";
+  inherit (src) rev;
+  name = "${targetPrefix}ghc-${version}";
 
   src = fetchgit {
-    url = "git://git.haskell.org/ghc.git";
-    inherit rev;
-    sha256 = "1ryggmz961qd0fl50rkjjvi6g9azwla2vx9310a9nzjaj5x6ib4y";
+    url = "https://gitlab.haskell.org/ghc/ghc.git/";
+    rev = "40c71c2cf38b4e134d81b7184a4d5e02949ae70c";
+    sha256 = "04h9rcyzm9w3an1z00hjs062dp7dl19b8pkyxjsypr7a2i9dmvkb";
   };
-
-  # This shouldn't be necessary since 1ad1edbb32ce01ba8b47d8e8dad357b0edd6a4dc, but
-  # see http://hydra.cryp.to/build/2061608/nixlog/1/raw
-  patches = [ ./ghc-HEAD-dont-pass-linker-flags-via-response-files.patch ];
-
-  postPatch = ''
-    echo ${version} >VERSION
-    echo ${rev} >GIT_COMMIT_ID
-    patchShebangs .
-    ./boot
-  '';
-
-  buildInputs = commonBuildInputs;
 
   enableParallelBuilding = true;
 
-  preConfigure = commonPreConfigure;
+  outputs = [ "out" "doc" ];
 
+  postPatch = "patchShebangs .";
+
+  # GHC is a bit confused on its cross terminology.
+  preConfigure = ''
+    for env in $(env | grep '^TARGET_' | sed -E 's|\+?=.*||'); do
+      export "''${env#TARGET_}=''${!env}"
+    done
+    # GHC is a bit confused on its cross terminology, as these would normally be
+    # the *host* tools.
+    export CC="${targetCC}/bin/${targetCC.targetPrefix}cc"
+    export CXX="${targetCC}/bin/${targetCC.targetPrefix}cxx"
+    # Use gold to work around https://sourceware.org/bugzilla/show_bug.cgi?id=16177
+    # and more generally have a faster linker.
+    export LD="${targetCC.bintools}/bin/${targetCC.bintools.targetPrefix}ld${stdenv.lib.optionalString useLdGold ".gold"}"
+    export AS="${targetCC.bintools.bintools}/bin/${targetCC.bintools.targetPrefix}as"
+    export AR="${targetCC.bintools.bintools}/bin/${targetCC.bintools.targetPrefix}ar"
+    export NM="${targetCC.bintools.bintools}/bin/${targetCC.bintools.targetPrefix}nm"
+    export RANLIB="${targetCC.bintools.bintools}/bin/${targetCC.bintools.targetPrefix}ranlib"
+    export READELF="${targetCC.bintools.bintools}/bin/${targetCC.bintools.targetPrefix}readelf"
+    export STRIP="${targetCC.bintools.bintools}/bin/${targetCC.bintools.targetPrefix}strip"
+
+    echo -n "${buildMK}" > mk/build.mk
+    echo ${version} > VERSION
+    echo ${src.rev} > GIT_COMMIT_ID
+    ./boot
+    sed -i -e 's|-isysroot /Developer/SDKs/MacOSX10.5.sdk||' configure
+  '' + stdenv.lib.optionalString (!stdenv.isDarwin) ''
+    export NIX_LDFLAGS+=" -rpath $out/lib/ghc-${version}"
+  '' + stdenv.lib.optionalString stdenv.isDarwin ''
+    export NIX_LDFLAGS+=" -no_dtrace_dof"
+  '' + stdenv.lib.optionalString targetPlatform.useAndroidPrebuilt ''
+    sed -i -e '5i ,("armv7a-unknown-linux-androideabi", ("e-m:e-p:32:32-i64:64-v128:64:128-a:0:32-n32-S64", "cortex-a8", ""))' llvm-targets
+  '' + stdenv.lib.optionalString targetPlatform.isMusl ''
+      echo "patching llvm-targets for musl targets..."
+      echo "Cloning these existing '*-linux-gnu*' targets:"
+      grep linux-gnu llvm-targets | sed 's/^/  /'
+      echo "(go go gadget sed)"
+      sed -i 's,\(^.*linux-\)gnu\(.*\)$,\0\n\1musl\2,' llvm-targets
+      echo "llvm-targets now contains these '*-linux-musl*' targets:"
+      grep linux-musl llvm-targets | sed 's/^/  /'
+
+      echo "And now patching to preserve '-musleabi' as done with '-gnueabi'"
+      # (aclocal.m4 is actual source, but patch configure as well since we don't re-gen)
+      for x in configure aclocal.m4; do
+        substituteInPlace $x \
+          --replace '*-android*|*-gnueabi*)' \
+                    '*-android*|*-gnueabi*|*-musleabi*)'
+      done
+  '';
+
+  # TODO(@Ericson2314): Always pass "--target" and always prefix.
+  configurePlatforms = [ "build" "host" ]
+    ++ stdenv.lib.optional (targetPlatform != hostPlatform) "target";
+
+  # `--with` flags for libraries needed for RTS linker
   configureFlags = [
-    "CC=${stdenv.cc}/bin/cc"
-    "--with-gmp-includes=${gmp.dev}/include" "--with-gmp-libraries=${gmp.out}/lib"
-    "--with-curses-includes=${ncurses.dev}/include" "--with-curses-libraries=${ncurses.out}/lib"
-  ] ++ stdenv.lib.optional stdenv.isDarwin [
-    "--with-iconv-includes=${libiconv}/include" "--with-iconv-libraries=${libiconv}/lib"
+    "--datadir=$doc/share/doc/ghc"
+    "--with-curses-libraries=${ncurses.out}/lib"
+  ] ++ stdenv.lib.optionals (libffi != null) [
+    "--with-system-libffi"
+    "--with-ffi-includes=${targetPackages.libffi.dev}/include"
+    "--with-ffi-libraries=${targetPackages.libffi.out}/lib"
+  ] ++ stdenv.lib.optionals (targetPlatform == hostPlatform && !enableIntegerSimple) [
+    "--with-gmp-includes=${targetPackages.gmp.dev}/include"
+    "--with-gmp-libraries=${targetPackages.gmp.out}/lib"
+  ] ++ stdenv.lib.optionals (targetPlatform == hostPlatform && hostPlatform.libc != "glibc" && !targetPlatform.isWindows) [
+    "--with-iconv-includes=${libiconv}/include"
+    "--with-iconv-libraries=${libiconv}/lib"
+  ] ++ stdenv.lib.optionals (targetPlatform != hostPlatform) [
+    "--enable-bootstrap-with-devel-snapshot"
+  ] ++ stdenv.lib.optionals useLdGold [
+    "CFLAGS=-fuse-ld=gold"
+    "CONF_GCC_LINKER_OPTS_STAGE1=-fuse-ld=gold"
+    "CONF_GCC_LINKER_OPTS_STAGE2=-fuse-ld=gold"
+  ] ++ stdenv.lib.optional disableLargeAddressSpace "--disable-large-address-space"
+    ++ stdenv.lib.optionals enableDwarf [
+    "--enable-dwarf-unwind"
+    "--with-libdw-includes=${stdenv.lib.getDev elfutils}/include"
+    "--with-libdw-libraries=${stdenv.lib.getLib elfutils}/lib"
   ];
+
+  # Make sure we never relax`$PATH` and hooks support for compatibility.
+  strictDeps = true;
+
+  # Don’t add -liconv to LDFLAGS automatically so that GHC will add it itself.
+	dontAddExtraLibs = true;
+
+  nativeBuildInputs = [
+    perl autoconf autoreconfHook automake m4 python3 sphinx
+    ghc bootPkgs.alex bootPkgs.happy bootPkgs.hscolour
+  ];
+
+  # For building runtime libs
+  depsBuildTarget = toolsForTarget;
+
+  buildInputs = [ perl bash ] ++ (libDeps hostPlatform);
+
+  propagatedBuildInputs = [ targetPackages.stdenv.cc ]
+    ++ stdenv.lib.optional useLLVM llvmPackages.llvm;
+
+  depsTargetTarget = map stdenv.lib.getDev (libDeps targetPlatform);
+  depsTargetTargetPropagated = map (stdenv.lib.getOutput "out") (libDeps targetPlatform);
 
   # required, because otherwise all symbols from HSffi.o are stripped, and
   # that in turn causes GHCi to abort
-  stripDebugFlags = [ "-S" ] ++ stdenv.lib.optional (!stdenv.isDarwin) "--keep-file-symbols";
+  stripDebugFlags = [ "-S" ] ++ stdenv.lib.optional (!targetPlatform.isDarwin) "--keep-file-symbols";
+
+  checkTarget = "test";
+
+  hardeningDisable = [ "format" ] ++ stdenv.lib.optional stdenv.targetPlatform.isMusl "pie";
 
   postInstall = ''
     # Install the bash completion file.
-    install -D -m 444 utils/completion/ghc.bash $out/share/bash-completion/completions/ghc
+    install -D -m 444 utils/completion/ghc.bash $out/share/bash-completion/completions/${targetPrefix}ghc
 
     # Patch scripts to include "readelf" and "cat" in $PATH.
     for i in "$out/bin/"*; do
       test ! -h $i || continue
       egrep --quiet '^#!' <(head -n 1 $i) || continue
-      sed -i -e '2i export PATH="$PATH:${stdenv.lib.makeBinPath [ binutils coreutils ]}"' $i
+      sed -i -e '2i export PATH="$PATH:${stdenv.lib.makeBinPath [ targetPackages.stdenv.cc.bintools coreutils ]}"' $i
     done
   '';
 
   passthru = {
-    inherit bootPkgs;
-  } // stdenv.lib.optionalAttrs (crossSystem != null) {
-    crossCompiler = selfPkgs.ghc.override {
-      cross = crossSystem;
-      bootPkgs = selfPkgs;
-    };
+    inherit bootPkgs targetPrefix;
+
+    inherit llvmPackages;
+    inherit enableShared;
+
+    # Our Cabal compiler name
+    haskellCompilerName = "ghc-${version}";
   };
 
   meta = {
@@ -84,35 +251,8 @@ in stdenv.mkDerivation (rec {
     inherit (ghc.meta) license platforms;
   };
 
-} // stdenv.lib.optionalAttrs (cross != null) {
-  name = "${cross.config}-ghc-${version}";
-
-  # Some fixes for cross-compilation to iOS. See https://phabricator.haskell.org/D2710 (D2711,D2712,D2713)
-  patches = [ ./D2710.patch ./D2711.patch ./D2712.patch ./D2713.patch ];
-
-  preConfigure = commonPreConfigure + ''
-    sed 's|#BuildFlavour  = quick-cross|BuildFlavour  = perf-cross|' mk/build.mk.sample > mk/build.mk
-  '';
-
-  configureFlags = [
-    "CC=${stdenv.ccCross}/bin/${cross.config}-cc"
-    "LD=${stdenv.binutilsCross}/bin/${cross.config}-ld"
-    "AR=${stdenv.binutilsCross}/bin/${cross.config}-ar"
-    "NM=${stdenv.binutilsCross}/bin/${cross.config}-nm"
-    "RANLIB=${stdenv.binutilsCross}/bin/${cross.config}-ranlib"
-    "--target=${cross.config}"
-    "--enable-bootstrap-with-devel-snapshot"
-  ];
-
-  buildInputs = commonBuildInputs ++ [ stdenv.ccCross stdenv.binutilsCross ];
-
-  dontSetConfigureCross = true;
-
-  passthru = {
-    inherit bootPkgs cross;
-
-    cc = "${stdenv.ccCross}/bin/${cross.config}-cc";
-
-    ld = "${stdenv.binutilsCross}/bin/${cross.config}-ld";
-  };
+} // stdenv.lib.optionalAttrs targetPlatform.useAndroidPrebuilt {
+  dontStrip = true;
+  dontPatchELF = true;
+  noAuditTmpdir = true;
 })

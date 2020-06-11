@@ -1,24 +1,48 @@
-{ stdenv, fetchurl, pam, xmlsec }:
+{ stdenv, fetchFromGitLab, fetchpatch, pam, xmlsec, autoreconfHook, pkgconfig, libxml2, gtk-doc, perl, gengetopt, bison, help2man }:
 
 let
   securityDependency =
     if stdenv.isDarwin then xmlsec
     else pam;
-in
-stdenv.mkDerivation rec {
-  name = "oath-toolkit-2.6.1";
 
-  src = fetchurl {
-    url = "mirror://savannah/oath-toolkit/${name}.tar.gz";
-    sha256 = "0ybg0gnddmhxga0jwdipyz8jv5mxs0kiiflhvzffl9mw0wcq6mww";
+in stdenv.mkDerivation {
+  name = "oath-toolkit-2.6.2";
+
+  src = fetchFromGitLab {
+    owner = "oath-toolkit";
+    repo = "oath-toolkit";
+    rev = "0dffdec9c5af5c89a5af43add29d8275eefe7414";
+    sha256 = "0n2sl444723f1k0sjmc0mzdwslx51yxac39c2cx2bl3ykacgfv74";
   };
 
-  
-  buildInputs = [ securityDependency ];
+  patches = [
+    # fix for glibc>=2.28
+    (fetchpatch {
+      name   = "new_glibc_check.patch";
+      url    = "https://sources.debian.org/data/main/o/oath-toolkit/2.6.1-1.3/debian/patches/new-glibc-check.patch";
+      sha256 = "0h75xyy3xsl485v7w27yqkks6z9sgsjmrv6wiswy15fdj5wyciv3";
+    })
+  ];
 
-  meta = {
-    homepage = http://www.nongnu.org/oath-toolkit/;
+  buildInputs = [ securityDependency libxml2 perl gengetopt bison ];
+
+  nativeBuildInputs = [ autoreconfHook gtk-doc help2man pkgconfig ];
+
+  # man file generation fails when true
+  enableParallelBuilding = false;
+
+  configureFlags = [ "--disable-pskc" ];
+
+  # Replicate the steps from cfg.mk
+  preAutoreconf = ''
+    printf "gdoc_MANS =\ngdoc_TEXINFOS =\n" > liboath/man/Makefile.gdoc
+    printf "gdoc_MANS =\ngdoc_TEXINFOS =\n" > libpskc/man/Makefile.gdoc
+    touch ChangeLog
+  '';
+
+  meta = with stdenv.lib; {
     description = "Components for building one-time password authentication systems";
-    platforms = with stdenv.lib.platforms; linux ++ darwin;
+    homepage = "https://www.nongnu.org/oath-toolkit/";
+    platforms = with platforms; linux ++ darwin;
   };
 }

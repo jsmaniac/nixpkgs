@@ -1,45 +1,56 @@
-{ stdenv, lib, fetchgit, cmake, extra-cmake-modules, makeQtWrapper
+{ mkDerivation, lib, stdenv, makeWrapper, fetchurl, cmake, extra-cmake-modules
 , karchive, kconfig, kwidgetsaddons, kcompletion, kcoreaddons
 , kguiaddons, ki18n, kitemmodels, kitemviews, kwindowsystem
 , kio, kcrash
-, boost, libraw, fftw, eigen, exiv2, lcms2, gsl, openexr
-, openjpeg, opencolorio, vc, poppler_qt5, curl, ilmbase
+, boost, libraw, fftw, eigen, exiv2, libheif, lcms2, gsl, openexr, giflib
+, openjpeg, opencolorio, vc, poppler, curl, ilmbase
+, qtmultimedia, qtx11extras, quazip
+, python3Packages
 }:
 
-stdenv.mkDerivation rec {
-  name = "krita-${version}";
-  version = "3.0";
+mkDerivation rec {
+  pname = "krita";
+  version = "4.2.9";
 
-  src = fetchgit {
-    url = "http://phabricator.kde.org/diffusion/KRITA/krita.git";
-    rev = "refs/tags/v${version}";
-    sha256 = "0aas86667ncp8jz00c8qk7bm26g76l65cysh06wxr8kxbvqynrdn";
+  src = fetchurl {
+    url = "https://download.kde.org/stable/${pname}/${version}/${pname}-${version}.tar.xz";
+    sha256 = "0rvm9mpaq66lxyq4f09x9w6xxhgys0phza223hm5zv6kgn413xsf";
   };
 
-  nativeBuildInputs = [ cmake extra-cmake-modules makeQtWrapper ];
+  # *somtimes* fails with can't find ui_manager.h, also see https://github.com/NixOS/nixpkgs/issues/35359
+  enableParallelBuilding = false;
+
+  nativeBuildInputs = [ cmake extra-cmake-modules python3Packages.sip makeWrapper ];
 
   buildInputs = [
     karchive kconfig kwidgetsaddons kcompletion kcoreaddons kguiaddons
     ki18n kitemmodels kitemviews kwindowsystem kio kcrash
-    boost libraw fftw eigen exiv2 lcms2 gsl openexr
-    openjpeg opencolorio vc poppler_qt5 curl ilmbase
+    boost libraw fftw eigen exiv2 lcms2 gsl openexr libheif giflib
+    openjpeg opencolorio poppler curl ilmbase
+    qtmultimedia qtx11extras quazip
+    python3Packages.pyqt5
+  ] ++ lib.optional (stdenv.hostPlatform.isi686 || stdenv.hostPlatform.isx86_64) vc;
+
+  NIX_CFLAGS_COMPILE = [ "-I${ilmbase.dev}/include/OpenEXR" ]
+    ++ lib.optional stdenv.cc.isGNU "-Wno-deprecated-copy";
+
+  cmakeFlags = [
+    "-DPYQT5_SIP_DIR=${python3Packages.pyqt5}/share/sip/PyQt5"
+    "-DPYQT_SIP_DIR_OVERRIDE=${python3Packages.pyqt5}/share/sip/PyQt5"
+    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   ];
-
-  NIX_CFLAGS_COMPILE = [ "-I${ilmbase.dev}/include/OpenEXR" ];
-
-  enableParallelBuilding = true;
 
   postInstall = ''
     for i in $out/bin/*; do
-      wrapQtProgram "$i"
+      wrapProgram $i --prefix PYTHONPATH : "$PYTHONPATH"
     done
   '';
 
-  meta = with stdenv.lib; {
-    description = "A free an open source painting application";
+  meta = with lib; {
+    description = "A free and open source painting application";
     homepage = "https://krita.org/";
     maintainers = with maintainers; [ abbradar ];
     platforms = platforms.linux;
-    licenses = licenses.gpl2;
+    license = licenses.gpl2;
   };
 }

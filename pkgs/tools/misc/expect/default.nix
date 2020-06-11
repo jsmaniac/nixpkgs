@@ -1,21 +1,21 @@
-{ stdenv, fetchurl, tcl, makeWrapper }:
+{ stdenv, fetchurl, tcl, makeWrapper, autoreconfHook }:
 
 stdenv.mkDerivation rec {
-  version = "5.45";
-  name = "expect-${version}";
+  version = "5.45.4";
+  pname = "expect";
 
   src = fetchurl {
     url = "mirror://sourceforge/expect/Expect/${version}/expect${version}.tar.gz";
-    sha256 = "0h60bifxj876afz4im35rmnbnxjx4lbdqp2ja3k30fwa8a8cm3dj";
+    sha256 = "0d1cp5hggjl93xwc8h1y6adbnrvpkk0ywkd00inz9ndxn21xm9s9";
   };
 
   buildInputs = [ tcl ];
-  nativeBuildInputs = [ makeWrapper ];
+  nativeBuildInputs = [ makeWrapper autoreconfHook ];
 
   hardeningDisable = [ "format" ];
 
-  patchPhase = ''
-    sed -i "s,/bin/stty,$(type -p stty),g" configure
+  postPatch = ''
+    sed -i "s,/bin/stty,$(type -p stty),g" configure.in
   '';
 
   configureFlags = [
@@ -35,9 +35,8 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A tool for automating interactive applications";
-    homepage = http://expect.nist.gov/;
+    homepage = "http://expect.sourceforge.net/";
     license = "Expect";
     platforms = platforms.unix;
-    maintainers = with maintainers; [ wkennington ];
   };
 }

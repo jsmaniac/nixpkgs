@@ -1,7 +1,7 @@
 { stdenv, perl, ronn, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "geteltorito-${version}";
+  pname = "geteltorito";
   version = "0.6";
 
   src = fetchurl {
@@ -41,7 +41,7 @@ stdenv.mkDerivation rec {
   meta = with stdenv.lib; {
     description = "Extract the initial/default boot image from a CD image if existent";
     homepage = "https://userpages.uni-koblenz.de/~krienke/ftp/noarch/geteltorito/";
-    maintainer = [ maintainers.profpatsch ];
+    maintainers = [ maintainers.Profpatsch ];
     license = licenses.gpl2;
   };
 

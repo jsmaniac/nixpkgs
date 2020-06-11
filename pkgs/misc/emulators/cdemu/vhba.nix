@@ -1,15 +1,16 @@
 { stdenv, fetchurl, kernel }:
 
 stdenv.mkDerivation rec {
-  name = "vhba-${version}";
-  version = "20140928";
+  pname = "vhba";
+  version = "20190831";
 
   src  = fetchurl {
     url = "mirror://sourceforge/cdemu/vhba-module-${version}.tar.bz2";
-    sha256 = "18jmpg2kpx87f32b8aprr1pxla9dlhf901rkj1sp3ammf94nxxa5";
+    sha256 = "1ybbk6l06n0y11n5wnfmvdz0baizmq55l458ywimghdyz0n7g0ws";
   };
 
   makeFlags = [ "KDIR=${kernel.dev}/lib/modules/${kernel.modDirVersion}/build" "INSTALL_MOD_PATH=$(out)" ];
+  nativeBuildInputs = kernel.moduleBuildDependencies;
 
   hardeningDisable = [ "pic" ];
 
@@ -17,6 +18,7 @@ stdenv.mkDerivation rec {
     description = "Provides a Virtual (SCSI) HBA";
     homepage = "http://cdemu.sourceforge.net/about/vhba/";
     platforms = platforms.linux;
-    licenses = licenses.gpl2Plus;
+    license = licenses.gpl2Plus;
+    maintainers = with stdenv.lib.maintainers; [ bendlas ];
   };
 }

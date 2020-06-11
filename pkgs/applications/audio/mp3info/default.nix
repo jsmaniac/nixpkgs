@@ -8,7 +8,8 @@ stdenv.mkDerivation rec {
     sha256 = "042f1czcs9n2sbqvg4rsvfwlqib2gk976mfa2kxlfjghx5laqf04";
   };
 
-  buildInputs = [ ncurses pkgconfig gtk2 ];
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ ncurses gtk2 ];
 
   hardeningDisable = [ "format" ];
 
@@ -34,11 +35,11 @@ stdenv.mkDerivation rec {
          other attributes in a pre-defined or user-specifiable output format.
       '';
 
-    homepage = http://www.ibiblio.org/mp3info/;
+    homepage = "http://www.ibiblio.org/mp3info/";
 
     license = stdenv.lib.licenses.gpl2Plus;
 
     maintainers = [ ];
-    platforms = stdenv.lib.platforms.unix;
+    platforms = stdenv.lib.platforms.linux;
   };
 }

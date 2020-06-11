@@ -1,26 +1,26 @@
-{ stdenv, fetchFromGitHub, rustPlatform, makeWrapper }:
+{ stdenv, fetchFromGitHub, rustPlatform }:
 
 with rustPlatform;
 
 buildRustPackage rec {
-  version = "0.3.3";
-  name = "loc-${version}";
+  version = "0.4.1";
+  pname = "loc";
 
   src = fetchFromGitHub {
     owner = "cgag";
     repo = "loc";
-    rev = "e2dfe2c1452f25f58974b545292b11dc450afd3d";
-    sha256 = "1kp5iawig6304gs1289aivgsq44zhnn0ykqv9ymwpvj0g12l4l8r";
+    rev = "v${version}";
+    sha256 = "0086asrx48qlmc484pjz5r5znli85q6qgpfbd81gjlzylj7f57gg";
   };
 
-  depsSha256 = "01jww6d4dzb5pq6vcrp3xslhxic0vp0gicsddda4adzqg1lab8c2";
+  cargoSha256 = "1fgv1kxiif48q9mm60ygn88r5nkxfyiacmvbgwp0jxiacv8r7779";
 
-  meta = {
-    homepage = "http://github.com/cgag/loc";
+  meta = with stdenv.lib; {
+    homepage = "https://github.com/cgag/loc";
     description = "Count lines of code quickly";
     license = stdenv.lib.licenses.mit;
-    maintainers = [ stdenv.lib.maintainers.matthiasbeyer ];
-    platforms = with stdenv.lib.platforms; linux;
+    maintainers = with stdenv.lib.maintainers; [ ];
+    platforms = platforms.unix;
   };
 }
 

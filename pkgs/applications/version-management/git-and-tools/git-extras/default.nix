@@ -1,20 +1,31 @@
-{ stdenv, fetchurl }:
+{ stdenv, fetchzip, unixtools, which }:
 
 stdenv.mkDerivation rec {
-  name = "git-extras-${version}";
-  version = "4.2.0";
+  pname = "git-extras";
+  version = "5.1.0";
 
-  src = fetchurl {
+  src = fetchzip {
     url = "https://github.com/tj/git-extras/archive/${version}.tar.gz";
-    sha256 = "0pr2vf5rajkwjm45zvnwkc13kvk3kyr18axxvmm8drsqdkr8lrjk";
+    sha256 = "0ja8ds9gpibrnwcf8n6cpbggwkbks0ik3z9vfx5h1yf3ln1nycky";
   };
 
-  phases = [ "unpackPhase" "installPhase" ];
+  nativeBuildInputs = [ unixtools.column which ];
 
-  makeFlags = "DESTDIR=$(out) PREFIX=";
+  dontBuild = true;
+
+  preInstall = ''
+    patchShebangs .
+  '';
+
+  installFlags = [ "PREFIX=${placeholder "out"}" ];
+
+  postInstall = ''
+    # bash completion is already handled by make install
+    install -D etc/git-extras-completion.zsh $out/share/zsh/site-functions/_git_extras
+  '';
 
   meta = with stdenv.lib; {
-    homepage = https://github.com/tj/git-extras;
+    homepage = "https://github.com/tj/git-extras";
     description = "GIT utilities -- repo summary, repl, changelog population, author commit percentages and more";
     license = licenses.mit;
     platforms = platforms.all;

@@ -1,22 +1,25 @@
-{ stdenv, fetchurl, SDL, libxml2, SDL_image, libjpeg, libpng, mesa, zlib }:
+{ stdenv, fetchurl, SDL, libxml2, SDL_image, libjpeg, libpng, libGLU, libGL, zlib }:
 
 let
   versionMajor = "0.2.8";
-  versionMinor = "3.3";
+  versionMinor = "3.5";
   version = "${versionMajor}.${versionMinor}";
 in
 
 stdenv.mkDerivation {
-  name = "armagetron-${version}";
+  pname = "armagetron";
+  inherit version;
   src = fetchurl {
-    url = "https://launchpad.net/armagetronad/${versionMajor}/0.2.8.3.x/+download/armagetronad-${version}.src.tar.bz2";
-    sha256 = "1s55irhg60fpmhy8wwxpdq7c45r1mqch6zpicyb2wf9ln60xgwnx";
+    url = "https://launchpad.net/armagetronad/${versionMajor}/${versionMajor}.${versionMinor}/+download/armagetronad-${version}.src.tar.bz2";
+    sha256 = "1vyja7mzivs3pacxb7kznndsgqhq4p0f7x2zg55dckvzqwprdhqx";
   };
 
-  NIX_LDFLAGS = [ "-lSDL_image" ];
+  NIX_LDFLAGS = "-lSDL_image";
+
+  enableParallelBuilding = true;
 
   configureFlags = [ "--disable-etc" ];
-  buildInputs = [ SDL SDL_image libxml2 libjpeg libpng mesa zlib ];
+  buildInputs = [ SDL SDL_image libxml2 libjpeg libpng libGLU libGL zlib ];
 
   meta = with stdenv.lib; {
     homepage = "http://armagetronad.org";

@@ -1,147 +1,170 @@
-{ stdenv, fetchurl, fetchgit, fetchzip, file, python2, tzdata, procps
-, llvm, jemalloc, ncurses, darwin, binutils, rustPlatform, git, cmake, curl
-
-, isRelease ? false
-, shortVersion
-, forceBundledLLVM ? false
-, srcSha, srcRev
-, configureFlags ? []
-, patches
-, targets
-, targetPatches
-, targetToolchains
-} @ args:
+{ stdenv, removeReferencesTo, pkgsBuildBuild, pkgsBuildHost, pkgsBuildTarget
+, fetchurl, file, python3
+, llvm_9, darwin, cmake, rust, rustPlatform
+, pkgconfig, openssl
+, which, libffi
+, withBundledLLVM ? false
+, enableRustcDev ? true
+, version
+, sha256
+, patches ? []
+}:
 
 let
-  inherit (stdenv.lib) optional optionalString;
+  inherit (stdenv.lib) optionals optional optionalString;
+  inherit (darwin.apple_sdk.frameworks) Security;
 
-  version = if isRelease then
-      "${shortVersion}"
-    else
-      "${shortVersion}-g${builtins.substring 0 7 srcRev}";
+  llvmSharedForBuild = pkgsBuildBuild.llvm_9.override { enableSharedLibraries = true; };
+  llvmSharedForHost = pkgsBuildHost.llvm_9.override { enableSharedLibraries = true; };
+  llvmSharedForTarget = pkgsBuildTarget.llvm_9.override { enableSharedLibraries = true; };
 
-  name = "rustc-${version}";
-
-  procps = if stdenv.isDarwin then darwin.ps else args.procps;
-
-  llvmShared = llvm.override { enableSharedLibraries = true; };
-
-  target = builtins.replaceStrings [" "] [","] (builtins.toString targets);
-
-  meta = with stdenv.lib; {
-    homepage = http://www.rust-lang.org/;
-    description = "A safe, concurrent, practical language";
-    maintainers = with maintainers; [ madjar cstrahan wizeman globin havvy wkennington retrry ];
-    license = [ licenses.mit licenses.asl20 ];
-    platforms = platforms.linux ++ platforms.darwin;
-  };
-in
-
-stdenv.mkDerivation {
-  inherit name;
+  # For use at runtime
+  llvmShared = llvm_9.override { enableSharedLibraries = true; };
+in stdenv.mkDerivation rec {
+  pname = "rustc";
   inherit version;
-  inherit meta;
 
-  __impureHostDeps = [ "/usr/lib/libedit.3.dylib" ];
-
-  NIX_LDFLAGS = optionalString stdenv.isDarwin "-rpath ${llvmShared}/lib";
-
-  src = fetchgit {
-    url = https://github.com/rust-lang/rust;
-    rev = srcRev;
-    sha256 = srcSha;
+  src = fetchurl {
+    url = "https://static.rust-lang.org/dist/rustc-${version}-src.tar.gz";
+    inherit sha256;
   };
+
+  __darwinAllowLocalNetworking = true;
+
+  # rustc complains about modified source files otherwise
+  dontUpdateAutotoolsGnuConfigScripts = true;
+
+  # Running the default `strip -S` command on Darwin corrupts the
+  # .rlib files in "lib/".
+  #
+  # See https://github.com/NixOS/nixpkgs/pull/34227
+  #
+  # Running `strip -S` when cross compiling can harm the cross rlibs.
+  # See: https://github.com/NixOS/nixpkgs/pull/56540#issuecomment-471624656
+  stripDebugList = [ "bin" ];
+
+  NIX_LDFLAGS = toString (
+       # when linking stage1 libstd: cc: undefined reference to `__cxa_begin_catch'
+       optional (stdenv.isLinux && !withBundledLLVM) "--push-state --as-needed -lstdc++ --pop-state"
+    ++ optional (stdenv.isDarwin && !withBundledLLVM) "-lc++"
+    ++ optional stdenv.isDarwin "-rpath ${llvmSharedForHost}/lib");
+
+  # Increase codegen units to introduce parallelism within the compiler.
+  RUSTFLAGS = "-Ccodegen-units=10";
 
   # We need rust to build rust. If we don't provide it, configure will try to download it.
-  configureFlags = configureFlags
-                ++ [ "--enable-local-rust" "--local-rust-root=${rustPlatform.rust.rustc}" "--enable-rpath" ]
-                # ++ [ "--jemalloc-root=${jemalloc}/lib"
-                ++ [ "--default-linker=${stdenv.cc}/bin/cc" "--default-ar=${binutils.out}/bin/ar" ]
-                ++ optional (stdenv.cc.cc ? isClang) "--enable-clang"
-                ++ optional (targets != []) "--target=${target}"
-                ++ optional (!forceBundledLLVM) "--llvm-root=${llvmShared}";
+  # Reference: https://github.com/rust-lang/rust/blob/master/src/bootstrap/configure.py
+  configureFlags = let
+    setBuild  = "--set=target.${rust.toRustTarget stdenv.buildPlatform}";
+    setHost   = "--set=target.${rust.toRustTarget stdenv.hostPlatform}";
+    setTarget = "--set=target.${rust.toRustTarget stdenv.targetPlatform}";
+    ccForBuild  = "${pkgsBuildBuild.targetPackages.stdenv.cc}/bin/${pkgsBuildBuild.targetPackages.stdenv.cc.targetPrefix}cc";
+    cxxForBuild = "${pkgsBuildBuild.targetPackages.stdenv.cc}/bin/${pkgsBuildBuild.targetPackages.stdenv.cc.targetPrefix}c++";
+    ccForHost  = "${pkgsBuildHost.targetPackages.stdenv.cc}/bin/${pkgsBuildHost.targetPackages.stdenv.cc.targetPrefix}cc";
+    cxxForHost = "${pkgsBuildHost.targetPackages.stdenv.cc}/bin/${pkgsBuildHost.targetPackages.stdenv.cc.targetPrefix}c++";
+    ccForTarget  = "${pkgsBuildTarget.targetPackages.stdenv.cc}/bin/${pkgsBuildTarget.targetPackages.stdenv.cc.targetPrefix}cc";
+    cxxForTarget = "${pkgsBuildTarget.targetPackages.stdenv.cc}/bin/${pkgsBuildTarget.targetPackages.stdenv.cc.targetPrefix}c++";
+  in [
+    "--release-channel=stable"
+    "--set=build.rustc=${rustPlatform.rust.rustc}/bin/rustc"
+    "--set=build.cargo=${rustPlatform.rust.cargo}/bin/cargo"
+    "--enable-rpath"
+    "--enable-vendor"
+    "--build=${rust.toRustTarget stdenv.buildPlatform}"
+    "--host=${rust.toRustTarget stdenv.hostPlatform}"
+    "--target=${rust.toRustTarget stdenv.targetPlatform}"
 
-  patches = patches ++ targetPatches;
+    "${setBuild}.cc=${ccForBuild}"
+    "${setHost}.cc=${ccForHost}"
+    "${setTarget}.cc=${ccForTarget}"
 
-  passthru.target = target;
+    "${setBuild}.linker=${ccForBuild}"
+    "${setHost}.linker=${ccForHost}"
+    "${setTarget}.linker=${ccForTarget}"
+
+    "${setBuild}.cxx=${cxxForBuild}"
+    "${setHost}.cxx=${cxxForHost}"
+    "${setTarget}.cxx=${cxxForTarget}"
+  ] ++ optionals (!withBundledLLVM) [
+    "--enable-llvm-link-shared"
+    "${setBuild}.llvm-config=${llvmSharedForBuild}/bin/llvm-config"
+    "${setHost}.llvm-config=${llvmSharedForHost}/bin/llvm-config"
+    "${setTarget}.llvm-config=${llvmSharedForTarget}/bin/llvm-config"
+  ] ++ optionals stdenv.isLinux [
+    "--enable-profiler" # build libprofiler_builtins
+  ];
+
+  # The bootstrap.py will generated a Makefile that then executes the build.
+  # The BOOTSTRAP_ARGS used by this Makefile must include all flags to pass
+  # to the bootstrap builder.
+  postConfigure = ''
+    substituteInPlace Makefile \
+      --replace 'BOOTSTRAP_ARGS :=' 'BOOTSTRAP_ARGS := --jobs $(NIX_BUILD_CORES)'
+  '';
+
+  # the rust build system complains that nix alters the checksums
+  dontFixLibtool = true;
+
+  inherit patches;
 
   postPatch = ''
-    substituteInPlace src/rust-installer/gen-install-script.sh \
-      --replace /bin/echo "$(type -P echo)"
-    substituteInPlace src/rust-installer/gen-installer.sh \
-      --replace /bin/echo "$(type -P echo)"
+    patchShebangs src/etc
 
-    # Workaround for NixOS/nixpkgs#8676
-    substituteInPlace mk/rustllvm.mk \
-      --replace "\$\$(subst  /,//," "\$\$(subst /,/,"
-
-    # Fix dynamic linking against llvm
-    ${optionalString (!forceBundledLLVM) ''sed -i 's/, kind = \\"static\\"//g' src/etc/mklldeps.py''}
+    ${optionalString (!withBundledLLVM) ''rm -rf src/llvm''}
 
     # Fix the configure script to not require curl as we won't use it
     sed -i configure \
       -e '/probe_need CFG_CURL curl/d'
 
-    # Fix the use of jemalloc prefixes which our jemalloc doesn't have
-    # TODO: reenable if we can figure out how to get our jemalloc to work
-    #[ -f src/liballoc_jemalloc/lib.rs ] && sed -i 's,je_,,g' src/liballoc_jemalloc/lib.rs
-    #[ -f src/liballoc/heap.rs ] && sed -i 's,je_,,g' src/liballoc/heap.rs # Remove for 1.4.0+
-
-    # Disable fragile linker-output-non-utf8 test
-    rm -vr src/test/run-make/linker-output-non-utf8/
-
-    # Remove test targeted at LLVM 3.9 - https://github.com/rust-lang/rust/issues/36835
-    rm -vr src/test/run-pass/issue-36023.rs
-
-    # Disable test getting stuck on hydra - possible fix:
-    # https://reviews.llvm.org/rL281650
-    rm -vr src/test/run-pass/issue-36474.rs
-
     # Useful debugging parameter
     # export VERBOSE=1
-  '' +
-  # In src/compiler-rt/cmake/config-ix.cmake, the cmake build falls
-  # back to darwin 10.4. This causes the OS name to be recorded as
-  # "10.4" rather than the expected "osx". But mk/rt.mk expects the
-  # built library name to have an "_osx" suffix on darwin.
-  optionalString stdenv.isDarwin ''
-    substituteInPlace mk/rt.mk --replace "_osx" "_10.4"
   '';
 
-  preConfigure = ''
-    # Needed flags as the upstream configure script has a broken prefix substitution
-    configureFlagsArray+=("--datadir=$out/share")
-    configureFlagsArray+=("--infodir=$out/share/info")
-  '';
-
-  # rustc unfortunately need cmake for compiling llvm-rt but doesn't
+  # rustc unfortunately needs cmake to compile llvm-rt but doesn't
   # use it for the normal build. This disables cmake in Nix.
   dontUseCmakeConfigure = true;
 
-  # ps is needed for one of the test cases
-  nativeBuildInputs = [ file python2 procps rustPlatform.rust.rustc git cmake ];
+  nativeBuildInputs = [
+    file python3 rustPlatform.rust.rustc cmake
+    which libffi removeReferencesTo pkgconfig
+  ];
 
-  buildInputs = [ ncurses ] ++ targetToolchains
-    ++ optional (!forceBundledLLVM) llvmShared;
+  buildInputs = [ openssl ]
+    ++ optional stdenv.isDarwin Security
+    ++ optional (!withBundledLLVM) llvmShared;
 
-  # https://github.com/rust-lang/rust/issues/30181
-  # enableParallelBuilding = false; # missing files during linking, occasionally
-
-  outputs = [ "out" "doc" ];
+  outputs = [ "out" "man" "doc" ];
   setOutputFlags = false;
 
-  preCheck = ''
-    export TZDIR=${tzdata}/share/zoneinfo
-  '' +
-  # Ensure TMPDIR is set, and disable a test that removing the HOME
-  # variable from the environment falls back to another home
-  # directory.
-  optionalString stdenv.isDarwin ''
-    export TMPDIR=/tmp
-    sed -i '28s/home_dir().is_some()/true/' ./src/test/run-pass/env-home-dir.rs
+  postInstall = stdenv.lib.optionalString enableRustcDev ''
+    # install rustc-dev components. Necessary to build rls, clippy...
+    python x.py dist rustc-dev
+    tar xf build/dist/rustc-dev*tar.gz
+    cp -r rustc-dev*/rustc-dev*/lib/* $out/lib/
+
+  '' + ''
+    # remove references to llvm-config in lib/rustlib/x86_64-unknown-linux-gnu/codegen-backends/librustc_codegen_llvm-llvm.so
+    # and thus a transitive dependency on ncurses
+    find $out/lib -name "*.so" -type f -exec remove-references-to -t ${llvmShared} '{}' '+'
   '';
 
-  # Disable doCheck on Darwin to work around upstream issue
-  doCheck = true;
-  dontSetConfigureCross = true;
+  configurePlatforms = [];
+
+  # https://github.com/NixOS/nixpkgs/pull/21742#issuecomment-272305764
+  # https://github.com/rust-lang/rust/issues/30181
+  # enableParallelBuilding = false;
+
+  setupHooks = ./setup-hook.sh;
+
+  requiredSystemFeatures = [ "big-parallel" ];
+
+  passthru.llvm = llvmShared;
+
+  meta = with stdenv.lib; {
+    homepage = "https://www.rust-lang.org/";
+    description = "A safe, concurrent, practical language";
+    maintainers = with maintainers; [ madjar cstrahan globin havvy ];
+    license = [ licenses.mit licenses.asl20 ];
+    platforms = platforms.linux ++ platforms.darwin;
+  };
 }

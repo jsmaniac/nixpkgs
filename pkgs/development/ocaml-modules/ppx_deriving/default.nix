@@ -1,26 +1,22 @@
-{stdenv, buildOcaml, fetchurl,
- cppo, ppx_tools, result, ounit}:
+{ lib, fetchzip, buildDunePackage
+, cppo, ppxfind, ppx_tools, ppx_derivers, result, ounit, ocaml-migrate-parsetree
+}:
 
-buildOcaml rec {
-  name = "ppx_deriving";
-  version = "v3.3";
+buildDunePackage rec {
+  pname = "ppx_deriving";
+  version = "4.4.1";
 
-  minimumSupportedOcamlVersion = "4.02";
-
-  src = fetchurl {
-    url = "https://github.com/whitequark/${name}/archive/${version}.tar.gz";
-    sha256 = "1j20c6r2v7h05a4v9m8z5m1yqgwif41yrp63mik14pf3dkrj8x3f";
+  src = fetchzip {
+    url = "https://github.com/ocaml-ppx/ppx_deriving/archive/v${version}.tar.gz";
+    sha256 = "1map50w2a35y83bcd19p9yakdkhp04z5as2j2wlygi0b6s0a9vba";
   };
 
-  hasSharedObjects = true;
+  buildInputs = [ ppxfind cppo ounit ];
+  propagatedBuildInputs = [ ocaml-migrate-parsetree ppx_derivers ppx_tools result ];
 
-  buildInputs = [ cppo ounit ];
-  propagatedBuildInputs =
-    [ ppx_tools result ];
+  doCheck = true;
 
-  installPhase = "OCAMLPATH=$OCAMLPATH:`ocamlfind printconf destdir` make install";
-
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "deriving is a library simplifying type-driven code generation on OCaml >=4.02.";
     maintainers = [ maintainers.maurer ];
     license = licenses.mit;

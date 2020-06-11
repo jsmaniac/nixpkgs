@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, pkgconfig, systemd, utillinux, coreutils }:
+{ stdenv, fetchurl, fetchpatch, pkgconfig, systemd, utillinux, coreutils }:
 
 let
   v = "2.02.106";
@@ -12,10 +12,28 @@ stdenv.mkDerivation {
     sha256 = "0nr833bl0q4zq52drjxmmpf7bs6kqxwa5kahwwxm9411khkxz0vc";
   };
 
-  configureFlags =
-    "--disable-readline --enable-udev_rules --enable-udev_sync --enable-pkgconfig --enable-applib";
+  patches = [
+    # Fix build with glibc >= 2.28
+    # https://github.com/NixOS/nixpkgs/issues/86403
+    (fetchpatch {
+      url = "https://github.com/lvmteam/lvm2/commit/92d5a8441007f578e000b492cecf67d6b8a87405.patch";
+      sha256 = "1yqd6jng0b370k53vks1shg57yhfyribhpmv19km5zsjqf0qqx2d";
+      excludes = [
+        "libdm/libdm-stats.c"
+      ];
+    })
+  ];
 
-  buildInputs = [ pkgconfig systemd ];
+  configureFlags = [
+    "--disable-readline"
+    "--enable-udev_rules"
+    "--enable-udev_sync"
+    "--enable-pkgconfig"
+    "--enable-applib"
+  ];
+
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ systemd ];
 
   preConfigure =
     ''
@@ -34,7 +52,7 @@ stdenv.mkDerivation {
   #patches = [ ./purity.patch ];
 
   # To prevent make install from failing.
-  preInstall = "installFlags=\"OWNER= GROUP= confdir=$out/etc\"";
+  installFlags = [ "OWNER=" "GROUP=" "confdir=${placeholder "out"}/etc" ];
 
   # Install systemd stuff.
   #installTargets = "install install_systemd_generators install_systemd_units install_tmpfiles_configuration";
@@ -51,8 +69,8 @@ stdenv.mkDerivation {
     '';
 
   meta = {
-    homepage = http://sourceware.org/lvm2/;
-    descriptions = "Tools to support Logical Volume Management (LVM) on Linux";
+    homepage = "http://sourceware.org/lvm2/";
+    description = "Tools to support Logical Volume Management (LVM) on Linux";
     platforms = stdenv.lib.platforms.linux;
   };
 }

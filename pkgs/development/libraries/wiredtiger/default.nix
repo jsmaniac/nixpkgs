@@ -7,14 +7,14 @@
 
 with stdenv.lib;
 let
-  mkFlag = trueStr: falseStr: cond: name: val:
-    if cond == null then null else
-      "--${if cond != false then trueStr else falseStr}${name}${if val != null && cond != false then "=${val}" else ""}";
+  mkFlag = trueStr: falseStr: cond: name: val: "--"
+    + (if cond then trueStr else falseStr)
+    + name
+    + optionalString (val != null && cond != false) "=${val}";
   mkEnable = mkFlag "enable-" "disable-";
   mkWith = mkFlag "with-" "without-";
-  mkOther = mkFlag "" "" true;
 
-  shouldUsePkg = pkg: if pkg != null && any (x: x == stdenv.system) pkg.meta.platforms then pkg else null;
+  shouldUsePkg = pkg: if pkg != null && stdenv.lib.any (stdenv.lib.meta.platformMatch stdenv.hostPlatform) pkg.meta.platforms then pkg else null;
 
   optLz4 = shouldUsePkg lz4;
   optSnappy = shouldUsePkg snappy;
@@ -25,14 +25,14 @@ let
   optLeveldb = shouldUsePkg leveldb;
 in
 stdenv.mkDerivation rec {
-  name = "wiredtiger-${version}";
-  version = "2.6.1";
+  pname = "wiredtiger";
+  version = "3.2.1";
 
   src = fetchFromGitHub {
     repo = "wiredtiger";
     owner = "wiredtiger";
     rev = version;
-    sha256 = "1nj319w3hvkq3za2dz9m0p1w683gycdb392v1jb910bhzpsq30pd";
+    sha256 = "04j2zw8b9jym43r682rh4kpdippxx7iw3ry16nxlbybzar9kgk83";
   };
 
   nativeBuildInputs = [ automake autoconf libtool ];
@@ -58,17 +58,10 @@ stdenv.mkDerivation rec {
     ./autogen.sh
   '';
 
-  prePatch = stdenv.lib.optionalString stdenv.isDarwin ''
-    substituteInPlace api/leveldb/leveldb_wt.h --replace \
-      '#include "wiredtiger.h"' \
-      ''$'#include "wiredtiger.h"\n#include "pthread.h"'
-  '';
-
   meta = {
-    homepage = http://wiredtiger.com/;
+    homepage = "http://wiredtiger.com/";
     description = "";
     license = licenses.gpl2;
     platforms = intersectLists platforms.unix platforms.x86_64;
-    maintainers = with maintainers; [ wkennington ];
   };
 }

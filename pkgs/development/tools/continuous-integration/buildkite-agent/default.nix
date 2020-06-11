@@ -1,32 +1,37 @@
-{ stdenv, fetchurl, makeWrapper, coreutils, git, openssh, bash, gnused, gnugrep }:
-
-stdenv.mkDerivation rec {
-  version = "2.1.13";
+{ fetchFromGitHub, stdenv, buildGoPackage,
+  makeWrapper, coreutils, git, openssh, bash, gnused, gnugrep }:
+buildGoPackage rec {
   name = "buildkite-agent-${version}";
-  dontBuild = true;
+  version = "3.17.0";
 
-  src = fetchurl {
-    url = "https://github.com/buildkite/agent/releases/download/v${version}/buildkite-agent-linux-386-${version}.tar.gz";
-    sha256 = "bd40c2ba37b3b54b875241a32b62190a4cf4c15e2513c573f1626a3ca35c8657";
+  goPackagePath = "github.com/buildkite/agent";
+
+  src = fetchFromGitHub {
+    owner = "buildkite";
+    repo = "agent";
+    rev = "v${version}";
+    sha256 = "0a7x919kxnpdn0pnhc5ilx1z6ninx8zgjvsd0jcg4qwh0qqp5ppr";
   };
+  postPatch = ''
+    substituteInPlace bootstrap/shell/shell.go --replace /bin/bash ${bash}/bin/bash
+  '';
 
   nativeBuildInputs = [ makeWrapper ];
-  sourceRoot = ".";
-  installPhase = ''
-    install -Dt "$out/bin/" buildkite-agent
 
-    mkdir -p $out/share
-    mv hooks bootstrap.sh $out/share/
-  '';
+  # on Linux, the TMPDIR is /build which is the same prefix as this package
+  # remove once #35068 is merged
+  noAuditTmpdir = stdenv.isLinux;
 
-  postFixup = ''
-    substituteInPlace $out/share/bootstrap.sh \
-      --replace "#!/bin/bash" "#!$(type -P bash)"
+  postInstall = ''
+    # Fix binary name
+    mv $out/bin/{agent,buildkite-agent}
+
+    # These are runtime dependencies
     wrapProgram $out/bin/buildkite-agent \
-      --set PATH '"${stdenv.lib.makeBinPath [ openssh git coreutils gnused gnugrep ]}:$PATH"'
+      --prefix PATH : '${stdenv.lib.makeBinPath [ openssh git coreutils gnused gnugrep ]}'
   '';
 
-  meta = {
+  meta = with stdenv.lib; {
     description = "Build runner for buildkite.com";
     longDescription = ''
       The buildkite-agent is a small, reliable, and cross-platform build runner
@@ -35,9 +40,9 @@ stdenv.mkDerivation rec {
       build jobs, reporting back the status code and output log of the job,
       and uploading the job's artifacts.
     '';
-    homepage = https://buildkite.com/docs/agent;
-    license = stdenv.lib.licenses.mit;
-    maintainers = [ stdenv.lib.maintainers.pawelpacana ];
-    platforms = stdenv.lib.platforms.linux;
+    homepage = "https://buildkite.com/docs/agent";
+    license = licenses.mit;
+    maintainers = with maintainers; [ pawelpacana zimbatm rvl ];
+    platforms = platforms.unix;
   };
 }

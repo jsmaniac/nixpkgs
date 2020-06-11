@@ -1,23 +1,41 @@
-{ stdenv, fetchurl, libuuid, zlib }:
+{ stdenv, fetchurl, autoreconfHook
+, libuuid, zlib }:
 
-stdenv.mkDerivation rec {
-  name = "xapian-${version}";
-  version = "1.4.0";
+let
+  generic = version: sha256: stdenv.mkDerivation {
+    pname = "xapian";
+    inherit version;
+    passthru = { inherit version; };
 
-  src = fetchurl {
-    url = "http://oligarchy.co.uk/xapian/${version}/xapian-core-${version}.tar.xz";
-    sha256 = "0xv4da5rmqqzkkkzx2v3jwh5hz5zxhd2b7m8x30fk99a25blyn0h";
+    src = fetchurl {
+      url = "https://oligarchy.co.uk/xapian/${version}/xapian-core-${version}.tar.xz";
+      inherit sha256;
+    };
+
+    outputs = [ "out" "man" "doc" ];
+
+    buildInputs = [ libuuid zlib ];
+    nativeBuildInputs = [ autoreconfHook ];
+
+    doCheck = true;
+
+    patches = stdenv.lib.optionals stdenv.isDarwin [ ./skip-flaky-darwin-test.patch ];
+
+    # the configure script thinks that Darwin has ___exp10
+    # but it’s not available on my systems (or hydra apparently)
+    postConfigure = stdenv.lib.optionalString stdenv.isDarwin ''
+      substituteInPlace config.h \
+        --replace "#define HAVE___EXP10 1" "#undef HAVE___EXP10"
+    '';
+
+    meta = with stdenv.lib; {
+      description = "Search engine library";
+      homepage = "https://xapian.org/";
+      license = licenses.gpl2Plus;
+      maintainers = with maintainers; [ ];
+      platforms = platforms.unix;
+    };
   };
-
-  outputs = [ "out" "doc" ];
-
-  buildInputs = [ libuuid zlib ];
-
-  meta = {
-    description = "Search engine library";
-    homepage = http://xapian.org/;
-    license = stdenv.lib.licenses.gpl2Plus;
-    maintainers = [ stdenv.lib.maintainers.chaoflow ];
-    platforms = stdenv.lib.platforms.unix;
-  };
+in {
+  xapian_1_4 = generic "1.4.15" "1sjhz6vgql801rdgl6vrsjj0vy1mwlkcxjx6nr7h27m031cyjs5i";
 }

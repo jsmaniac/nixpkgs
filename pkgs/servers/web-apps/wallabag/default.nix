@@ -1,28 +1,23 @@
 { stdenv, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "wallabag-${version}";
-  version = "2.1.3";
+  pname = "wallabag";
+  version = "2.3.8";
 
   # remember to rm -r var/cache/* after a rebuild or unexpected errors will occur
 
   src = fetchurl {
-    url = "https://framabag.org/wallabag-release-${version}.tar.gz";
-    sha256 = "0pl1sqigrp08r657jmfpf8m3wnw65g2k3mg50zsc8xbrzn6nwbgp";
+    url = "https://static.wallabag.org/releases/wallabag-release-${version}.tar.gz";
+    sha256 = "1sr62hfk2f2rl5by48dg8yd1gchngjnc850as17wr3w287p1kwsq";
   };
 
-  outputs = [ "out" "doc" ];
+  outputs = [ "out" ];
 
-  patchPhase = ''
-    rm Makefile # use the "shared hosting" package with bundled dependencies
-    substituteInPlace app/AppKernel.php \
-      --replace "__DIR__" "getenv('WALLABAG_DATA')"
-    substituteInPlace var/bootstrap.php.cache \
-      --replace "\$this->rootDir = \$this->getRootDir()" "\$this->rootDir = getenv('WALLABAG_DATA')"
-  ''; # exposes $WALLABAG_DATA
+  patches = [ ./wallabag-data.patch ]; # exposes $WALLABAG_DATA
+
+  dontBuild = true;
 
   installPhase = ''
-    mv docs $doc/
     mkdir $out/
     cp -R * $out/
   '';
@@ -32,11 +27,12 @@ stdenv.mkDerivation rec {
     longDescription = ''
       wallabag is a self hostable application for saving web pages.
 
-      To use, point the environment variable $WALLABAG_DATA to a directory called `app` that contains the folder `config` with wallabag's configuration files. These need to be updated every package upgrade. In `app`'s parent folder, a directory called `var` containing wallabag's data will be created.
+      Point the environment variable $WALLABAG_DATA to a data directory that contains the folder `app/config` which must be a clone of wallabag's configuration files with your customized `parameters.yml`. These need to be updated every package upgrade.
       After a package upgrade, empty the `var/cache` folder.
     '';
     license = licenses.mit;
-    homepage = http://wallabag.org;
+    homepage = "http://wallabag.org";
+    maintainers = with maintainers; [ schneefux ];
     platforms = platforms.all;
   };
 }

@@ -1,13 +1,15 @@
-{ stdenv, fetchurl, pkgconfig, udev, dbus_libs, perl, python2
+{ stdenv, fetchurl, pkgconfig, udev, dbus, perl, python3
 , IOKit ? null }:
 
 stdenv.mkDerivation rec {
-  name = "pcsclite-${version}";
-  version = "1.8.17";
+  pname = "pcsclite";
+  version = "1.8.26";
+
+  outputs = [ "bin" "out" "dev" "doc" "man" ];
 
   src = fetchurl {
-    url = "https://alioth.debian.org/frs/download.php/file/4173/pcsc-lite-${version}.tar.bz2";
-    sha256 = "0vq2291kvnbg8czlakqahxrdhsvp74fqy3z75lfjlkq2aj36yayp";
+    url = "https://pcsclite.apdu.fr/files/pcsc-lite-${version}.tar.bz2";
+    sha256 = "1ndvvz0fgqwz70pijymsxmx25mzryb0zav1i8jjc067ndryvxdry";
   };
 
   patches = [ ./no-dropdir-literals.patch ];
@@ -18,7 +20,9 @@ stdenv.mkDerivation rec {
     "--enable-confdir=/etc"
     "--enable-ipcdir=/run/pcscd"
   ] ++ stdenv.lib.optional stdenv.isLinux
-         "--with-systemdsystemunitdir=\${out}/etc/systemd/system";
+         "--with-systemdsystemunitdir=\${out}/etc/systemd/system"
+    ++ stdenv.lib.optional (!stdenv.isLinux)
+         "--disable-libsystemd";
 
   postConfigure = ''
     sed -i -re '/^#define *PCSCLITE_HP_DROPDIR */ {
@@ -26,15 +30,19 @@ stdenv.mkDerivation rec {
     }' config.h
   '';
 
-  nativeBuildInputs = [ pkgconfig perl python2 ];
-  buildInputs = stdenv.lib.optionals stdenv.isLinux [ udev dbus_libs ]
+  postInstall = ''
+    # pcsc-spy is a debugging utility and it drags python into the closure
+    moveToOutput bin/pcsc-spy "$dev"
+  '';
+
+  nativeBuildInputs = [ pkgconfig perl ];
+  buildInputs = [ python3 ] ++ stdenv.lib.optionals stdenv.isLinux [ udev dbus ]
              ++ stdenv.lib.optionals stdenv.isDarwin [ IOKit ];
 
   meta = with stdenv.lib; {
     description = "Middleware to access a smart card using SCard API (PC/SC)";
-    homepage = http://pcsclite.alioth.debian.org/;
+    homepage = "https://pcsclite.apdu.fr/";
     license = licenses.bsd3;
-    maintainers = with maintainers; [ viric wkennington ];
     platforms = with platforms; unix;
   };
 }

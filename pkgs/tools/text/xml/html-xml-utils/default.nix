@@ -1,18 +1,20 @@
-{ stdenv, fetchurl }:
+{ stdenv, fetchurl, curl, libiconv }:
 
 stdenv.mkDerivation rec {
-  name = "html-xml-utils-6.9";
+  pname = "html-xml-utils";
+  version = "7.8";
 
   src = fetchurl {
-    url = "http://www.w3.org/Tools/HTML-XML-utils/${name}.tar.gz";
-
-    sha256 = "1cpshwz60h7xsw1rvv84jl4bn9zjqii9hb8zvwm7a0fahkf03x4w";
+    url = "https://www.w3.org/Tools/HTML-XML-utils/${pname}-${version}.tar.gz";
+    sha256 = "0p8df3c6mw879vdi8l63kbdqylkf1is10b067mh9kipgfy91rd4s";
   };
 
-  meta = {
+  buildInputs = [curl libiconv];
+
+  meta = with stdenv.lib; {
     description = "Utilities for manipulating HTML and XML files";
-    homepage = http://www.w3.org/Tools/HTML-XML-utils/;
-    license = stdenv.lib.licenses.w3c;
-    platforms = stdenv.lib.platforms.linux;
+    homepage = "http://www.w3.org/Tools/HTML-XML-utils/";
+    license = licenses.w3c;
+    platforms = platforms.all;
   };
 }

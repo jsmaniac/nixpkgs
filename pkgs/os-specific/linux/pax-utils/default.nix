@@ -1,23 +1,27 @@
-{ fetchurl, stdenv }:
+{ stdenv, lib, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "pax-utils-${version}";
-  version = "1.1.7";
+  pname = "pax-utils";
+  version = "1.2.6";
 
   src = fetchurl {
-    url = "https://dev.gentoo.org/~vapier/dist/${name}.tar.xz";
-    sha256 = "045dxgl4kkmq6205iw6fqyx3565gd607p3xpad5l9scdi3qdp6xv";
+    url = "http://distfiles.gentoo.org/distfiles/${pname}-${version}.tar.xz";
+    sha256 = "08bzvgv1z3371sqf7zlm9i0b1y3wdymj2dqdvzvf192k3nix4hlp";
   };
 
-  makeFlags = [
-    "PREFIX=$(out)"
-  ];
+  makeFlags = [ "PREFIX=$(out)" ];
 
-  meta = with stdenv.lib; {
-    description = "A suite of tools for PaX/grsecurity";
-    homepage    = "https://dev.gentoo.org/~vapier/dist/";
-    license     = licenses.gpl2;
-    platforms   = platforms.linux;
+  meta = with lib; {
+    description = "ELF utils that can check files for security relevant properties";
+    longDescription = ''
+      A suite of ELF tools to aid auditing systems. Contains
+      various ELF related utils for ELF32, ELF64 binaries useful
+      for displaying PaX and security info on a large groups of
+      binary files.
+    '';
+    homepage = "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities";
+    license = licenses.gpl2;
+    platforms = platforms.unix;
     maintainers = with maintainers; [ thoughtpolice joachifm ];
   };
 }

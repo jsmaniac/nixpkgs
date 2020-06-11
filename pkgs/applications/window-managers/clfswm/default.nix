@@ -1,8 +1,7 @@
-{ stdenv, pkgs, fetchgit, autoconf, sbcl, lispPackages, xdpyinfo, texinfo4
-, makeWrapper , rlwrap, gnused, gnugrep, coreutils, xprop
-, extraModulePaths ? [] }:
+{ stdenv, fetchgit, autoconf, sbcl, lispPackages, xdpyinfo, texinfo4
+, makeWrapper }:
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   name = "clfswm";
 
   src = fetchgit {
@@ -42,7 +41,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A(nother) Common Lisp FullScreen Window Manager";
-    homepage    = https://common-lisp.net/project/clfswm/;
+    homepage    = "https://common-lisp.net/project/clfswm/";
     license     = licenses.gpl3;
     maintainers = with maintainers; [ robgssp ];
     platforms   = platforms.linux;

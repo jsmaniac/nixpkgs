@@ -1,17 +1,16 @@
 { stdenv, fetchurl, dysnomia, disnix, socat, pkgconfig, getopt }:
 
 stdenv.mkDerivation {
-  name = "disnixos-0.5";
+  name = "disnixos-0.8";
   
   src = fetchurl {
-    url = http://hydra.nixos.org/build/36899006/download/3/disnixos-0.5.tar.gz;
-    sha256 = "0pl3j8kwcz90as5cs0yipfbg555lw3z6xsylk6g2ili878mni1aq";
+    url = "https://github.com/svanderburg/disnixos/releases/download/disnixos-0.8/disnixos-0.8.tar.gz";
+    sha256 = "186blirfx89i8hdp4a0djy4q9qr9wcl0ilwr66hlil0wxqj1sr91";
   };
-  
-  buildInputs = [ socat pkgconfig dysnomia disnix getopt ];
-  
-  dontStrip = true;
-  
+
+  nativeBuildInputs = [ pkgconfig ];
+  buildInputs = [ socat dysnomia disnix getopt ];
+
   meta = {
     description = "Provides complementary NixOS infrastructure deployment to Disnix";
     license = stdenv.lib.licenses.lgpl21Plus;

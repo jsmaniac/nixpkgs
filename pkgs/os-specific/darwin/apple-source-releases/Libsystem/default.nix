@@ -1,11 +1,13 @@
-{ stdenv, appleDerivation, cpio, bootstrap_cmds, xnu, Libc, Libm, libdispatch, cctools, Libinfo,
-  dyld, Csu, architecture, libclosure, CarbonHeaders, ncurses, CommonCrypto, copyfile,
-  removefile, libresolv, Libnotify, libpthread, mDNSResponder, launchd, libutil, version }:
+{ stdenv, appleDerivation, cpio, xnu, Libc, Libm, libdispatch, cctools, Libinfo
+, dyld, Csu, architecture, libclosure, CarbonHeaders, ncurses, CommonCrypto
+, copyfile, removefile, libresolv, Libnotify, libplatform, libpthread
+, mDNSResponder, launchd, libutil, hfs, darling }:
 
-appleDerivation rec {
-  phases = [ "unpackPhase" "installPhase" ];
+appleDerivation {
+  dontBuild = true;
+  dontFixup = true;
 
-  buildInputs = [ cpio ];
+  nativeBuildInputs = [ cpio ];
 
   installPhase = ''
     export NIX_ENFORCE_PURITY=
@@ -17,18 +19,48 @@ appleDerivation rec {
     cp ${xnu}/Library/Frameworks/Kernel.framework/Versions/A/Headers/Availability*.h $out/include
     cp ${xnu}/Library/Frameworks/Kernel.framework/Versions/A/Headers/stdarg.h        $out/include
 
-    for dep in ${Libc} ${Libm} ${Libinfo} ${dyld} ${architecture} ${libclosure} ${CarbonHeaders} \
-               ${libdispatch} ${ncurses.dev} ${CommonCrypto} ${copyfile} ${removefile} ${libresolv} \
-               ${Libnotify} ${mDNSResponder} ${launchd} ${libutil} ${libpthread}; do
+    for dep in ${Libc} ${Libm} ${Libinfo} ${dyld} ${architecture} \
+               ${libclosure} ${CarbonHeaders} ${libdispatch} ${ncurses.dev} \
+               ${CommonCrypto} ${copyfile} ${removefile} ${libresolv} \
+               ${Libnotify} ${libplatform} ${mDNSResponder} ${launchd} \
+               ${libutil} ${libpthread} ${hfs}; do
       (cd $dep/include && find . -name '*.h' | cpio -pdm $out/include)
     done
 
-    (cd ${cctools}/include/mach-o && find . -name '*.h' | cpio -pdm $out/include/mach-o)
+    (cd ${cctools.dev}/include/mach-o && find . -name '*.h' | cpio -pdm $out/include/mach-o)
+
+    mkdir -p $out/include/os
+
+    cp ${darling.src}/src/libc/os/activity.h $out/include/os
+    cp ${darling.src}/src/libc/os/log.h $out/include/os
+    cp ${darling.src}/src/duct/include/os/trace.h $out/include/os
+
+    cat <<EOF > $out/include/os/availability.h
+    #ifndef __OS_AVAILABILITY__
+    #define __OS_AVAILABILITY__
+    #include <AvailabilityInternal.h>
+
+    #if defined(__has_feature) && defined(__has_attribute) && __has_attribute(availability)
+      #define API_AVAILABLE(...) __API_AVAILABLE_GET_MACRO(__VA_ARGS__, __API_AVAILABLE4, __API_AVAILABLE3, __API_AVAILABLE2, __API_AVAILABLE1)(__VA_ARGS__)
+      #define API_DEPRECATED(...) __API_DEPRECATED_MSG_GET_MACRO(__VA_ARGS__, __API_DEPRECATED_MSG5, __API_DEPRECATED_MSG4, __API_DEPRECATED_MSG3, __API_DEPRECATED_MSG2, __API_DEPRECATED_MSG1)(__VA_ARGS__)
+      #define API_DEPRECATED_WITH_REPLACEMENT(...) __API_DEPRECATED_REP_GET_MACRO(__VA_ARGS__, __API_DEPRECATED_REP5, __API_DEPRECATED_REP4, __API_DEPRECATED_REP3, __API_DEPRECATED_REP2, __API_DEPRECATED_REP1)(__VA_ARGS__)
+      #define API_UNAVAILABLE(...) __API_UNAVAILABLE_GET_MACRO(__VA_ARGS__, __API_UNAVAILABLE3, __API_UNAVAILABLE2, __API_UNAVAILABLE1)(__VA_ARGS__)
+    #else
+
+      #define API_AVAILABLE(...)
+      #define API_DEPRECATED(...)
+      #define API_DEPRECATED_WITH_REPLACEMENT(...)
+      #define API_UNAVAILABLE(...)
+
+    #endif
+    #endif
+    EOF
 
     cat <<EOF > $out/include/TargetConditionals.h
     #ifndef __TARGETCONDITIONALS__
     #define __TARGETCONDITIONALS__
     #define TARGET_OS_MAC           1
+    #define TARGET_OS_OSX           1
     #define TARGET_OS_WIN32         0
     #define TARGET_OS_UNIX          0
     #define TARGET_OS_EMBEDDED      0
@@ -76,7 +108,11 @@ appleDerivation rec {
        /usr/lib/libSystem.dylib \
        -reexported_symbols_list ${./system_symbols}
 
-    libs=$(otool -arch x86_64 -L /usr/lib/libSystem.dylib | tail -n +3 | awk '{ print $1 }')
+    # We used to determine these impurely based on the host system, but then when we got some 10.12 Hydra boxes,
+    # one of them accidentally built this derivation, referenced libsystem_symptoms.dylib, which doesn't exist on
+    # 10.11, and then broke all subsequent builds on 10.11. By picking a 10.11 compatible subset of the libraries,
+    # we avoid scary impurity issues like that.
+    libs=$(cat ${./reexported_libraries} | grep -v '^#')
 
     for i in $libs; do
       if [ "$i" != "/usr/lib/system/libsystem_kernel.dylib" ] && [ "$i" != "/usr/lib/system/libsystem_c.dylib" ]; then
@@ -109,7 +145,6 @@ appleDerivation rec {
     install_name_tool \
       -id $out/lib/libresolv.9.dylib \
       -change "$resolv_libSystem" $out/lib/libSystem.dylib \
-      -delete_rpath ${libresolv}/lib \
       $out/lib/libresolv.9.dylib
     ln -s libresolv.9.dylib $out/lib/libresolv.dylib
   '';

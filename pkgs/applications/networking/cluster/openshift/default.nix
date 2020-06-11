@@ -1,49 +1,77 @@
-{ stdenv, fetchFromGitHub, go, which }:
+{ stdenv, lib, fetchFromGitHub, buildGoPackage, which, go-bindata, rsync, utillinux
+, coreutils, kerberos, ncurses, clang, installShellFiles
+, components ? [
+  "cmd/oc"
+  "cmd/openshift"
+  ]
+}:
+
+with lib;
 
 let
-  version = "1.3.1";
-  versionMajor = "1";
-  versionMinor = "3";
-in
-stdenv.mkDerivation rec {
-  name = "openshift-origin-${version}";
+  version = "4.1.0";
+  ver = stdenv.lib.elemAt (stdenv.lib.splitVersion version);
+  versionMajor = ver 0;
+  versionMinor = ver 1;
+  versionPatch = ver 2;
+  gitCommit = "b4261e0";
+  # version is in vendor/k8s.io/kubernetes/pkg/version/base.go
+  k8sversion = "v1.11.1";
+  k8sgitcommit = "b1b2997";
+  k8sgitMajor = "0";
+  k8sgitMinor = "1";
+in buildGoPackage rec {
+  pname = "openshift-origin";
   inherit version;
 
   src = fetchFromGitHub {
     owner = "openshift";
     repo = "origin";
     rev = "v${version}";
-    sha256 = "1kxa1k38hvi1vg52p82mmkmp9k4bbbm2pryzapsxwga7d8x4bnbh";
+    sha256 = "16bc6ljm418kxz92gz8ldm82491mvlqamrvigyr6ff72rf7ml7ba";
   };
 
-  buildInputs = [ go which ];
+  goPackagePath = "github.com/openshift/origin";
+
+  buildInputs = [ kerberos ncurses ];
+
+  nativeBuildInputs = [ which rsync go-bindata clang installShellFiles ];
 
   patchPhase = ''
     patchShebangs ./hack
   '';
 
   buildPhase = ''
-    export GOPATH=$(pwd)
+    cd go/src/${goPackagePath}
     # Openshift build require this variables to be set
     # unless there is a .git folder which is not the case with fetchFromGitHub
-    export OS_GIT_VERSION=${version}
-    export OS_GIT_MAJOR=${versionMajor}
-    export OS_GIT_MINOR=${versionMinor}
-    make build
+    echo "OS_GIT_VERSION=v${version}" >> os-version-defs
+    echo "OS_GIT_TREE_STATE=clean" >> os-version-defs
+    echo "OS_GIT_MAJOR=${versionMajor}" >> os-version-defs
+    echo "OS_GIT_MINOR=${versionMinor}" >> os-version-defs
+    echo "OS_GIT_PATCH=${versionPatch}" >> os-version-defs
+    echo "OS_GIT_COMMIT=${gitCommit}" >> os-version-defs
+    echo "KUBE_GIT_VERSION=${k8sversion}" >> os-version-defs
+    echo "KUBE_GIT_COMMIT=${k8sgitcommit}" >> os-version-defs
+    echo "KUBE_GIT_MAJOR=${k8sgitMajor}" >> os-version-defs
+    echo "KUBE_GIT_MINOR=${k8sgitMinor}" >> os-version-defs
+    export OS_VERSION_FILE="os-version-defs"
+    export CC=clang
+    make all WHAT='${concatStringsSep " " components}'
   '';
 
   installPhase = ''
-    export GOOS=$(go env GOOS)
-    export GOARCH=$(go env GOARCH)
-    mkdir -p "$out/bin"
-    mv _output/local/bin/$GOOS/$GOARCH/* "$out/bin/"
+    mkdir -p $out/bin
+    cp -a "_output/local/bin/$(go env GOOS)/$(go env GOARCH)/"* "$out/bin/"
+    installShellCompletion --bash contrib/completions/bash/*
+    installShellCompletion --zsh contrib/completions/zsh/*
   '';
 
   meta = with stdenv.lib; {
     description = "Build, deploy, and manage your applications with Docker and Kubernetes";
     license = licenses.asl20;
-    homepage = http://www.openshift.org;
-    maintainers = with maintainers; [offline];
-    platforms = platforms.linux;
+    homepage = "http://www.openshift.org";
+    maintainers = with maintainers; [offline bachp moretea];
+    platforms = platforms.unix;
   };
 }

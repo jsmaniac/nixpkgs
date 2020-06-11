@@ -19,41 +19,57 @@ with lib;
   };
 
   config = {
-
-    boot.loader.grub.version = 2;
-
     # Don't build the GRUB menu builder script, since we don't need it
     # here and it causes a cyclic dependency.
     boot.loader.grub.enable = false;
 
-    boot.initrd.postMountCommands = ''
-      mkdir -p /mnt-root/nix/store
-      mount -t squashfs /nix-store.squashfs /mnt-root/nix/store
-    '';
-
     # !!! Hack - attributes expected by other modules.
-    system.boot.loader.kernelFile = "bzImage";
-    environment.systemPackages = [ pkgs.grub2 pkgs.grub2_efi pkgs.syslinux ];
-
-    boot.consoleLogLevel = mkDefault 7;
+    environment.systemPackages = [ pkgs.grub2_efi ]
+      ++ (if pkgs.stdenv.hostPlatform.system == "aarch64-linux"
+          then []
+          else [ pkgs.grub2 pkgs.syslinux ]);
 
     fileSystems."/" =
       { fsType = "tmpfs";
         options = [ "mode=0755" ];
       };
 
-    boot.initrd.availableKernelModules = [ "squashfs" ];
+    # In stage 1, mount a tmpfs on top of /nix/store (the squashfs
+    # image) to make this a live CD.
+    fileSystems."/nix/.ro-store" =
+      { fsType = "squashfs";
+        device = "../nix-store.squashfs";
+        options = [ "loop" ];
+        neededForBoot = true;
+      };
 
-    boot.initrd.kernelModules = [ "loop" ];
+    fileSystems."/nix/.rw-store" =
+      { fsType = "tmpfs";
+        options = [ "mode=0755" ];
+        neededForBoot = true;
+      };
+
+    fileSystems."/nix/store" =
+      { fsType = "overlay";
+        device = "overlay";
+        options = [
+          "lowerdir=/nix/.ro-store"
+          "upperdir=/nix/.rw-store/store"
+          "workdir=/nix/.rw-store/work"
+        ];
+      };
+
+    boot.initrd.availableKernelModules = [ "squashfs" "overlay" ];
+
+    boot.initrd.kernelModules = [ "loop" "overlay" ];
 
     # Closures to be copied to the Nix store, namely the init
     # script and the top-level system configuration directory.
-   netboot.storeContents =
+    netboot.storeContents =
       [ config.system.build.toplevel ];
 
     # Create the squashfs image that contains the Nix store.
-    system.build.squashfsStore = import ../../../lib/make-squashfs.nix {
-      inherit (pkgs) stdenv squashfsTools perl pathsFromGraph;
+    system.build.squashfsStore = pkgs.callPackage ../../../lib/make-squashfs.nix {
       storeContents = config.netboot.storeContents;
     };
 
@@ -70,7 +86,12 @@ with lib;
         ];
     };
 
-    system.build.netbootIpxeScript = pkgs.writeTextDir "netboot.ipxe" "#!ipxe\nkernel bzImage init=${config.system.build.toplevel}/init ${toString config.boot.kernelParams}\ninitrd initrd\nboot";
+    system.build.netbootIpxeScript = pkgs.writeTextDir "netboot.ipxe" ''
+      #!ipxe
+      kernel ${pkgs.stdenv.hostPlatform.platform.kernelTarget} init=${config.system.build.toplevel}/init initrd=initrd ${toString config.boot.kernelParams}
+      initrd initrd
+      boot
+    '';
 
     boot.loader.timeout = 10;
 

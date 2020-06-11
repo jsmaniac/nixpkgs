@@ -18,9 +18,6 @@ stdenv.mkDerivation rec {
 
   doCheck = true;
 
-  # FIXME needs gcc 4.9 in bootstrap tools
-  hardeningDisable = [ "stackprotector" ];
-
   meta = {
     description = "Library that generates loops for scanning polyhedra";
 
@@ -38,7 +35,7 @@ stdenv.mkDerivation rec {
       effective code.
     '';
 
-    homepage = http://www.cloog.org/;
+    homepage = "http://www.cloog.org/";
 
     license = stdenv.lib.licenses.gpl2Plus;
 
@@ -61,6 +58,6 @@ stdenv.mkDerivation rec {
        make[3]: *** [Box.lo] Error 1
 
     */
-    platforms = with stdenv.lib.platforms; allBut cygwin;
+    platforms = stdenv.lib.platforms.unix; # Once had cygwin problems
   };
 }

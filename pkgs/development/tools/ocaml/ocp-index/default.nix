@@ -1,54 +1,22 @@
-{ stdenv, fetchFromGitHub, ocaml, findlib, ocpBuild, ocpIndent, opam, cmdliner, ncurses, re, lambdaTerm, libev }:
+{ lib, fetchurl, buildDunePackage, ocp-build, ocp-indent, cmdliner, re }:
 
-let inherit (stdenv.lib) getVersion versionAtLeast optional; in
+buildDunePackage rec {
+  pname = "ocp-index";
+  version = "1.2";
 
-assert versionAtLeast (getVersion ocaml) "4";
-assert versionAtLeast (getVersion ocpBuild) "1.99.6-beta";
-assert versionAtLeast (getVersion ocpIndent) "1.4.2";
-
-let
-  version = "1.1.4";
-  srcs = {
-    "4.03.0" = {
-      rev = "${version}-4.03";
-      sha256 = "0c6s5radwyvxf9hrq2y9lirk72z686k9yzd0vgzy98yrrp1w56mv";
-    };
-    "4.02.3" = {
-      rev = "${version}-4.02";
-      sha256 = "057ss3lz754b2pznkb3zda5h65kjgqnvabvfqwqcz4qqxxki2yc8";
-    };
-    "4.01.0" = {
-      rev = "${version}";
-      sha256 = "106bnc8jhmjnychcl8k3gl9n6b50bc66qc5hqf1wkbkk9kz4vc9d";
-    };
+  src = fetchurl {
+    url = "https://github.com/OCamlPro/ocp-index/releases/download/${version}/ocp-index-${version}.tbz";
+    sha256 = "1lchw02sakjjppmzr0rzlarwbg1lc2bl7pwcfpsiycnaz46x6gmr";
   };
 
-  src = fetchFromGitHub ({
-    owner = "OCamlPro";
-    repo = "ocp-index";
-  } // srcs."${ocaml.version}");
-in
+  buildInputs = [ ocp-build cmdliner re ];
 
-stdenv.mkDerivation {
-
-  name = "ocp-index-${version}";
-
-  inherit src;
-
-  buildInputs = [ ocaml findlib ocpBuild opam cmdliner ncurses re libev ]
-  ++ optional (versionAtLeast (getVersion lambdaTerm) "1.7") lambdaTerm;
-  propagatedBuildInputs = [ ocpIndent ];
-
-  createFindlibDestdir = true;
-
-  preBuild = "export TERM=xterm";
-  postInstall = "mv $out/lib/{ocp-index,ocaml/${getVersion ocaml}/site-lib/}";
+  propagatedBuildInputs = [ ocp-indent ];
 
   meta = {
-    homepage = http://typerex.ocamlpro.com/ocp-index.html;
+    homepage = "http://typerex.ocamlpro.com/ocp-index.html";
     description = "A simple and light-weight documentation extractor for OCaml";
-    license = stdenv.lib.licenses.lgpl3;
-    platforms = ocaml.meta.platforms or [];
-    maintainers = with stdenv.lib.maintainers; [ vbgl ];
+    license = lib.licenses.lgpl3;
+    maintainers = with lib.maintainers; [ vbgl ];
   };
 }

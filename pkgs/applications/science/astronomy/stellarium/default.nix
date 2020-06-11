@@ -1,34 +1,33 @@
-{ stdenv, fetchurl, cmake, freetype, libpng, mesa, gettext, openssl, perl, libiconv
-, qtscript, qtserialport, qttools, makeQtWrapper
+{ mkDerivation, lib, fetchFromGitHub
+, cmake, freetype, libpng, libGLU, libGL, openssl, perl, libiconv
+, qtscript, qtserialport, qttools
+, qtmultimedia, qtlocation, qtbase, wrapQtAppsHook
 }:
 
-stdenv.mkDerivation rec {
-  name = "stellarium-0.14.3";
+mkDerivation rec {
+  pname = "stellarium";
+  version = "0.20.1";
 
-  src = fetchurl {
-    url = "mirror://sourceforge/stellarium/${name}.tar.gz";
-    sha256 = "1919wzlvhfxdxficbwhp31xlhm0571grgcmsfdp5y36z9yqwahfy";
+  src = fetchFromGitHub {
+    owner = "Stellarium";
+    repo = "stellarium";
+    rev = "v${version}";
+    sha256 = "1x8svan03k1x9jwqflimbpj7jpg6mjrbz26bg1sbhsqdlc8rbhky";
   };
 
-  nativeBuildInputs = [ makeQtWrapper ];
+  nativeBuildInputs = [ cmake perl wrapQtAppsHook ];
 
   buildInputs = [
-    cmake freetype libpng mesa gettext openssl perl libiconv qtscript
-    qtserialport qttools
+    freetype libpng libGLU libGL openssl libiconv qtscript qtserialport qttools
+    qtmultimedia qtlocation qtbase
   ];
 
-  enableParallelBuilding = true;
-
-  postInstall = ''
-    wrapQtProgram "$out/bin/stellarium"
-  '';
-
-  meta = {
+  meta = with lib; {
     description = "Free open-source planetarium";
     homepage = "http://stellarium.org/";
-    license = stdenv.lib.licenses.gpl2;
+    license = licenses.gpl2;
 
-    platforms = stdenv.lib.platforms.linux; # should be mesaPlatforms, but we don't have qt on darwin
-    maintainers = [ stdenv.lib.maintainers.peti ];
+    platforms = platforms.linux; # should be mesaPlatforms, but we don't have qt on darwin
+    maintainers = with maintainers; [ peti ma27 ];
   };
 }

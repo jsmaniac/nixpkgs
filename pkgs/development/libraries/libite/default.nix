@@ -1,14 +1,14 @@
 { stdenv, fetchFromGitHub, autoreconfHook, pkgconfig, libconfuse }:
 
 stdenv.mkDerivation rec {
-  name = "libite-${version}";
-  version = "1.8.2";
+  pname = "libite";
+  version = "2.2.0";
 
   src = fetchFromGitHub {
     owner = "troglobit";
     repo = "libite";
     rev = "v${version}";
-    sha256 = "0cx566rcjq2m24yq7m88ci642x34lxy97kjb12cbi1c174k738hm";
+    sha256 = "0kad501mrvn0s0sw9pz5spjq7ymk117hnff249z6026gswrxv1mh";
   };
 
   nativeBuildInputs = [ autoreconfHook pkgconfig ];
@@ -31,6 +31,7 @@ stdenv.mkDerivation rec {
     '';
     platforms = platforms.unix;
     maintainers = with maintainers; [ fpletz ];
+    license = with licenses; [ mit isc bsd2 bsd3 ];
   };
 }
 

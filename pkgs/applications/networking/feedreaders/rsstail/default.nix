@@ -1,7 +1,7 @@
-{ stdenv, fetchFromGitHub, cppcheck, libmrss }:
+{ stdenv, fetchFromGitHub, cppcheck, libmrss, libiconv }:
 
-stdenv.mkDerivation rec {
-  name = "rsstail-${version}";
+stdenv.mkDerivation {
+  pname = "rsstail";
   version = "2.1";
 
   src = fetchFromGitHub {
@@ -11,8 +11,8 @@ stdenv.mkDerivation rec {
     owner = "flok99";
   };
 
-  buildInputs = [ libmrss ]
-    ++ stdenv.lib.optional doCheck cppcheck;
+  buildInputs = [ libmrss ] ++ stdenv.lib.optionals stdenv.isDarwin [ libiconv ];
+  checkInputs = [ cppcheck ];
 
   postPatch = ''
     substituteInPlace Makefile --replace -liconv_hook ""
@@ -29,9 +29,8 @@ stdenv.mkDerivation rec {
       RSSTail is more or less an RSS reader: it monitors an RSS feed and if it
       detects a new entry it'll emit only that new entry.
     '';
-    homepage = http://www.vanheusden.com/rsstail/;
+    homepage = "http://www.vanheusden.com/rsstail/";
     license = licenses.gpl2Plus;
-    platforms = platforms.linux;
-    maintainers = with maintainers; [ nckx ];
+    platforms = platforms.unix;
   };
 }

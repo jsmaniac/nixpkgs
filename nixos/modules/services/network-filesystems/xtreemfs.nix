@@ -11,7 +11,7 @@ let
   home = cfg.homeDir;
 
   startupScript = class: configPath: pkgs.writeScript "xtreemfs-osd.sh" ''
-    #! ${pkgs.stdenv.shell}
+    #! ${pkgs.runtimeShell}
     JAVA_HOME="${pkgs.jdk}"
     JAVADIR="${xtreemfs}/share/java"
     JAVA_CALL="$JAVA_HOME/bin/java -ea -cp $JAVADIR/XtreemFS.jar:$JAVADIR/BabuDB.jar:$JAVADIR/Flease.jar:$JAVADIR/protobuf-java-2.5.0.jar:$JAVADIR/Foundation.jar:$JAVADIR/jdmkrt.jar:$JAVADIR/jdmktk.jar:$JAVADIR/commons-codec-1.3.jar"
@@ -100,11 +100,13 @@ in
 
       dir = {
         enable = mkOption {
+          type = types.bool;
           default = true;
           description = ''
             Whether to enable XtreemFS DIR service.
           '';
         };
+
         uuid = mkOption {
           example = "eacb6bab-f444-4ebf-a06a-3f72d7465e40";
           description = ''
@@ -218,11 +220,13 @@ in
 
       mrc = {
         enable = mkOption {
+          type = types.bool;
           default = true;
           description = ''
             Whether to enable XtreemFS MRC service.
           '';
         };
+
         uuid = mkOption {
           example = "eacb6bab-f444-4ebf-a06a-3f72d7465e41";
           description = ''
@@ -354,11 +358,13 @@ in
 
       osd = {
         enable = mkOption {
+          type = types.bool;
           default = true;
           description = ''
             Whether to enable XtreemFS OSD service.
           '';
         };
+
         uuid = mkOption {
           example = "eacb6bab-f444-4ebf-a06a-3f72d7465e42";
           description = ''
@@ -432,14 +438,14 @@ in
 
     environment.systemPackages = [ xtreemfs ];
 
-    users.extraUsers.xtreemfs =
+    users.users.xtreemfs =
       { uid = config.ids.uids.xtreemfs;
         description = "XtreemFS user";
         createHome = true;
         home = home;
       };
 
-    users.extraGroups.xtreemfs =
+    users.groups.xtreemfs =
       { gid = config.ids.gids.xtreemfs;
       };
 

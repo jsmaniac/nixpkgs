@@ -1,14 +1,15 @@
 { stdenv, fetchurl, ruby, makeWrapper, git }:
 
 let
-  version = "2.3.2";
+  version = "2.4.0";
 in
 stdenv.mkDerivation {
-  name = "svn2git-${version}";
+  pname = "svn2git";
+  inherit version;
 
   src = fetchurl {
     url = "https://github.com/nirvdrum/svn2git/archive/v${version}.tar.gz";
-    sha256 = "1484mpcabqf9kr6xdpdgb1npkqav1bcah3w5lxj2djjx4bjf2g3y";
+    sha256 = "0ly2vrv6q31n0xhciwb7a1ilr5c6ndyi3bg81yfp4axiypps7l41";
   };
 
   buildInputs = [ ruby makeWrapper ];
@@ -30,11 +31,9 @@ stdenv.mkDerivation {
   '';
 
   meta = {
-    homepage = https://github.com/nirvdrum/svn2git;
+    homepage = "https://github.com/nirvdrum/svn2git";
     description = "Tool for importing Subversion repositories into git";
     license = stdenv.lib.licenses.mit;
-
-    maintainers = [ stdenv.lib.maintainers.the-kenny ];
     platforms = stdenv.lib.platforms.unix;
   };
 }

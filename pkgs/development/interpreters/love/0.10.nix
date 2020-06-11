@@ -1,24 +1,25 @@
-{ stdenv, fetchFromBitbucket, pkgconfig, SDL2, mesa, openal, luajit,
+{ stdenv, fetchFromBitbucket, pkgconfig, SDL2, libGLU, libGL, openal, luajit,
   libdevil, freetype, physfs, libmodplug, mpg123, libvorbis, libogg,
   libtheora, which, autoconf, automake, libtool
 }:
 
 let
   pname = "love";
-  version = "0.10.1";
+  version = "0.10.2";
 in
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   name = "${pname}-${version}";
   src = fetchFromBitbucket {
     owner = "rude";
     repo = "love";
-    rev = "${version}";
-    sha256 = "10a2kkyx7x9jkcj9xrqgmvp0b6gbapjqjx9fib9f6a0nbz0xaswj";
+    rev = version;
+    sha256 = "19yfmlcx6w8yi4ndm5lni8lrsvnn77bxw5py0dc293nzzlaqa9ym";
   };
 
+  nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
-    pkgconfig SDL2 mesa openal luajit libdevil freetype physfs libmodplug mpg123
+    SDL2 libGLU libGL openal luajit libdevil freetype physfs libmodplug mpg123
     libvorbis libogg libtheora autoconf which libtool automake
   ];
 
@@ -27,6 +28,8 @@ stdenv.mkDerivation rec {
   configureFlags = [
     "--with-lua=luajit"
   ];
+
+  NIX_CFLAGS_COMPILE = "-DluaL_reg=luaL_Reg"; # needed since luajit-2.1.0-beta3
 
   meta = {
     homepage = "http://love2d.org";

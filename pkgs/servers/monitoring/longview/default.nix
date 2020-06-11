@@ -2,7 +2,7 @@
 
 stdenv.mkDerivation rec {
   version = "1.1.5";
-  name = "longview-${version}";
+  pname = "longview";
 
   src = fetchFromGitHub {
     owner = "linode";
@@ -16,13 +16,18 @@ stdenv.mkDerivation rec {
     ./log-stdout.patch
   ];
 
+  # Read all configuration from /run/longview
   postPatch = ''
-    substituteInPlace Linode/Longview/Util.pm --replace /var/run/longview.pid /run/longview.pid
+    substituteInPlace Linode/Longview/Util.pm \
+        --replace /var/run/longview.pid /run/longview/longview.pid \
+        --replace /etc/linode /run/longview
+    substituteInPlace Linode/Longview.pl \
+        --replace /etc/linode /run/longview
   '';
 
   buildInputs = [ perl makeWrapper glibc ]
     ++ (with perlPackages; [
-      LWPUserAgent
+      LWP
       LWPProtocolHttps
       MozillaCA
       CryptSSLeay
@@ -53,11 +58,11 @@ stdenv.mkDerivation rec {
   '';
 
   meta = with stdenv.lib; {
-    homepage = https://www.linode.com/longview;
+    homepage = "https://www.linode.com/longview";
     description = "Longview collects all of your system-level metrics and sends them to Linode";
     license = licenses.gpl2Plus;
     maintainers = [ maintainers.rvl ];
     inherit version;
-    platforms = platforms.linux;
+    platforms = [ "x86_64-linux" "i686-linux" ];
   };
 }

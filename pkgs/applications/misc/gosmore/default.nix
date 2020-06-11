@@ -9,9 +9,9 @@ stdenv.mkDerivation {
   # so we explicitly disable them to avoid breaking the hash
   # especially as the externals appear to be unused
   src = fetchsvn {
-    url = http://svn.openstreetmap.org/applications/rendering/gosmore;
+    url = "http://svn.openstreetmap.org/applications/rendering/gosmore";
     sha256 = "0qsckpqx7i7f8gkqhkzdamr65250afk1rpnh3nbman35kdv3dsxi";
-    rev = "${version}";
+    rev = version;
     ignoreExternals = true;
   };
 
@@ -22,10 +22,13 @@ stdenv.mkDerivation {
   prePatch = ''
     sed -e '/curl.types.h/d' -i *.{c,h,hpp,cpp}
   '';
+
+  patches = [ ./pointer_int_comparison.patch ];
+  patchFlags = [ "-p1" "--binary" ]; # patch has dos style eol
       
   meta = with stdenv.lib; {
     description = "Open Street Map viewer";
-    homepage = http://sourceforge.net/projects/gosmore/;
+    homepage = "https://sourceforge.net/projects/gosmore/";
     maintainers = with maintainers; [
       raskin
     ];

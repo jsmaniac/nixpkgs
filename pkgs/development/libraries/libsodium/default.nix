@@ -1,14 +1,15 @@
 { stdenv, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "libsodium-1.0.11";
+  name = "libsodium-1.0.18";
 
   src = fetchurl {
     url = "https://download.libsodium.org/libsodium/releases/${name}.tar.gz";
-    sha256 = "0rf7z6bgpnf8lyz8sph4h43fbb28pmj4dgybf0hsxxj97kdljid1";
+    sha256 = "1h9ncvj23qbbni958knzsli8dvybcswcjbx0qjjgi922nf848l3g";
   };
 
   outputs = [ "out" "dev" ];
+  separateDebugInfo = stdenv.isLinux && stdenv.hostPlatform.libc != "musl";
 
   enableParallelBuilding = true;
 
@@ -16,9 +17,9 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A modern and easy-to-use crypto library";
-    homepage = http://doc.libsodium.org/;
+    homepage = "http://doc.libsodium.org/";
     license = licenses.isc;
-    maintainers = with maintainers; [ raskin viric wkennington ];
+    maintainers = with maintainers; [ raskin ];
     platforms = platforms.all;
   };
 }

@@ -1,29 +1,51 @@
-{ stdenv, fetchurl, fetchpatch, libjpeg, autoreconfHook }:
+{ stdenv, fetchFromGitHub, fetchpatch, libjpeg, cmake }:
 
 stdenv.mkDerivation rec {
-  name = "jasper-1.900.28";
+  pname = "jasper";
+  version = "2.0.16";
 
-  src = fetchurl {
-    # You can find this code on Github at https://github.com/mdadams/jasper
-    # however note at https://www.ece.uvic.ca/~frodo/jasper/#download
-    # not all tagged releases are for distribution.
-    url = "http://www.ece.uvic.ca/~mdadams/jasper/software/${name}.tar.gz";
-    sha256 = "0nsiblsfpfa0dahsk6hw9cd18fp9c8sk1z5hdp19m33c0bf92ip9";
+  src = fetchFromGitHub {
+    repo = "jasper";
+    owner = "mdadams";
+    rev = "version-${version}";
+    sha256 = "05l75yd1zsxwv25ykwwwjs8961szv7iywf16nc6vc6qpby27ckv6";
   };
 
+  patches = [
+    (fetchpatch {
+      name = "CVE-2018-9055.patch";
+      url = "http://paste.opensuse.org/view/raw/330751ce";
+      sha256 = "0m798m6c4v9yyhql7x684j5kppcm6884n1rrb9ljz8p9aqq2jqnm";
+    })
+  ];
+
+
   # newer reconf to recognize a multiout flag
-  nativeBuildInputs = [ autoreconfHook ];
+  nativeBuildInputs = [ cmake ];
   propagatedBuildInputs = [ libjpeg ];
 
-  configureFlags = "--enable-shared";
+  configureFlags = [ "--enable-shared" ];
 
   outputs = [ "bin" "dev" "out" "man" ];
 
   enableParallelBuilding = true;
 
-  meta = {
-    homepage = https://www.ece.uvic.ca/~frodo/jasper/;
+  doCheck = false; # fails
+
+  postInstall = ''
+    moveToOutput bin "$bin"
+  '';
+
+  meta = with stdenv.lib; {
+    homepage = "https://www.ece.uvic.ca/~frodo/jasper/";
     description = "JPEG2000 Library";
-    platforms = stdenv.lib.platforms.unix;
+    platforms = platforms.unix;
+    license = licenses.jasper;
+    maintainers = with maintainers; [ pSub ];
+    knownVulnerabilities = [
+      "Numerous CVE unsolved upstream"
+      "See: https://github.com/NixOS/nixpkgs/pull/57681#issuecomment-475857499"
+      "See: https://github.com/mdadams/jasper/issues/208"
+    ];
   };
 }

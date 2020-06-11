@@ -1,71 +1,75 @@
-{ stdenv, lib, kernel, fetchurl, pkgconfig, libvirt }:
+{ stdenv, lib
+, kernel
+, fetchurl
+, pkgconfig, meson, ninja
+, libbsd, numactl, libbpf, zlib, libelf, jansson, openssl, libpcap
+, doxygen, python3
+, shared ? false }:
 
-assert lib.versionAtLeast kernel.version "3.18";
+let
+  mod = kernel != null;
 
-stdenv.mkDerivation rec {
-  name = "dpdk-${version}-${kernel.version}";
-  version = "16.07";
+in stdenv.mkDerivation rec {
+  name = "dpdk-${version}" + lib.optionalString mod "-${kernel.version}";
+  version = "19.11";
 
   src = fetchurl {
-    url = "http://dpdk.org/browse/dpdk/snapshot/dpdk-${version}.tar.gz";
-    sha256 = "1sgh55w3xpc0lb70s74cbyryxdjijk1fbv9b25jy8ms3lxaj966c";
+    url = "https://fast.dpdk.org/rel/dpdk-${version}.tar.xz";
+    sha256 = "1aqjn6bm9miv3v2rbqi1rh1c19wa8nip9fvnqaqpnrs3i2b36wa6";
   };
 
-  buildInputs = [ pkgconfig libvirt ];
+  nativeBuildInputs = [
+    doxygen
+    meson
+    ninja
+    pkgconfig
+    python3
+    python3.pkgs.sphinx
+  ];
+  buildInputs = [
+    jansson
+    libbpf
+    libbsd
+    libelf
+    libpcap
+    numactl
+    openssl.dev
+    zlib
+  ] ++ lib.optionals mod kernel.moduleBuildDependencies;
 
-  RTE_KERNELDIR = "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build";
-  RTE_TARGET = "x86_64-native-linuxapp-gcc";
+  postPatch = ''
+    patchShebangs config/arm
+  '';
 
-  # we need sse3 instructions to build
-  NIX_CFLAGS_COMPILE = [ "-march=core2" ];
+  mesonFlags = [
+    "-Denable_docs=true"
+    "-Denable_kmods=${if mod then "true" else "false"}"
+  ]
+  ++ lib.optional (!shared) "-Ddefault_library=static"
+  ++ lib.optional stdenv.isx86_64 "-Dmachine=nehalem"
+  ++ lib.optional mod "-Dkernel_dir=${placeholder "kmod"}/lib/modules/${kernel.modDirVersion}";
+
+  # dpdk meson script does not support separate kernel source and installion
+  # dirs (except via destdir), so we temporarily link the former into the latter.
+  preConfigure = lib.optionalString mod ''
+    mkdir -p $kmod/lib/modules/${kernel.modDirVersion}
+    ln -sf ${kernel.dev}/lib/modules/${kernel.modDirVersion}/build \
+      $kmod/lib/modules/${kernel.modDirVersion}
+  '';
+
+  postBuild = lib.optionalString mod ''
+    rm -f $kmod/lib/modules/${kernel.modDirVersion}/build
+  '';
+
+  outputs = [ "out" ] ++ lib.optional mod "kmod";
 
   enableParallelBuilding = true;
-  outputs = [ "out" "kmod" "examples" ];
 
-  hardeningDisable = [ "pic" ];
-
-  configurePhase = ''
-    make T=x86_64-native-linuxapp-gcc config
-  '';
-
-  buildPhase = ''
-    make T=x86_64-native-linuxapp-gcc install
-    make T=x86_64-native-linuxapp-gcc examples
-  '';
-
-  installPhase = ''
-    install -m 0755 -d $out/lib
-    install -m 0644 ${RTE_TARGET}/lib/*.a $out/lib
-
-    install -m 0755 -d $out/include
-    install -m 0644 ${RTE_TARGET}/include/*.h $out/include
-
-    install -m 0755 -d $out/include/generic
-    install -m 0644 ${RTE_TARGET}/include/generic/*.h $out/include/generic
-
-    install -m 0755 -d $out/include/exec-env
-    install -m 0644 ${RTE_TARGET}/include/exec-env/*.h $out/include/exec-env
-
-    install -m 0755 -d $out/${RTE_TARGET}
-    install -m 0644 ${RTE_TARGET}/.config $out/${RTE_TARGET}
-
-    install -m 0755 -d $out/${RTE_TARGET}/include
-    install -m 0644 ${RTE_TARGET}/include/rte_config.h $out/${RTE_TARGET}/include
-
-    cp -pr mk scripts $out/
-
-    mkdir -p $kmod/lib/modules/${kernel.modDirVersion}/kernel/drivers/net
-    cp ${RTE_TARGET}/kmod/*.ko $kmod/lib/modules/${kernel.modDirVersion}/kernel/drivers/net
-
-    mkdir -p $examples/bin
-    find examples ${RTE_TARGET}/app -type f -executable -exec cp {} $examples/bin \;
-  '';
-
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "Set of libraries and drivers for fast packet processing";
-    homepage = http://dpdk.org/;
+    homepage = "http://dpdk.org/";
     license = with licenses; [ lgpl21 gpl2 bsd2 ];
-    platforms =  [ "x86_64-linux" ];
-    maintainers = [ maintainers.domenkozar ];
+    platforms =  platforms.linux;
+    maintainers = with maintainers; [ domenkozar magenbluten orivej ];
   };
 }

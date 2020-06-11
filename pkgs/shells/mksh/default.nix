@@ -1,33 +1,24 @@
-{ stdenv, fetchurl, groff }:
+{ stdenv, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "mksh-${version}";
-  version = "52c";
+  pname = "mksh";
+  version = "59b";
 
   src = fetchurl {
     urls = [
-      "http://www.mirbsd.org/MirOS/dist/mir/mksh/mksh-R${version}.tgz"
+      "https://www.mirbsd.org/MirOS/dist/mir/mksh/mksh-R${version}.tgz"
       "http://pub.allbsd.org/MirOS/dist/mir/mksh/mksh-R${version}.tgz"
     ];
-    sha256 = "19ivsic15903hv3ipzk0kvkaxardw7b99s8l5iw3y415lz71ld66";
+    sha256 = "1rp0farbylypyiaald2hw5avg5w3m8x7cjnxxyyihzvfb2lx2zlh";
   };
 
-  buildInputs = [ groff ];
+  dontConfigure = true;
 
-  hardeningDisable = [ "format" ];
-
-  buildPhase = ''
-    mkdir build-dir/
-    cp mksh.1 dot.mkshrc build-dir/
-    cd build-dir/
-    sh ../Build.sh -c lto
-  '';
+  buildPhase = ''sh ./Build.sh -r'';
 
   installPhase = ''
-    mkdir -p $out/bin $out/share/man/man1 $out/share/mksh $out/bin
     install -D -m 755 mksh $out/bin/mksh
     install -D -m 644 mksh.1 $out/share/man/man1/mksh.1
-    install -D -m 644 mksh.cat1 $out/share/mksh/mksh.cat1
     install -D -m 644 dot.mkshrc $out/share/mksh/mkshrc
   '';
 
@@ -41,8 +32,8 @@ stdenv.mkDerivation rec {
       systems.
     '';
     homepage = "https://www.mirbsd.org/mksh.htm";
-    license = licenses.free;
-    maintainers = with maintainers; [ AndersonTorres nckx ];
+    license = licenses.bsd3;
+    maintainers = with maintainers; [ AndersonTorres joachifm ];
     platforms = platforms.unix;
   };
 

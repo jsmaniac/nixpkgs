@@ -1,154 +1,107 @@
-{ stdenv, lib, fetchFromGitHub, fetchgit, qtbase, qtimageformats
-, breakpad, ffmpeg, openalSoft, openssl, zlib, libexif, lzma, libopus
-, gtk2, glib, cairo, pango, gdk_pixbuf, atk, libappindicator-gtk2
-, libwebp, libunity, dee, libdbusmenu-glib, libva
-
-, pkgconfig, libxcb, xcbutilwm, xcbutilimage, xcbutilkeysyms
-, libxkbcommon, libpng, libjpeg, freetype, harfbuzz, pcre16
-, xproto, libX11, inputproto, sqlite, dbus
+{ mkDerivation, lib, fetchurl, fetchsvn
+, pkgconfig, cmake, ninja, python3, wrapGAppsHook, wrapQtAppsHook
+, qtbase, qtimageformats, gtk3, libsForQt5, enchant2, lz4, xxHash
+, dee, ffmpeg_4, openalSoft, minizip, libopus, alsaLib, libpulseaudio, range-v3
+, tl-expected, hunspell
+# TODO: Shouldn't be required:
+, pcre, xorg, utillinux, libselinux, libsepol, epoxy, at-spi2-core, libXtst
+, xdg_utils
 }:
 
-let
-  system-x86_64 = lib.elem stdenv.system lib.platforms.x86_64;
-  packagedQt = "5.6.0";
-  # Hacky: split "1.2.3-4" into "1.2.3" and "4"
-  systemQt = (builtins.parseDrvName qtbase.version).name;
+with lib;
 
-in stdenv.mkDerivation rec {
-  name = "telegram-desktop-${version}";
-  version = "0.10.1";
-  qtVersion = lib.replaceStrings ["."] ["_"] packagedQt;
+# Main reference:
+# - This package was originally based on the Arch package but all patches are now upstreamed:
+#   https://git.archlinux.org/svntogit/community.git/tree/trunk/PKGBUILD?h=packages/telegram-desktop
+# Other references that could be useful:
+# - https://git.alpinelinux.org/aports/tree/testing/telegram-desktop/APKBUILD
+# - https://github.com/void-linux/void-packages/blob/master/srcpkgs/telegram-desktop/template
 
-  src = fetchFromGitHub {
-    owner = "telegramdesktop";
-    repo = "tdesktop";
-    rev = "v${version}";
-    sha256 = "08isxwif6zllglkpd9i7ypxm2s4bibzqris48607bafr88ylksdk";
+mkDerivation rec {
+  pname = "telegram-desktop";
+  version = "2.1.11";
+
+  # Telegram-Desktop with submodules
+  src = fetchurl {
+    url = "https://github.com/telegramdesktop/tdesktop/releases/download/v${version}/tdesktop-${version}-full.tar.gz";
+    sha256 = "1sd6nrcjg5gpq6ynvwnz8f4jz8flknybx6b0pfxqrqqpzy7wjl5m";
   };
 
-  tgaur = fetchgit {
-    url = "https://aur.archlinux.org/telegram-desktop.git";
-    rev = "9ce7be9efed501f988bb099956fa63729f2c25ea";
-    sha256 = "1wp6lqscpm2byizchm0bj48dg9bga02r9r69ns10zxk0gk0qvvdn";
-  };
+  postPatch = ''
+    substituteInPlace Telegram/lib_spellcheck/spellcheck/platform/linux/linux_enchant.cpp \
+      --replace '"libenchant-2.so.2"' '"${enchant2}/lib/libenchant-2.so.2"'
+    substituteInPlace Telegram/CMakeLists.txt \
+      --replace '"''${TDESKTOP_LAUNCHER_BASENAME}.appdata.xml"' '"''${TDESKTOP_LAUNCHER_BASENAME}.metainfo.xml"'
+  '';
+
+  # We want to run wrapProgram manually (with additional parameters)
+  dontWrapGApps = true;
+  dontWrapQtApps = true;
+
+  nativeBuildInputs = [ pkgconfig cmake ninja python3 wrapGAppsHook wrapQtAppsHook ];
 
   buildInputs = [
-    breakpad ffmpeg openalSoft openssl zlib libexif lzma libopus
-    gtk2 glib libappindicator-gtk2 libunity cairo pango gdk_pixbuf atk
-    dee libdbusmenu-glib libva
-    # Qt dependencies
-    libxcb xcbutilwm xcbutilimage xcbutilkeysyms libxkbcommon
-    libpng libjpeg freetype harfbuzz pcre16 xproto libX11
-    inputproto sqlite dbus libwebp
+    qtbase qtimageformats gtk3 libsForQt5.libdbusmenu enchant2 lz4 xxHash
+    dee ffmpeg_4 openalSoft minizip libopus alsaLib libpulseaudio range-v3
+    tl-expected hunspell
+    # TODO: Shouldn't be required:
+    pcre xorg.libpthreadstubs xorg.libXdmcp utillinux libselinux libsepol epoxy at-spi2-core libXtst
   ];
-
-  nativeBuildInputs = [ pkgconfig ];
 
   enableParallelBuilding = true;
 
-  qmakeFlags = [
-    "CONFIG+=release"
-    "DEFINES+=TDESKTOP_DISABLE_AUTOUPDATE"
-    "DEFINES+=TDESKTOP_DISABLE_REGISTER_CUSTOM_SCHEME"
-    "INCLUDEPATH+=${breakpad}/include/breakpad"
-    "QT_TDESKTOP_VERSION=${systemQt}"
+  cmakeFlags = [
+    "-Ddisable_autoupdate=ON"
+    # TODO: Officiall API credentials for Nixpkgs
+    # (see: https://github.com/NixOS/nixpkgs/issues/55271):
+    "-DTDESKTOP_API_TEST=ON"
+    "-DDESKTOP_APP_USE_PACKAGED_RLOTTIE=OFF"
+    "-DDESKTOP_APP_USE_PACKAGED_VARIANT=OFF"
+    "-DDESKTOP_APP_USE_PACKAGED_GSL=OFF"
+    "-DTDESKTOP_DISABLE_REGISTER_CUSTOM_SCHEME=ON"
+    "-DTDESKTOP_USE_PACKAGED_TGVOIP=OFF"
+    #"-DDESKTOP_APP_SPECIAL_TARGET=\"\"" # TODO: Error when set to "": Bad special target '""'
+    "-DTDESKTOP_LAUNCHER_BASENAME=telegramdesktop" # Note: This is the default
   ];
 
-  qtSrcs = [ qtbase.src qtimageformats.src ];
-  qtPatches = qtbase.patches;
+  # Note: The following packages could be packaged system-wide, but it's
+  # probably best to use the bundled ones from tdesktop (Arch does this too):
+  # rlottie:
+  # - CMake flag: "-DTDESKTOP_USE_PACKAGED_TGVOIP=ON"
+  # - Sources (problem: there are no stable releases!):
+  #   - desktop-app (tdesktop): https://github.com/desktop-app/rlottie
+  #   - upstream: https://github.com/Samsung/rlottie
+  # libtgvoip:
+  # - CMake flag: "-DDESKTOP_APP_USE_PACKAGED_RLOTTIE=ON"
+  # - Sources  (problem: the stable releases might be too old!):
+  #   - tdesktop: https://github.com/telegramdesktop/libtgvoip
+  #   - upstream: https://github.com/grishka/libtgvoip
+  # Both of these packages are included in this PR (kotatogram-desktop):
+  # https://github.com/NixOS/nixpkgs/pull/75210
+  # TODO: Package mapbox-variant
 
-  buildCommand = ''
-    unpackPhase
-    cd "$sourceRoot"
-
-    patchPhase
-    sed -i 'Telegram/Telegram.pro' \
-      -e 's,CUSTOM_API_ID,,g' \
-      -e 's,/usr,/does-not-exist,g' \
-      -e 's, -flto,,g' \
-      -e 's,LIBS += .*libbreakpad_client.a,LIBS += ${breakpad}/lib/libbreakpad_client.a,' \
-      -e 's, -static-libstdc++,,g' \
-      -e '/LIBS += .*libxkbcommon.a/d'
-
-    export qmakeFlags="$qmakeFlags QT_TDESKTOP_PATH=$PWD/../qt"
-
-    export QMAKE=$PWD/../qt/bin/qmake
-    ( mkdir -p ../Libraries
-      cd ../Libraries
-      for i in $qtSrcs; do
-        tar -xaf $i
-      done
-      cd qtbase-*
-      # This patch is outdated but the fixes doesn't feel very important
-      patch -p1 < ../../$sourceRoot/Telegram/Patches/qtbase_${qtVersion}.diff || true
-      for i in $qtPatches; do
-        patch -p1 < $i
-      done
-      ${qtbase.postPatch}
-      cd ..
-
-      export configureFlags="-prefix "$PWD/../qt" -release -opensource -confirm-license -system-zlib \
-        -system-libpng -system-libjpeg -system-freetype -system-harfbuzz -system-pcre -system-xcb \
-        -system-xkbcommon-x11 -no-opengl -static -nomake examples -nomake tests \
-        -openssl-linked -dbus-linked -system-sqlite -verbose -no-gtkstyle \
-        ${lib.optionalString (!system-x86_64) "-no-sse2"} -no-sse3 -no-ssse3 \
-        -no-sse4.1 -no-sse4.2 -no-avx -no-avx2 -no-mips_dsp -no-mips_dspr2"
-      export dontAddPrefix=1
-      export MAKEFLAGS=-j$NIX_BUILD_CORES
-
-      ( cd qtbase-*
-        configurePhase
-        buildPhase
-        make install
-      )
-
-      ( cd qtimageformats-*
-        $QMAKE
-        buildPhase
-        make install
-      )
-    )
-
-    ( mkdir -p Linux/obj/codegen_style/Debug
-      cd Linux/obj/codegen_style/Debug
-      $QMAKE $qmakeFlags ../../../../Telegram/build/qmake/codegen_style/codegen_style.pro
-      buildPhase
-    )
-    ( mkdir -p Linux/obj/codegen_numbers/Debug
-      cd Linux/obj/codegen_numbers/Debug
-      $QMAKE $qmakeFlags ../../../../Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
-      buildPhase
-    )
-    ( mkdir -p Linux/DebugIntermediateLang
-      cd Linux/DebugIntermediateLang
-      $QMAKE $qmakeFlags ../../Telegram/MetaLang.pro
-      buildPhase
-    )
-
-    ( mkdir -p Linux/ReleaseIntermediate
-      cd Linux/ReleaseIntermediate
-      $QMAKE $qmakeFlags ../../Telegram/Telegram.pro
-      pattern="^PRE_TARGETDEPS +="
-      grep "$pattern" "../../Telegram/Telegram.pro" | sed "s/$pattern//g" | xargs make
-      buildPhase
-    )
-
-    install -Dm755 Linux/Release/Telegram $out/bin/telegram-desktop
-    mkdir -p $out/share/applications $out/share/kde4/services
-    sed "s,/usr/bin,$out/bin,g" $tgaur/telegramdesktop.desktop > $out/share/applications/telegramdesktop.desktop
-    sed "s,/usr/bin,$out/bin,g" $tgaur/tg.protocol > $out/share/kde4/services/tg.protocol
-    for icon_size in 16 32 48 64 128 256 512; do
-      install -Dm644 "Telegram/Resources/art/icon''${icon_size}.png" "$out/share/icons/hicolor/''${icon_size}x''${icon_size}/apps/telegram-desktop.png"
-    done
-
-    fixupPhase
+  postFixup = ''
+    # This is necessary to run Telegram in a pure environment.
+    # We also use gappsWrapperArgs from wrapGAppsHook.
+    wrapProgram $out/bin/telegram-desktop \
+      "''${gappsWrapperArgs[@]}" \
+      "''${qtWrapperArgs[@]}" \
+      --prefix PATH : ${xdg_utils}/bin \
+      --set XDG_RUNTIME_DIR "XDG-RUNTIME-DIR"
+    sed -i $out/bin/telegram-desktop \
+      -e "s,'XDG-RUNTIME-DIR',\"\''${XDG_RUNTIME_DIR:-/run/user/\$(id --user)}\","
   '';
 
-  meta = with stdenv.lib; {
+  meta = {
     description = "Telegram Desktop messaging app";
+    longDescription = ''
+      Desktop client for the Telegram messenger, based on the Telegram API and
+      the MTProto secure protocol.
+    '';
     license = licenses.gpl3;
     platforms = platforms.linux;
     homepage = "https://desktop.telegram.org/";
-    maintainers = with maintainers; [ abbradar garbas ];
+    changelog = "https://github.com/telegramdesktop/tdesktop/releases/tag/v{version}";
+    maintainers = with maintainers; [ primeos abbradar ];
   };
 }

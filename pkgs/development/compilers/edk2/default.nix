@@ -1,71 +1,105 @@
-{ stdenv, fetchgit, libuuid, python2, iasl }:
+{
+  stdenv,
+  clangStdenv,
+  fetchgit,
+  fetchpatch,
+  libuuid,
+  python3,
+  iasl,
+  bc,
+  clang_9,
+  llvmPackages_9,
+  overrideCC,
+  lib,
+}:
 
 let
-  pythonEnv = python2.withPackages(ps: [ps.tkinter]);
+  pythonEnv = python3.withPackages (ps: [ps.tkinter]);
 
 targetArch = if stdenv.isi686 then
   "IA32"
 else if stdenv.isx86_64 then
   "X64"
+else if stdenv.isAarch64 then
+  "AARCH64"
 else
   throw "Unsupported architecture";
 
-edk2 = stdenv.mkDerivation {
-  name = "edk2-2014-12-10";
+buildStdenv = if stdenv.isDarwin then
+  overrideCC clangStdenv [ clang_9 llvmPackages_9.llvm llvmPackages_9.lld ]
+else
+  stdenv;
 
+buildType = if stdenv.isDarwin then
+    "CLANGPDB"
+  else
+    "GCC5";
+
+edk2 = buildStdenv.mkDerivation {
+  pname = "edk2";
+  version = "201911";
+
+  # submodules
   src = fetchgit {
-    url = git://github.com/tianocore/edk2;
-    rev = "684a565a04";
-    sha256 = "0s9ywb8w7xzlnmm4kwzykxkrdaw53b7pky121cc9wjkllzqwyxrb";
+    url = "https://github.com/tianocore/edk2";
+    rev = "edk2-stable${edk2.version}";
+    sha256 = "1rmvb4w043v25cppsqxqrpzqqcay3yrzsrhhzm2q9bncrj56vm8q";
   };
 
-  buildInputs = [ libuuid pythonEnv];
+  buildInputs = [ libuuid pythonEnv ];
 
-  makeFlags = "-C BaseTools";
+  makeFlags = [ "-C BaseTools" ]
+    ++ lib.optional (stdenv.cc.isClang) [ "BUILD_CC=clang BUILD_CXX=clang++ BUILD_AS=clang" ];
+
+  NIX_CFLAGS_COMPILE = "-Wno-return-type" + lib.optionalString (stdenv.cc.isGNU) " -Wno-error=stringop-truncation";
 
   hardeningDisable = [ "format" "fortify" ];
 
   installPhase = ''
     mkdir -vp $out
     mv -v BaseTools $out
-    mv -v EdkCompatibilityPkg $out
     mv -v edksetup.sh $out
   '';
 
-  meta = {
+  enableParallelBuilding = true;
+
+  meta = with lib; {
     description = "Intel EFI development kit";
-    homepage = http://sourceforge.net/projects/edk2/;
-    license = stdenv.lib.licenses.bsd2;
-    platforms = ["x86_64-linux" "i686-linux"];
+    homepage = "https://sourceforge.net/projects/edk2/";
+    license = licenses.bsd2;
+    platforms = [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" ];
   };
 
   passthru = {
-    setup = projectDscPath: attrs: {
-      buildInputs = [ pythonEnv ] ++
-        stdenv.lib.optionals (attrs ? buildInputs) attrs.buildInputs;
+    mkDerivation = projectDscPath: attrs: buildStdenv.mkDerivation ({
+      inherit (edk2) src;
 
-      configurePhase = ''
-        mkdir -v Conf
-        sed -e 's|Nt32Pkg/Nt32Pkg.dsc|${projectDscPath}|' -e \
-          's|MYTOOLS|GCC49|' -e 's|IA32|${targetArch}|' -e 's|DEBUG|RELEASE|'\
-          < ${edk2}/BaseTools/Conf/target.template > Conf/target.txt
-        sed -e 's|DEFINE GCC48_IA32_PREFIX       = /usr/bin/|DEFINE GCC48_IA32_PREFIX       = ""|' \
-          -e 's|DEFINE GCC48_X64_PREFIX        = /usr/bin/|DEFINE GCC48_X64_PREFIX        = ""|' \
-          -e 's|DEFINE UNIX_IASL_BIN           = /usr/bin/iasl|DEFINE UNIX_IASL_BIN           = ${iasl}/bin/iasl|' \
-          < ${edk2}/BaseTools/Conf/tools_def.template > Conf/tools_def.txt
-        export WORKSPACE="$PWD"
-        export EFI_SOURCE="$PWD/EdkCompatibilityPkg"
+      buildInputs = [ bc pythonEnv ] ++ attrs.buildInputs or [];
+
+      prePatch = ''
+        rm -rf BaseTools
         ln -sv ${edk2}/BaseTools BaseTools
-        ln -sv ${edk2}/EdkCompatibilityPkg EdkCompatibilityPkg
-        . ${edk2}/edksetup.sh BaseTools
       '';
 
-      buildPhase = "
-        build
-      ";
+      configurePhase = ''
+        runHook preConfigure
+        export WORKSPACE="$PWD"
+        . ${edk2}/edksetup.sh BaseTools
+        runHook postConfigure
+      '';
 
-      installPhase = "mv -v Build/*/* $out";
-    } // (removeAttrs attrs [ "buildInputs" ] );
+      buildPhase = ''
+        runHook preBuild
+        build -a ${targetArch} -b RELEASE -t ${buildType} -p ${projectDscPath} -n $NIX_BUILD_CORES $buildFlags
+        runHook postBuild
+      '';
+
+      installPhase = ''
+        runHook preInstall
+        mv -v Build/*/* $out
+        runHook postInstall
+      '';
+    } // removeAttrs attrs [ "buildInputs" ]);
   };
 };
 

@@ -1,19 +1,23 @@
 { stdenv, fetchFromGitHub, cmake, boost, curl, leatherman }:
 
 stdenv.mkDerivation rec {
-  name = "cpp-hocon-${version}";
-  version = "0.1.2";
+  pname = "cpp-hocon";
+  version = "0.2.1";
 
   src = fetchFromGitHub {
-    sha256 = "0v2mnak6fh13dkl25lfvw1la2dfjqrh3lq1d40r3a52m56vwflrg";
+    sha256 = "0ar7q3rp46m01wvfa289bxnk9xma3ydc67by7i4nrpz8vamvhwc3";
     rev = version;
     repo = "cpp-hocon";
     owner = "puppetlabs";
   };
 
+  NIX_CFLAGS_COMPILE = "-Wno-error=catch-value";
+
   nativeBuildInputs = [ cmake ];
 
   buildInputs = [ boost curl leatherman ];
+
+  enableParallelBuilding = true;
 
   meta = with stdenv.lib; {
     inherit (src.meta) homepage;

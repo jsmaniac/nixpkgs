@@ -1,7 +1,7 @@
 { stdenv, lib, fetchurl, ncurses }:
 
 stdenv.mkDerivation rec {
-  name = "ht-${version}";
+  pname = "ht";
   version = "2.1.0";
 
   src = fetchurl {
@@ -14,6 +14,8 @@ stdenv.mkDerivation rec {
   ];
 
   hardeningDisable = [ "format" ];
+
+  patches = [ ./gcc7.patch ];
 
   meta = with lib; {
     description = "File editor/viewer/analyzer for executables";

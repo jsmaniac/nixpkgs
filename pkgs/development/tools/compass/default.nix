@@ -1,18 +1,17 @@
-{ stdenv, lib, bundlerEnv, ruby }:
+{ lib, bundlerApp, bundlerUpdateScript }:
 
-bundlerEnv {
-  name = "compass-1.0.3";
+bundlerApp {
+  pname = "compass";
+  gemdir = ./.;
+  exes = [ "compass" ];
 
-  inherit ruby;
-  gemfile = ./Gemfile;
-  lockfile = ./Gemfile.lock;
-  gemset = ./gemset.nix;
+  passthru.updateScript = bundlerUpdateScript "compass";
 
   meta = with lib; {
     description = "Stylesheet Authoring Environment that makes your website design simpler to implement and easier to maintain";
-    homepage    = https://github.com/Compass/compass;
+    homepage    = "https://github.com/Compass/compass";
     license     = with licenses; mit;
-    maintainers = with maintainers; [ offline ];
+    maintainers = with maintainers; [ offline manveru nicknovitski ];
     platforms   = platforms.unix;
   };
 }

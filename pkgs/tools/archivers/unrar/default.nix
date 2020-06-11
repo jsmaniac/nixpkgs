@@ -1,16 +1,19 @@
 {stdenv, fetchurl}:
 
 stdenv.mkDerivation rec {
-  name = "unrar-${version}";
-  version = "5.4.5";
+  pname = "unrar";
+  version = "5.9.2";
 
   src = fetchurl {
-    url = "http://www.rarlab.com/rar/unrarsrc-${version}.tar.gz";
-    sha256 = "0v3rz2245bp2nh4115ysqv34vqlrpln9y11fnlzqj8i46f2caw74";
+    url = "https://www.rarlab.com/rar/unrarsrc-${version}.tar.gz";
+    sha256 = "19nsxdvf9ll99hvgzq6f89ymxhwki224lygjdabrg8ghikqvmlvk";
   };
 
   postPatch = ''
-    sed 's/^CXX=g++/#CXX/' -i makefile
+    substituteInPlace makefile \
+      --replace "CXX=" "#CXX=" \
+      --replace "STRIP=" "#STRIP=" \
+      --replace "AR=" "#AR="
   '';
 
   buildPhase = ''
@@ -18,6 +21,8 @@ stdenv.mkDerivation rec {
     make clean
     make lib
   '';
+
+  outputs = [ "out" "dev" ];
 
   installPhase = ''
     install -Dt "$out/bin" unrar
@@ -27,14 +32,15 @@ stdenv.mkDerivation rec {
         $out/share/doc/unrar
 
     install -Dm755 libunrar.so $out/lib/libunrar.so
-    install -D dll.hpp $out/include/unrar/dll.hpp
+
+    install -Dt $dev/include/unrar/ *.hpp
   '';
 
   setupHook = ./setup-hook.sh;
 
   meta = with stdenv.lib; {
     description = "Utility for RAR archives";
-    homepage = http://www.rarlab.com/;
+    homepage = "https://www.rarlab.com/";
     license = licenses.unfreeRedistributable;
     maintainers = [ maintainers.ehmry ];
     platforms = platforms.all;

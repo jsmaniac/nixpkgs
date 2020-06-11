@@ -10,6 +10,7 @@ in
   options = {
     services.uptimed = {
       enable = mkOption {
+        type = types.bool;
         default = false;
         description = ''
           Enable <literal>uptimed</literal>, allowing you to track
@@ -20,7 +21,7 @@ in
   };
 
   config = mkIf cfg.enable {
-    users.extraUsers.uptimed = {
+    users.users.uptimed = {
       description = "Uptimed daemon user";
       home        = stateDir;
       createHome  = true;

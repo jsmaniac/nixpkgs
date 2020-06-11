@@ -1,80 +1,64 @@
-{ stdenv, fetchgit, fetchurl, python, ninja, libevent, xdg-user-dirs }:
+{ stdenv, lib, fetchgit, darwin, writeText
+, ninja, python3
+}:
 
 let
-  date = "20161008";
+  # Note: Please use the recommended version for Chromium, e.g.:
+  # https://git.archlinux.org/svntogit/packages.git/tree/trunk/chromium-gn-version.sh?h=packages/gn
+  rev = "fd3d768bcfd44a8d9639fe278581bd9851d0ce3a";
+  revNum = "1718"; # git describe HEAD --match initial-commit | cut -d- -f3
+  version = "2020-03-09";
+  sha256 = "1asc14y8by7qcn10vbk467hvx93s30pif8r0brissl0sihsaqazr";
 
-  sourceTree = {
-    "src/base" = {
-      rev = "e71a514e60b085cc92bf6ef951ec329f52c79f9f";
-      sha256 = "0zycbssmd2za0zij8czcs1fr66fi12f1g5ysc8fzkf8khbs5h6a9";
-    };
-    "src/build" = {
-      rev = "17093d45bf738e9ae4b6294492860ee65218a657";
-      sha256 = "0i9py78c3f46sc789qvdhmgjgyrghysbqjgr67iypwphw52jv2dz";
-    };
-    "src/tools/gn" = {
-      rev = "9ff32cf3f1f4ad0212ac674b6303e7aa68f44f3f";
-      sha256 = "14jr45k5fgcqk9d18fd77sijlqavvnv0knndh74zyb0b60464hz1";
-    };
-    "testing/gtest" = {
-      rev = "585ec31ea716f08233a815e680fc0d4699843938";
-      sha256 = "0csn1cza66851nmxxiw42smsm3422mx67vcyykwn0a71lcjng6rc";
-    };
-  };
+  revShort = builtins.substring 0 7 rev;
+  lastCommitPosition = writeText "last_commit_position.h" ''
+    #ifndef OUT_LAST_COMMIT_POSITION_H_
+    #define OUT_LAST_COMMIT_POSITION_H_
 
-  mkDepend = path: attrs: fetchgit {
-    url = "https://chromium.googlesource.com/chromium/${path}";
-    inherit (attrs) rev sha256;
-  };
+    #define LAST_COMMIT_POSITION_NUM ${revNum}
+    #define LAST_COMMIT_POSITION "${revNum} (${revShort})"
 
-in stdenv.mkDerivation rec {
-  name = "gn-${version}";
-  version = "0.0.0.${date}";
-
-  unpackPhase = ''
-    ${with stdenv.lib; concatStrings (mapAttrsToList (path: sha256: ''
-      dest=source/${escapeShellArg (removePrefix "src/" path)}
-      mkdir -p "$(dirname "$dest")"
-      cp --no-preserve=all -rT ${escapeShellArg (mkDepend path sha256)} "$dest"
-    '') sourceTree)}
-    ( mkdir -p source/third_party
-      cd source/third_party
-      unpackFile ${xdg-user-dirs.src}
-      mv * xdg_user
-    )
+    #endif  // OUT_LAST_COMMIT_POSITION_H_
   '';
 
-  sourceRoot = "source";
+in stdenv.mkDerivation {
+  pname = "gn-unstable";
+  inherit version;
 
-  postPatch = ''
-    # GN's bootstrap script relies on shebangs (which are relying on FHS paths),
-    # except when on Windows. So instead of patchShebang-ing it, let's just
-    # force the same behaviour as on Windows.
-    sed -i -e '/^def  *check_call/,/^[^ ]/ {
-      s/is_win/True/
-    }' tools/gn/bootstrap/bootstrap.py
+  src = fetchgit {
+    # Note: The TAR-Archives (+archive/${rev}.tar.gz) are not deterministic!
+    url = "https://gn.googlesource.com/gn";
+    inherit rev sha256;
+  };
 
-    # Patch out Chromium-bundled libevent and xdg_user_dirs
-    sed -i -e '/static_libraries.*libevent/,/^ *\]\?[})]$/d' \
-      tools/gn/bootstrap/bootstrap.py
-  '';
+  nativeBuildInputs = [ ninja python3 ];
+  buildInputs = lib.optionals stdenv.isDarwin (with darwin; with apple_sdk.frameworks; [
+    libobjc
+    cctools
 
-  NIX_LDFLAGS = "-levent";
-
-  nativeBuildInputs = [ python ninja ];
-  buildInputs = [ libevent ];
+    # frameworks
+    ApplicationServices
+    Foundation
+    AppKit
+  ]);
 
   buildPhase = ''
-    python tools/gn/bootstrap/bootstrap.py -v -s --no-clean
+    python build/gen.py --no-last-commit-position
+    ln -s ${lastCommitPosition} out/last_commit_position.h
+    ninja -j $NIX_BUILD_CORES -C out gn
   '';
 
   installPhase = ''
-    install -vD out_bootstrap/gn "$out/bin/gn"
+    install -vD out/gn "$out/bin/gn"
   '';
 
-  meta = {
-    description = "A meta-build system that generates NinjaBuild files";
-    homepage = "https://chromium.googlesource.com/chromium/src/tools/gn/";
-    license = stdenv.lib.licenses.bsd3;
+  setupHook = ./setup-hook.sh;
+
+  meta = with lib; {
+    description = "A meta-build system that generates build files for Ninja";
+    homepage = "https://gn.googlesource.com/gn";
+    license = licenses.bsd3;
+    platforms = platforms.unix;
+    maintainers = with maintainers; [ stesie matthewbauer ];
   };
 }

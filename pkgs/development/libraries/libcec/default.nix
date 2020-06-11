@@ -1,16 +1,19 @@
-{ stdenv, fetchurl, cmake, pkgconfig, udev, libcec_platform }:
+{ stdenv, fetchurl, cmake, pkgconfig, udev, libcec_platform, libraspberrypi ? null }:
 
-let version = "3.0.1"; in
+let version = "4.0.5"; in
 
 stdenv.mkDerivation {
-  name = "libcec-${version}";
+  pname = "libcec";
+  inherit version;
 
   src = fetchurl {
     url = "https://github.com/Pulse-Eight/libcec/archive/libcec-${version}.tar.gz";
-    sha256 = "0gi5gq8pz6vfdx80pimx23d5g243zzgmc7s8wpb686csjk470dky";
+    sha256 = "0hvp33mq0kg544hw20aq3vy5lxf5zid6gxm3qdga7wxw1r1lkmz4";
   };
 
-  buildInputs = [ cmake pkgconfig udev libcec_platform ];
+  nativeBuildInputs = [ pkgconfig cmake ];
+  buildInputs = [ udev libcec_platform ] ++
+    stdenv.lib.optional (libraspberrypi != null) libraspberrypi;
 
   cmakeFlags = [ "-DBUILD_SHARED_LIBS=1" ];
 

@@ -3,7 +3,7 @@
 stdenv.mkDerivation {
   name = "unclutter-8";
   src = fetchurl {
-    url = http://www.ibiblio.org/pub/X11/contrib/utilities/unclutter-8.tar.gz;
+    url = "https://www.ibiblio.org/pub/X11/contrib/utilities/unclutter-8.tar.gz";
     sha256 = "33a78949a7dedf2e8669ae7b5b2c72067896497820292c96afaa60bb71d1f2a6";
   };
 
@@ -32,5 +32,6 @@ stdenv.mkDerivation {
     '';
     maintainers = with maintainers; [ domenkozar ];
     platforms = platforms.unix;
+    license = stdenv.lib.licenses.publicDomain;
   };
 }

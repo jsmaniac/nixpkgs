@@ -2,12 +2,12 @@
 , ncurses, libdrm, libpciaccess, libxcb }:
 
 stdenv.mkDerivation rec {
-  name = "radeontop-${version}";
-  version = "2016-07-04";
+  pname = "radeontop";
+  version = "2019-06-03";
 
   src = fetchFromGitHub {
-    sha256 = "07pj5c3shnxljwq0hkksw7qnp8kb3n5ngihdmi4fqbmyz8in2vm5";
-    rev = "bb3ed18aa8877f2816348ca9f016bb61d67e636f";
+    sha256 = "1b1m30r2nfwqkajqw6m01xmfhlq83z1qylyijxg7962mp9x2k0gw";
+    rev = "v1.2";
     repo = "radeontop";
     owner = "clbr";
   };
@@ -37,9 +37,9 @@ stdenv.mkDerivation rec {
       is also valid for OpenCL loads; the other blocks are only useful for GL
       loads. Requires root rights or other permissions to read /dev/mem.
     '';
-    homepage = https://github.com/clbr/radeontop;
+    homepage = "https://github.com/clbr/radeontop";
     platforms = platforms.linux;
     license = licenses.gpl3;
-    maintainers = with maintainers; [ rycee nckx ];
+    maintainers = with maintainers; [ rycee ];
   };
 }

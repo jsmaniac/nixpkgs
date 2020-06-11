@@ -1,16 +1,16 @@
-{ stdenv, fetchurl, python }:
+{ stdenv, fetchurl, python2 }:
 stdenv.mkDerivation rec {
 
-  name = "omniorb-${version}";
+  pname = "omniorb";
 
-  version = "4.2.0";
+  version = "4.2.4";
 
-  src = fetchurl rec {
+  src = fetchurl {
     url = "mirror://sourceforge/project/omniorb/omniORB/omniORB-${version}/omniORB-${version}.tar.bz2";
-    sha256 = "1g58xcw4641wyisp9wscrkzaqrz0vf123dgy52qq2a3wk7y77hkl";
+    sha256 = "0vvsvi5nx4k7kk4qh1pkf3f5fpz7wv4rsdna4hayihbnvz81rh18";
   };
 
-  buildInputs = [ python ];
+  buildInputs = [ python2 ];
 
   hardeningDisable = [ "format" ];
 

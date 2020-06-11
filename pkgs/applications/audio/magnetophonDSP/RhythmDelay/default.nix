@@ -1,6 +1,6 @@
 { stdenv, fetchFromGitHub, faust2jaqt, faust2lv2 }:
 stdenv.mkDerivation rec {
-  name = "RhythmDelay-${version}";
+  pname = "RhythmDelay";
   version = "2.1";
 
   src = fetchFromGitHub {
@@ -14,7 +14,6 @@ stdenv.mkDerivation rec {
 
   buildPhase = ''
     faust2jaqt -time -vec -t 99999 RhythmDelay.dsp
-    sed -i "s|\[ *scale *: *log *\]||g ; s|\btgroup\b|hgroup|g" "RhythmDelay.dsp"
     faust2lv2  -time -vec -t 99999 -gui RhythmDelay.dsp
   '';
 
@@ -27,7 +26,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Tap a rhythm into your delay! For jack and lv2";
-    homepage = https://github.com/magnetophon/RhythmDelay;
+    homepage = "https://github.com/magnetophon/RhythmDelay";
     license = stdenv.lib.licenses.gpl3;
     maintainers = [ stdenv.lib.maintainers.magnetophon ];
   };

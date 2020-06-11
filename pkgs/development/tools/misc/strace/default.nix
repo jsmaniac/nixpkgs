@@ -1,23 +1,32 @@
-{ stdenv, fetchurl, perl, libunwind }:
+{ stdenv, fetchurl, perl, libunwind, buildPackages }:
 
 stdenv.mkDerivation rec {
-  name = "strace-${version}";
-  version = "4.13";
+  pname = "strace";
+  version = "5.7";
 
   src = fetchurl {
-    url = "mirror://sourceforge/strace/${name}.tar.xz";
-    sha256 = "d48f732576c91ece36a5843d63f9be054c40ef59f1e4773986042636861625d7";
+    url = "https://strace.io/files/${version}/${pname}-${version}.tar.xz";
+    sha256 = "1n6cfz3i2krkyvxpdp3kmxhf7sy5xp0danzaiirbk5fdkfgvb15j";
   };
 
+  depsBuildBuild = [ buildPackages.stdenv.cc ];
   nativeBuildInputs = [ perl ];
 
-  buildInputs = [ libunwind ]; # support -k
+  buildInputs = stdenv.lib.optional libunwind.supportsHost libunwind; # support -k
+
+  postPatch = "patchShebangs strace-graph";
+
+  configureFlags = stdenv.lib.optional (!stdenv.hostPlatform.isx86) "--enable-mpers=check";
+
+  # fails 1 out of 523 tests with
+  # "strace-k.test: failed test: ../../strace -e getpid -k ../stack-fcall output mismatch"
+  doCheck = false;
 
   meta = with stdenv.lib; {
-    homepage = http://strace.sourceforge.net/;
+    homepage = "https://strace.io/";
     description = "A system call tracer for Linux";
-    license = licenses.bsd3;
+    license =  with licenses; [ lgpl21Plus gpl2Plus ]; # gpl2Plus is for the test suite
     platforms = platforms.linux;
-    maintainers = with maintainers; [ mornfall jgeerds globin ];
+    maintainers = with maintainers; [ globin ];
   };
 }

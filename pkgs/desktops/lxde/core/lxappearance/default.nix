@@ -1,22 +1,42 @@
-{ stdenv, fetchurl, intltool, pkgconfig, libX11, gtk2 }:
+{ stdenv
+, fetchurl
+, intltool
+, pkg-config
+, libX11
+, gtk2
+, gtk3
+, withGtk3 ? true
+}:
 
 stdenv.mkDerivation rec {
-  name = "lxappearance-0.6.2";
+  name = "lxappearance-0.6.3";
 
-  src = fetchurl{
+  src = fetchurl {
     url = "mirror://sourceforge/project/lxde/LXAppearance/${name}.tar.xz";
-    sha256 = "07r0xbi6504zjnbpan7zrn7gi4j0kbsqqfpj8v2x94gr05p16qj4";
+    sha256 = "0f4bjaamfxxdr9civvy55pa6vv9dx1hjs522gjbbgx7yp1cdh8kj";
   };
 
-  nativeBuildInputs = [ pkgconfig intltool ];
+  nativeBuildInputs = [
+    pkg-config
+    intltool
+  ];
 
-  buildInputs = [ libX11 gtk2 ];
+  buildInputs = [
+    libX11
+    (if withGtk3 then gtk3 else gtk2)
+  ];
 
-  meta = {
-    description = "A lightweight program for configuring the theme and fonts of gtk applications";
-    maintainers = [ stdenv.lib.maintainers.hinton ];
-    platforms = stdenv.lib.platforms.all;
-    license = stdenv.lib.licenses.gpl2;
-    homepage = "http://lxde.org/";
+  patches = [
+    ./lxappearance-0.6.3-xdg.system.data.dirs.patch
+  ];
+
+  configureFlags = stdenv.lib.optional withGtk3 "--enable-gtk3";
+
+  meta = with stdenv.lib; {
+    description = "Lightweight program for configuring the theme and fonts of gtk applications";
+    homepage = "https://lxde.org/";
+    license = licenses.gpl2;
+    platforms = platforms.linux;
+    maintainers = with maintainers; [ hinton romildo ];
   };
 }

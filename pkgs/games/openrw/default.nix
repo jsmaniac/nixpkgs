@@ -1,20 +1,26 @@
-{ stdenv, fetchgit, cmake, sfml, mesa, bullet, glm, libmad, x11 }:
+{ stdenv, fetchgit, cmake, sfml, libGLU, libGL, bullet, glm, libmad, xlibsWrapper, openal
+, SDL2, boost, ffmpeg, Cocoa, OpenAL }:
 
-stdenv.mkDerivation rec {
-  version = "2016-06-29";
-  name = "openrw-${version}";
+stdenv.mkDerivation {
+  version = "2019-10-26";
+  pname = "openrw";
+
   src = fetchgit {
     url = "https://github.com/rwengine/openrw";
-    rev = "46a7254a41d9f6e1eda8d31e742de492abb2540e";
-    sha256 = "16ip9779dy59xcj9src2i4zp8jq2h0h5mb4a7d5cpkhd3xlcpabm";
+    rev = "51b7264744d1aaa20de3b86a7a4e92a9930881ba";
+    sha256 = "04s088wfxkfmb4dxdvad611yxj8smxlnxdm5xy81zldfzybvx8dg";
     fetchSubmodules = true;
   };
 
-  buildInputs = [ cmake sfml mesa bullet glm libmad x11 ];
+  nativeBuildInputs = [ cmake ];
+
+  buildInputs = [
+    sfml libGLU libGL bullet glm libmad xlibsWrapper openal SDL2 boost ffmpeg
+  ] ++ stdenv.lib.optionals stdenv.isDarwin [ OpenAL Cocoa ];
 
   meta = with stdenv.lib; {
     description = "Unofficial open source recreation of the classic Grand Theft Auto III game executable";
-    homepage = https://github.com/rwengine/openrw;
+    homepage = "https://github.com/rwengine/openrw";
     license = licenses.gpl3;
     longDescription = ''
       OpenRW is an open source re-implementation of Rockstar Games' Grand Theft

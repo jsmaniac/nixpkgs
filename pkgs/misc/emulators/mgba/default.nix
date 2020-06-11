@@ -1,24 +1,45 @@
-{ stdenv, fetchFromGitHub
-, pkgconfig, cmake, libzip, epoxy, ffmpeg, imagemagick, SDL2
-, qtbase, qtmultimedia }:
+{ stdenv, fetchFromGitHub, makeDesktopItem, wrapQtAppsHook, pkgconfig
+, cmake, epoxy, libzip, libelf, libedit, ffmpeg, SDL2, imagemagick
+, qtbase, qtmultimedia, qttools, minizip }:
 
-stdenv.mkDerivation rec {
-  name = "mgba-${version}";
-  version = "0.5.1";
+let
+  desktopItem = makeDesktopItem {
+    name = "mgba";
+    exec = "mgba-qt";
+    icon = "mgba";
+    comment = "A Game Boy Advance Emulator";
+    desktopName = "mgba";
+    genericName = "Game Boy Advance Emulator";
+    categories = "Game;Emulator;";
+    startupNotify = "false";
+  };
+in stdenv.mkDerivation rec {
+  pname = "mgba";
+  version = "0.8.1";
 
   src = fetchFromGitHub {
     owner = "mgba-emu";
     repo = "mgba";
     rev = version;
-    sha256 = "1ysxyy888qdwjbgsh3xdzsx8f3a5yd1gqx54xvndpv9v3zqgr2jf";
+    sha256 = "1if82mfaak3696w5d5yshynpzywrxgvg3ifdfi2rwlpvq1gpd429";
   };
 
-  nativeBuildInputs = [ pkgconfig cmake ];
-  buildInputs = [ libzip epoxy ffmpeg imagemagick SDL2 qtbase qtmultimedia ];
+  enableParallelBuilding = true;
+  nativeBuildInputs = [ wrapQtAppsHook pkgconfig cmake ];
+
+  buildInputs = [
+    epoxy libzip libelf libedit ffmpeg SDL2 imagemagick
+    qtbase qtmultimedia qttools minizip
+  ];
+
+  postInstall = ''
+    cp -r ${desktopItem}/share/applications $out/share
+  '';
 
   meta = with stdenv.lib; {
-    homepage = https://mgba.io;
+    homepage = "https://mgba.io";
     description = "A modern GBA emulator with a focus on accuracy";
+
     longDescription = ''
       mGBA is a new Game Boy Advance emulator written in C.
 
@@ -34,8 +55,9 @@ stdenv.mkDerivation rec {
       for tool-assist runners, and a modern feature set for emulators
       that older emulators may not support.
     '';
+
     license = licenses.mpl20;
     maintainers = with maintainers; [ MP2E AndersonTorres ];
-    platforms = with platforms; linux;
+    platforms = platforms.linux;
   };
 }

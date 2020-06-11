@@ -1,14 +1,14 @@
 { stdenv, fetchFromGitHub, cmake }:
 
 stdenv.mkDerivation rec {
-  version = "1.2.0";
-  name = "Vc-${version}";
+  pname = "Vc";
+  version = "1.4.1";
 
   src = fetchFromGitHub {
     owner = "VcDevel";
     repo = "Vc";
     rev = version;
-    sha256 = "0qlfvcxv3nmf5drz5bc9kynaljr513pbn7snwgvghm150skmkpfl";
+    sha256 = "09nf6j1hyq2yv0c1cmnv4ff5243ylsajy1xj3dz8c2qqcm14y6cm";
   };
 
   nativeBuildInputs = [ cmake ];
@@ -24,7 +24,7 @@ stdenv.mkDerivation rec {
     description = "Library for multiprecision complex arithmetic with exact rounding";
     homepage = "https://github.com/VcDevel/Vc";
     license = licenses.bsd3;
-    platforms = [ "x86_64-linux" "x86_64-darwin" ];
+    platforms = platforms.all;
     maintainers = with maintainers; [ abbradar ];
   };
 }

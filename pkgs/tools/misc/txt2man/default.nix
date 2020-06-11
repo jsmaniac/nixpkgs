@@ -1,11 +1,12 @@
 { stdenv, fetchurl, coreutils, gawk }:
 
 stdenv.mkDerivation rec {
-  name = "txt2man-1.5.6";
+  pname = "txt2man";
+  version = "1.6.0";
 
   src = fetchurl {
-    url = "http://mvertes.free.fr/download/${name}.tar.gz";
-    sha256 = "0ammlb4pwc4ya1kc9791vjl830074zrpfcmzc18lkcqczp2jaj4q";
+    url = "https://github.com/mvertes/txt2man/archive/${pname}-${version}.tar.gz";
+    sha256 = "168cj96974n2z0igin6j1ic1m45zyic7nm5ark7frq8j78rrx4zn";
   };
 
   preConfigure = ''
@@ -34,7 +35,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Convert flat ASCII text to man page format";
-    homepage = http://mvertes.free.fr/;
+    homepage = "http://mvertes.free.fr/";
     license = stdenv.lib.licenses.gpl2;
     platforms = with stdenv.lib.platforms; linux ++ darwin;
     maintainers = with stdenv.lib.maintainers; [ bjornfor ];

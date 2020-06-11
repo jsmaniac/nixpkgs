@@ -55,7 +55,7 @@ stdenv.mkDerivation rec {
 
   name = "brgenml1cupswrapper-3.1.0-1";
   src = fetchurl {
-    url = "http://download.brother.com/welcome/dlf101125/${name}.i386.deb";
+    url = "https://download.brother.com/welcome/dlf101125/${name}.i386.deb";
     sha256 = "0kd2a2waqr10kfv1s8is3nd5dlphw4d1343srdsbrlbbndja3s6r";
   };
 
@@ -116,7 +116,7 @@ stdenv.mkDerivation rec {
 
   meta = {
     description = "Brother BrGenML1 CUPS wrapper driver";
-    homepage = http://www.brother.com;
+    homepage = "http://www.brother.com";
     platforms = stdenv.lib.platforms.linux;
     license = stdenv.lib.licenses.gpl2Plus;
     maintainers = with stdenv.lib.maintainers; [ jraygauthier ];

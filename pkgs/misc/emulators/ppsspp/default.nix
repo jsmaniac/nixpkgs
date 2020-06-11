@@ -1,37 +1,69 @@
-{ stdenv, fetchgit, zlib, libpng, qt4, qmake4Hook, pkgconfig
-, withGamepads ? true, SDL # SDL is used for gamepad functionality
+{ SDL2
+, cmake
+, fetchFromGitHub
+, ffmpeg
+, glew
+, lib
+, libzip
+, mkDerivation
+, pkgconfig
+, python3
+, qtbase
+, qtmultimedia
+, snappy
+, zlib
 }:
 
-assert withGamepads -> (SDL != null);
+mkDerivation rec {
+  pname = "ppsspp";
+  version = "1.9.4";
 
-let
-  version = "1.1.0";
-  fstat = x: fn: "-D" + fn + "=" + (if x then "ON" else "OFF");
-in
-with stdenv.lib;
-stdenv.mkDerivation rec{
-  name = "PPSSPP-${version}";
-
-  src = fetchgit {
-    url = "https://github.com/hrydgard/ppsspp.git";
-    rev = "8c8e5de89d52b8bcb968227d96cbf049d04d1241";
+  src = fetchFromGitHub {
+    owner = "hrydgard";
+    repo = "ppsspp";
+    rev = "v${version}";
     fetchSubmodules = true;
-    sha256 = "1q21qskzni0nvz2yi2m17gjh4i9nrs2l4fm4y2dww9m29xpvzw3x";
+    sha256 = "0ivi0dcfxwa4nz19amki80qacnjhqr42f0ihyby1scxafl3nq55c";
   };
 
-  buildInputs = [ zlib libpng pkgconfig qt4 qmake4Hook ]
-                ++ (if withGamepads then [ SDL ] else [ ]);
+  postPatch = ''
+    substituteInPlace git-version.cmake \
+      --replace unknown ${src.rev}
+    substituteInPlace UI/NativeApp.cpp \
+      --replace /usr/share $out/share
+  '';
 
-  qmakeFlags = [ "PPSSPPQt.pro" ];
+  nativeBuildInputs = [ cmake pkgconfig python3 ];
 
-  preConfigure = "cd Qt";
-  installPhase = "mkdir -p $out/bin && cp ppsspp $out/bin";
+  buildInputs = [
+    SDL2
+    ffmpeg
+    glew
+    libzip
+    qtbase
+    qtmultimedia
+    snappy
+    zlib
+  ];
 
-  meta = {
-    homepage = "http://www.ppsspp.org/";
-    description = "A PSP emulator, the Qt4 version";
+  cmakeFlags = [
+    "-DOpenGL_GL_PREFERENCE=GLVND"
+    "-DUSE_SYSTEM_FFMPEG=ON"
+    "-DUSE_SYSTEM_LIBZIP=ON"
+    "-DUSE_SYSTEM_SNAPPY=ON"
+    "-DUSING_QT_UI=ON"
+  ];
+
+  installPhase = ''
+    mkdir -p $out/share/ppsspp
+    install -Dm555 PPSSPPQt $out/bin/ppsspp
+    mv assets $out/share/ppsspp
+  '';
+
+  meta = with lib; {
+    description = "A PSP emulator for Android, Windows, Mac and Linux, written in C++";
+    homepage = "https://www.ppsspp.org/";
     license = licenses.gpl2Plus;
-    maintainers = [ maintainers.fuuzetsu maintainers.AndersonTorres ];
-    platforms = platforms.linux ++ platforms.darwin ++ platforms.cygwin;
+    maintainers = with maintainers; [ AndersonTorres ];
   };
 }

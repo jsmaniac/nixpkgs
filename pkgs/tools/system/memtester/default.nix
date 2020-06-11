@@ -1,8 +1,13 @@
 { stdenv, fetchurl }:
 
 stdenv.mkDerivation rec {
-  name = "memtester-${version}";
+  pname = "memtester";
   version = "4.3.0";
+
+  preConfigure = ''
+    echo "$CC" > conf-cc
+    echo "$CC" > conf-ld
+  '';
 
   src = fetchurl {
     url = "http://pyropus.ca/software/memtester/old-versions/memtester-${version}.tar.gz";
@@ -13,7 +18,7 @@ stdenv.mkDerivation rec {
 
   meta = with stdenv.lib; {
     description = "A userspace utility for testing the memory subsystem for faults";
-    homepage = http://pyropus.ca/software/memtester/;
+    homepage = "http://pyropus.ca/software/memtester/";
     license = licenses.gpl2;
     maintainers = [ maintainers.dezgeg ];
     platforms = platforms.unix;

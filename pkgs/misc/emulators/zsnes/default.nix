@@ -1,4 +1,4 @@
-{stdenv, fetchFromGitHub, nasm, SDL, zlib, libpng, ncurses, mesa
+{stdenv, fetchFromGitHub, nasm, SDL, zlib, libpng, ncurses, libGLU, libGL
 , makeDesktopItem }:
 
 let
@@ -22,7 +22,7 @@ in stdenv.mkDerivation {
     sha256 = "1gy79d5wdaacph0cc1amw7mqm7i0716n6mvav16p1svi26iz193v";
   };
 
-  buildInputs = [ nasm SDL zlib libpng ncurses mesa ];
+  buildInputs = [ nasm SDL zlib libpng ncurses libGLU libGL ];
 
   prePatch = ''
     for i in $(cat debian/patches/series); do
@@ -34,6 +34,7 @@ in stdenv.mkDerivation {
   preConfigure = ''
     cd src
     sed -i "/^STRIP/d" configure
+    sed -i "/\$STRIP/d" configure
   '';
 
   configureFlags = [ "--enable-release" ];
@@ -56,7 +57,7 @@ in stdenv.mkDerivation {
     description = "A Super Nintendo Entertainment System Emulator";
     license = stdenv.lib.licenses.gpl2Plus;
     maintainers = [ stdenv.lib.maintainers.sander ];
-    homepage = http://www.zsnes.com;
-    platforms = stdenv.lib.platforms.unix;
+    homepage = "http://www.zsnes.com";
+    platforms = [ "i686-linux" "x86_64-linux" ];
   };
 }

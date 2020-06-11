@@ -1,28 +1,32 @@
 { stdenv, fetchgit, pkgconfig, pidgin, libwebp, libgcrypt, gettext } :
 
 let
-  version = "2016-03-17";
+  version = "1.3.1";
 in
 stdenv.mkDerivation rec {
-  name = "telegram-purple-${version}";
+  pname = "telegram-purple";
+  inherit version;
 
   src = fetchgit {
     url = "https://github.com/majn/telegram-purple";
-    rev = "ee2a6fb740fe9580336e4af9a153b845bc715927";
-    sha256 = "0pxaj95b6nzy73dckpr3v4nljyijkx71vmnp9dcj48d22pvy0nyf";
+    rev = "v${version}";
+    sha256 = "0p93jpjpx7hszwffzgixw04zkrpsiyzz4za3gfr4j07krc4771fp";
   };
+
+  NIX_CFLAGS_COMPILE = "-Wno-error=cast-function-type";
 
   nativeBuildInputs = [ pkgconfig ];
   buildInputs = [ pidgin libwebp libgcrypt gettext ];
 
   preConfigure = ''
-    sed -i "s|/etc/telegram-purple/server.tglpub|$out/lib/pidgin/server.tglpub|g" telegram-purple.c
+    sed -i "s|/etc/telegram-purple/server.tglpub|$out/lib/purple-2/server.tglpub|g" telegram-purple.c
+    echo "#define GIT_COMMIT \"${builtins.substring 0 10 src.rev}\"" > commit.h
   '';
 
   installPhase = ''
-    mkdir -p $out/lib/pidgin/
-    cp bin/*.so $out/lib/pidgin/ #*/
-    cp tg-server.tglpub $out/lib/pidgin/server.tglpub
+    mkdir -p $out/lib/purple-2/
+    cp bin/*.so $out/lib/purple-2/ #*/
+    cp tg-server.tglpub $out/lib/purple-2/server.tglpub
     mkdir -p $out/pixmaps/pidgin/protocols/{16,22,48}
     cp imgs/telegram16.png $out/pixmaps/pidgin/protocols/16
     cp imgs/telegram22.png $out/pixmaps/pidgin/protocols/22
@@ -30,7 +34,7 @@ stdenv.mkDerivation rec {
   '';
 
   meta = with stdenv.lib; {
-    homepage = https://github.com/majn/telegram-purple;
+    homepage = "https://github.com/majn/telegram-purple";
     description = "Telegram for Pidgin / libpurple";
     license = licenses.gpl2;
     maintainers = [ maintainers.jagajaga ];
